@@ -1,7 +1,8 @@
-import { Box, Container } from '@mui/material';
+import { Box } from '@mui/material';
 import { Outlet } from 'react-router';
 import AppTopNav from '../navigation/AppTopNav';
 import { AppFooter } from './AppFooter';
+import { AppContainer } from './AppContainer';
 
 export function PrivateLayout() {
   return (
@@ -17,9 +18,9 @@ export function PrivateLayout() {
       <AppTopNav />
 
       <Box component='main' sx={{ flex: 1 }}>
-        <Container maxWidth='lg' sx={{ py: { xs: 3, sm: 4, md: 5 } }}>
+        <AppContainer>
           <Outlet />
-        </Container>
+        </AppContainer>
       </Box>
       <AppFooter />
     </Box>
