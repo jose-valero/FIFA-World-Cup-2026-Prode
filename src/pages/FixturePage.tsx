@@ -21,7 +21,7 @@ import {
 import { getMatches } from '../features/matches/matches.api';
 import type { Match } from '../features/matches/types';
 import { KnockoutBracket } from '../features/tournament/components/KnockoutBracket';
-import { mockKnockoutMatches } from '../features/tournament/mockKnockoutMatches';
+import { buildProjectedKnockoutMatches } from '../features/tournament/buildProjectedKnockoutMatches';
 type FixtureViewMode = 'group_stage' | 'knockout';
 
 type ClientGroupStandingRow = {
@@ -78,30 +78,16 @@ function sortMatches(matches: Match[]) {
 }
 
 function getInitialFixtureView(matches: Match[]): FixtureViewMode {
-  if (matches.length === 0) return 'group_stage';
+  const groupStageMatches = matches.filter((match) => match.stage === 'group_stage');
 
-  const now = Date.now();
-
-  const relevantMatches = [...matches].sort(
-    (a, b) => new Date(a.kickoffAt).getTime() - new Date(b.kickoffAt).getTime()
-  );
-
-  const currentOrNextMatch =
-    relevantMatches.find((match) => match.status === 'live' || new Date(match.kickoffAt).getTime() >= now) ?? null;
-
-  if (currentOrNextMatch) {
-    return currentOrNextMatch.stage === 'group_stage' ? 'group_stage' : 'knockout';
+  if (groupStageMatches.length === 0) {
+    const hasKnockoutMatches = matches.some((match) => match.stage !== 'group_stage');
+    return hasKnockoutMatches ? 'knockout' : 'group_stage';
   }
 
-  const lastFinishedMatch = [...matches]
-    .filter((match) => match.status === 'finished')
-    .sort((a, b) => new Date(b.kickoffAt).getTime() - new Date(a.kickoffAt).getTime())[0];
+  const isGroupStageFinished = groupStageMatches.every((match) => match.status === 'finished');
 
-  if (!lastFinishedMatch) {
-    return 'group_stage';
-  }
-
-  return lastFinishedMatch.stage === 'group_stage' ? 'group_stage' : 'knockout';
+  return isGroupStageFinished ? 'knockout' : 'group_stage';
 }
 
 function getScoreLabel(match: Match) {
@@ -280,6 +266,11 @@ function GroupMatchCard({ match }: { match: Match }) {
   );
 }
 
+function isGroupCompleted(matches: Match[]) {
+  if (matches.length === 0) return false;
+  return matches.every((match) => match.status === 'finished');
+}
+
 export function FixturePage() {
   const [matches, setMatches] = React.useState<Match[]>([]);
   const [fixtureView, setFixtureView] = React.useState<FixtureViewMode>('group_stage');
@@ -316,11 +307,8 @@ export function FixturePage() {
   const groupedStandings = groupStandingsByCode(standings);
   const groupCodes = Object.keys(groupedMatches).sort();
 
-  // para prueba
   const knockoutMatches = React.useMemo(() => {
-    const realKnockoutMatches = matches.filter((match) => match.stage !== 'group_stage');
-
-    return realKnockoutMatches.length > 0 ? realKnockoutMatches : mockKnockoutMatches;
+    return buildProjectedKnockoutMatches(matches);
   }, [matches]);
 
   return (
@@ -382,6 +370,7 @@ export function FixturePage() {
               {groupCodes.map((groupCode) => {
                 const groupMatches = sortMatches(groupedMatches[groupCode] ?? []);
                 const groupRows = groupedStandings[groupCode] ?? [];
+                const isCompleted = isGroupCompleted(groupMatches);
 
                 return (
                   <Card
@@ -418,24 +407,44 @@ export function FixturePage() {
                                 </TableRow>
                               </TableHead>
                               <TableBody>
-                                {groupRows.map((row) => (
-                                  <TableRow key={row.team_id} hover>
-                                    <TableCell>{row.rank_in_group}</TableCell>
-                                    <TableCell>
-                                      <Stack direction='row' spacing={1}>
-                                        <Typography fontWeight={700}>{row.team_name}</Typography>
-                                        <Typography variant='caption' color='text.secondary'>
-                                          {row.team_code}
-                                        </Typography>
-                                      </Stack>
-                                    </TableCell>
-                                    <TableCell align='right'>{row.points}</TableCell>
-                                    <TableCell align='right'>{row.played}</TableCell>
-                                    <TableCell align='right'>{row.goal_difference}</TableCell>
-                                    <TableCell align='right'>{row.goals_for}</TableCell>
-                                    <TableCell align='right'>{row.goals_against}</TableCell>
-                                  </TableRow>
-                                ))}
+                                {groupRows.map((row) => {
+                                  const stripeColor = !isCompleted
+                                    ? 'transparent'
+                                    : row.rank_in_group <= 2
+                                      ? 'success.main'
+                                      : row.rank_in_group === 3
+                                        ? 'warning.main'
+                                        : 'transparent';
+
+                                  return (
+                                    <TableRow
+                                      key={row.team_id}
+                                      hover
+                                      sx={{
+                                        '& td:first-of-type': {
+                                          borderLeft: '4px solid',
+                                          borderLeftColor: stripeColor,
+                                          pl: 1.5
+                                        }
+                                      }}
+                                    >
+                                      <TableCell>{row.rank_in_group}</TableCell>
+                                      <TableCell>
+                                        <Stack direction='row' spacing={1}>
+                                          <Typography fontWeight={700}>{row.team_name}</Typography>
+                                          <Typography variant='caption' color='text.secondary'>
+                                            {row.team_code}
+                                          </Typography>
+                                        </Stack>
+                                      </TableCell>
+                                      <TableCell align='right'>{row.points}</TableCell>
+                                      <TableCell align='right'>{row.played}</TableCell>
+                                      <TableCell align='right'>{row.goal_difference}</TableCell>
+                                      <TableCell align='right'>{row.goals_for}</TableCell>
+                                      <TableCell align='right'>{row.goals_against}</TableCell>
+                                    </TableRow>
+                                  );
+                                })}
 
                                 {groupRows.length === 0 ? (
                                   <TableRow>

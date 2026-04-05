@@ -48,12 +48,12 @@ const Y = {
   right32: [52, 140, 228, 316, 436, 524, 612, 700]
 };
 
-const LEFT_ROUND_OF_32 = ['73', '74', '75', '76', '81', '82', '83', '84'];
+const LEFT_ROUND_OF_32 = ['74', '77', '73', '75', '83', '84', '81', '82'];
 const LEFT_ROUND_OF_16 = ['89', '90', '93', '94'];
 const LEFT_QUARTERS = ['97', '98'];
 const LEFT_SEMIS = ['101'];
 
-const RIGHT_ROUND_OF_32 = ['77', '78', '79', '80', '85', '86', '87', '88'];
+const RIGHT_ROUND_OF_32 = ['76', '78', '79', '80', '86', '88', '85', '87'];
 const RIGHT_ROUND_OF_16 = ['91', '92', '95', '96'];
 const RIGHT_QUARTERS = ['99', '100'];
 const RIGHT_SEMIS = ['102'];
