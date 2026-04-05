@@ -1,0 +1,217 @@
+import * as React from 'react';
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  CircularProgress,
+  MenuItem,
+  Stack,
+  TextField,
+  Typography
+} from '@mui/material';
+import {
+  getAdminMatches,
+  updateOfficialResult,
+  type AdminMatchRow,
+  type AdminMatchStatus
+} from '../features/admin/adminResults.api';
+
+type DraftMap = Record<
+  string,
+  {
+    status: AdminMatchStatus;
+    officialHomeScore: string;
+    officialAwayScore: string;
+  }
+>;
+
+function formatKickoff(isoDate: string) {
+  return new Intl.DateTimeFormat('es-AR', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  }).format(new Date(isoDate));
+}
+
+function buildInitialDrafts(matches: AdminMatchRow[]): DraftMap {
+  return matches.reduce<DraftMap>((acc, match) => {
+    acc[match.id] = {
+      status: match.status,
+      officialHomeScore: match.official_home_score !== null ? String(match.official_home_score) : '',
+      officialAwayScore: match.official_away_score !== null ? String(match.official_away_score) : ''
+    };
+    return acc;
+  }, {});
+}
+
+export function AdminResultsPage() {
+  const [matches, setMatches] = React.useState<AdminMatchRow[]>([]);
+  const [drafts, setDrafts] = React.useState<DraftMap>({});
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [errorMessage, setErrorMessage] = React.useState('');
+  const [successMessage, setSuccessMessage] = React.useState('');
+
+  React.useEffect(() => {
+    async function loadMatches() {
+      setIsLoading(true);
+      setErrorMessage('');
+
+      try {
+        const data = await getAdminMatches();
+        setMatches(data);
+        setDrafts(buildInitialDrafts(data));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'No se pudieron cargar los partidos';
+        setErrorMessage(message);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    void loadMatches();
+  }, []);
+
+  const handleDraftChange = (
+    matchId: string,
+    field: 'status' | 'officialHomeScore' | 'officialAwayScore',
+    value: string
+  ) => {
+    setDrafts((prev) => ({
+      ...prev,
+      [matchId]: {
+        ...prev[matchId],
+        [field]: value
+      }
+    }));
+  };
+
+  const handleSave = async (matchId: string) => {
+    const draft = drafts[matchId];
+    if (!draft) return;
+
+    setErrorMessage('');
+    setSuccessMessage('');
+
+    const parsedHome = draft.officialHomeScore.trim() === '' ? null : Number(draft.officialHomeScore);
+    const parsedAway = draft.officialAwayScore.trim() === '' ? null : Number(draft.officialAwayScore);
+
+    if (
+      (parsedHome !== null && (Number.isNaN(parsedHome) || parsedHome < 0)) ||
+      (parsedAway !== null && (Number.isNaN(parsedAway) || parsedAway < 0))
+    ) {
+      setErrorMessage('Los resultados deben ser números válidos mayores o iguales a 0.');
+      return;
+    }
+
+    try {
+      await updateOfficialResult({
+        matchId,
+        status: draft.status,
+        officialHomeScore: parsedHome,
+        officialAwayScore: parsedAway
+      });
+
+      setMatches((prev) =>
+        prev.map((match) =>
+          match.id === matchId
+            ? {
+                ...match,
+                status: draft.status,
+                official_home_score: parsedHome,
+                official_away_score: parsedAway
+              }
+            : match
+        )
+      );
+
+      setSuccessMessage('Resultado actualizado correctamente.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo actualizar el resultado';
+      setErrorMessage(message);
+    }
+  };
+
+  return (
+    <Stack spacing={3}>
+      <Card elevation={0} sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider' }}>
+        <CardContent sx={{ p: { xs: 3, md: 4 } }}>
+          <Stack spacing={1}>
+            <Typography variant='h4' fontWeight={800}>
+              Admin · Resultados oficiales
+            </Typography>
+            <Typography color='text.secondary'>Aquí puedes editar los marcadores oficiales.</Typography>
+          </Stack>
+        </CardContent>
+      </Card>
+
+      {errorMessage ? <Alert severity='error'>{errorMessage}</Alert> : null}
+      {successMessage ? <Alert severity='success'>{successMessage}</Alert> : null}
+
+      {isLoading ? (
+        <Stack alignItems='center' sx={{ py: 6 }}>
+          <CircularProgress />
+        </Stack>
+      ) : (
+        <Stack spacing={2}>
+          {matches.map((match) => {
+            const draft = drafts[match.id];
+
+            return (
+              <Card key={match.id} elevation={0} sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider' }}>
+                <CardContent sx={{ p: 3 }}>
+                  <Stack spacing={2}>
+                    <Box>
+                      <Typography variant='h6' fontWeight={800}>
+                        {match.home_team} vs {match.away_team}
+                      </Typography>
+                      <Typography variant='body2' color='text.secondary'>
+                        {match.group_name} · {formatKickoff(match.kickoff_at)}
+                      </Typography>
+                    </Box>
+
+                    <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+                      <TextField
+                        select
+                        label='Estado'
+                        value={draft?.status ?? 'scheduled'}
+                        onChange={(event) => handleDraftChange(match.id, 'status', event.target.value)}
+                        sx={{ minWidth: 180 }}
+                      >
+                        <MenuItem value='scheduled'>Pendiente</MenuItem>
+                        <MenuItem value='live'>En vivo</MenuItem>
+                        <MenuItem value='finished'>Finalizado</MenuItem>
+                      </TextField>
+
+                      <TextField
+                        label={match.home_team}
+                        type='number'
+                        value={draft?.officialHomeScore ?? ''}
+                        onChange={(event) => handleDraftChange(match.id, 'officialHomeScore', event.target.value)}
+                        inputProps={{ min: 0 }}
+                        sx={{ maxWidth: 180 }}
+                      />
+
+                      <TextField
+                        label={match.away_team}
+                        type='number'
+                        value={draft?.officialAwayScore ?? ''}
+                        onChange={(event) => handleDraftChange(match.id, 'officialAwayScore', event.target.value)}
+                        inputProps={{ min: 0 }}
+                        sx={{ maxWidth: 180 }}
+                      />
+
+                      <Button variant='contained' onClick={() => void handleSave(match.id)}>
+                        Guardar
+                      </Button>
+                    </Stack>
+                  </Stack>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </Stack>
+      )}
+    </Stack>
+  );
+}
