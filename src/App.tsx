@@ -1,4 +1,4 @@
-import { Route, Routes } from 'react-router';
+import { Navigate, Route, Routes } from 'react-router';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
@@ -23,6 +23,7 @@ function App() {
     <Routes>
       <Route element={<PublicLayout />}>
         <Route path='/' element={<HomePage />} />
+        <Route path='/leaderboard' element={<LeaderboardPage />} />
       </Route>
 
       <Route element={<PublicOnlyRoute />}>
@@ -34,8 +35,8 @@ function App() {
 
       <Route element={<RequireAuth />}>
         <Route element={<PrivateLayout />}>
-          <Route path='/app/leaderboard' element={<LeaderboardPage />} />
           <Route path='/app/fixture' element={<FixturePage />} />
+          <Route path='/app/leaderboard' element={<Navigate to='/leaderboard' replace />} />
 
           <Route element={<ParticipantLayout />}>
             <Route path='/app' element={<DashboardPage />} />

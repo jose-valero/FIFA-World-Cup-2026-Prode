@@ -45,6 +45,38 @@ function buildInitialDrafts(matches: AdminMatchRow[]): DraftMap {
   }, {});
 }
 
+function validateOfficialResultDraft(input: {
+  status: AdminMatchStatus;
+  officialHomeScore: number | null;
+  officialAwayScore: number | null;
+}): string | null {
+  const { status, officialHomeScore, officialAwayScore } = input;
+
+  const hasHome = officialHomeScore !== null;
+  const hasAway = officialAwayScore !== null;
+
+  if (hasHome !== hasAway) {
+    return 'Debes completar ambos marcadores o dejar ambos vacíos.';
+  }
+
+  if (
+    (officialHomeScore !== null && (!Number.isInteger(officialHomeScore) || officialHomeScore < 0)) ||
+    (officialAwayScore !== null && (!Number.isInteger(officialAwayScore) || officialAwayScore < 0))
+  ) {
+    return 'Los resultados deben ser números enteros válidos mayores o iguales a 0.';
+  }
+
+  if (status === 'scheduled' && (hasHome || hasAway)) {
+    return 'Un partido pendiente no debe tener marcador oficial.';
+  }
+
+  if (status === 'finished' && (!hasHome || !hasAway)) {
+    return 'Un partido finalizado debe tener ambos marcadores cargados.';
+  }
+
+  return null;
+}
+
 export function AdminResultsPage() {
   const [matches, setMatches] = React.useState<AdminMatchRow[]>([]);
   const [drafts, setDrafts] = React.useState<DraftMap>({});
@@ -77,13 +109,22 @@ export function AdminResultsPage() {
     field: 'status' | 'officialHomeScore' | 'officialAwayScore',
     value: string
   ) => {
-    setDrafts((prev) => ({
-      ...prev,
-      [matchId]: {
+    setDrafts((prev) => {
+      const nextDraft = {
         ...prev[matchId],
         [field]: value
+      };
+
+      if (field === 'status' && value === 'scheduled') {
+        nextDraft.officialHomeScore = '';
+        nextDraft.officialAwayScore = '';
       }
-    }));
+
+      return {
+        ...prev,
+        [matchId]: nextDraft
+      };
+    });
   };
 
   const handleSave = async (matchId: string) => {
@@ -96,13 +137,28 @@ export function AdminResultsPage() {
     const parsedHome = draft.officialHomeScore.trim() === '' ? null : Number(draft.officialHomeScore);
     const parsedAway = draft.officialAwayScore.trim() === '' ? null : Number(draft.officialAwayScore);
 
-    if (
-      (parsedHome !== null && (Number.isNaN(parsedHome) || parsedHome < 0)) ||
-      (parsedAway !== null && (Number.isNaN(parsedAway) || parsedAway < 0))
-    ) {
-      setErrorMessage('Los resultados deben ser números válidos mayores o iguales a 0.');
+    if ((parsedHome !== null && Number.isNaN(parsedHome)) || (parsedAway !== null && Number.isNaN(parsedAway))) {
+      setErrorMessage('Los resultados deben ser números válidos.');
       return;
     }
+
+    const validationError = validateOfficialResultDraft({
+      status: draft.status,
+      officialHomeScore: parsedHome,
+      officialAwayScore: parsedAway
+    });
+
+    if (validationError) {
+      setErrorMessage(validationError);
+      return;
+    }
+    // if (
+    //   (parsedHome !== null && (Number.isNaN(parsedHome) || parsedHome < 0)) ||
+    //   (parsedAway !== null && (Number.isNaN(parsedAway) || parsedAway < 0))
+    // ) {
+    //   setErrorMessage('Los resultados deben ser números válidos mayores o iguales a 0.');
+    //   return;
+    // }
 
     try {
       await updateOfficialResult({
@@ -124,6 +180,15 @@ export function AdminResultsPage() {
             : match
         )
       );
+
+      setDrafts((prev) => ({
+        ...prev,
+        [matchId]: {
+          status: draft.status,
+          officialHomeScore: parsedHome !== null ? String(parsedHome) : '',
+          officialAwayScore: parsedAway !== null ? String(parsedAway) : ''
+        }
+      }));
 
       setSuccessMessage('Resultado actualizado correctamente.');
     } catch (error) {

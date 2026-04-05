@@ -17,15 +17,18 @@ export interface AdminMatchRow {
   stadium: string;
   city: string;
   status: AdminMatchStatus;
-  official_home_score: number | null;
-  official_away_score: number | null;
 
+  official_away_score: number | null;
+  official_home_score: number | null;
+
+  home_team_id: string | null;
   home_source_type: 'team' | 'group_position' | 'best_third_place' | 'match_winner' | 'match_loser' | null;
   home_source_group_code: string | null;
   home_source_group_rank: number | null;
   home_source_group_set: string | null;
   home_source_match_id: string | null;
 
+  away_team_id: string | null;
   away_source_type: 'team' | 'group_position' | 'best_third_place' | 'match_winner' | 'match_loser' | null;
   away_source_group_code: string | null;
   away_source_group_rank: number | null;
@@ -47,6 +50,8 @@ export interface UpsertAdminMatchInput {
   stadium: string;
   city: string;
   status: AdminMatchStatus;
+  homeTeamId: string | null;
+  awayTeamId: string | null;
 }
 
 export async function getAdminMatches(): Promise<AdminMatchRow[]> {
@@ -61,6 +66,8 @@ export async function getAdminMatches(): Promise<AdminMatchRow[]> {
       group_name,
       home_team,
       away_team,
+      home_team_id,
+      away_team_id,
       home_team_code,
       away_team_code,
       kickoff_at,
@@ -103,6 +110,8 @@ export async function createAdminMatch(input: UpsertAdminMatchInput): Promise<vo
     group_name: input.groupName,
     home_team: input.homeTeam,
     away_team: input.awayTeam,
+    home_team_id: input.homeTeamId,
+    away_team_id: input.awayTeamId,
     home_team_code: input.homeTeamCode,
     away_team_code: input.awayTeamCode,
     kickoff_at: input.kickoffAt,
@@ -126,6 +135,8 @@ export async function updateAdminMatch(input: UpsertAdminMatchInput): Promise<vo
       group_name: input.groupName,
       home_team: input.homeTeam,
       away_team: input.awayTeam,
+      home_team_id: input.homeTeamId,
+      away_team_id: input.awayTeamId,
       home_team_code: input.homeTeamCode,
       away_team_code: input.awayTeamCode,
       kickoff_at: input.kickoffAt,

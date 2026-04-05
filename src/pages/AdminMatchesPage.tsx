@@ -31,6 +31,9 @@ type FormState = {
   groupName: string;
   homeTeam: string;
   awayTeam: string;
+
+  homeTeamId: string;
+  awayTeamId: string;
   homeTeamCode: string;
   awayTeamCode: string;
   kickoffAt: string;
@@ -47,6 +50,8 @@ const emptyForm: FormState = {
   groupName: '',
   homeTeam: '',
   awayTeam: '',
+  homeTeamId: '',
+  awayTeamId: '',
   homeTeamCode: '',
   awayTeamCode: '',
   kickoffAt: '',
@@ -78,6 +83,8 @@ function mapMatchToForm(match: AdminMatchRow): FormState {
     groupName: match.group_name,
     homeTeam: match.home_team,
     awayTeam: match.away_team,
+    homeTeamId: match.home_team_id ?? '',
+    awayTeamId: match.away_team_id ?? '',
     homeTeamCode: match.home_team_code ?? '',
     awayTeamCode: match.away_team_code ?? '',
     kickoffAt: toDateTimeLocal(match.kickoff_at),
@@ -161,22 +168,73 @@ export function AdminMatchesPage() {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
+  function getExpectedSlotForEditing(editingMatch: AdminMatchRow | null, side: 'home' | 'away') {
+    if (!editingMatch) return null;
+    return buildSourceSlot(editingMatch, side);
+  }
+
   const handleTeamSelection = (side: 'home' | 'away', nextCode: string) => {
     const selectedTeam = teams.find((team) => team.code === nextCode);
+    const fallbackSlot = getExpectedSlotForEditing(editingMatch, side);
 
     if (side === 'home') {
+      if (!selectedTeam) {
+        setForm((prev) => ({
+          ...prev,
+          homeTeamId: '',
+          homeTeamCode: '',
+          homeTeam: fallbackSlot ?? ''
+        }));
+        return;
+      }
+
       setForm((prev) => ({
         ...prev,
-        homeTeamCode: selectedTeam?.code ?? '',
-        homeTeam: selectedTeam?.name ?? ''
+        homeTeamId: selectedTeam.id,
+        homeTeamCode: selectedTeam.code ?? '',
+        homeTeam: selectedTeam.name
+      }));
+      return;
+    }
+
+    if (!selectedTeam) {
+      setForm((prev) => ({
+        ...prev,
+        awayTeamId: '',
+        awayTeamCode: '',
+        awayTeam: fallbackSlot ?? ''
       }));
       return;
     }
 
     setForm((prev) => ({
       ...prev,
-      awayTeamCode: selectedTeam?.code ?? '',
-      awayTeam: selectedTeam?.name ?? ''
+      awayTeamId: selectedTeam.id,
+      awayTeamCode: selectedTeam.code ?? '',
+      awayTeam: selectedTeam.name
+    }));
+  };
+
+  const handleResetTeamOverride = (side: 'home' | 'away') => {
+    const fallbackSlot = getExpectedSlotForEditing(editingMatch, side);
+
+    if (!fallbackSlot) return;
+
+    if (side === 'home') {
+      setForm((prev) => ({
+        ...prev,
+        homeTeamId: '',
+        homeTeamCode: '',
+        homeTeam: fallbackSlot
+      }));
+      return;
+    }
+
+    setForm((prev) => ({
+      ...prev,
+      awayTeamId: '',
+      awayTeamCode: '',
+      awayTeam: fallbackSlot
     }));
   };
 
@@ -256,6 +314,8 @@ export function AdminMatchesPage() {
         groupName: form.groupName.trim(),
         homeTeam: form.homeTeam.trim(),
         awayTeam: form.awayTeam.trim(),
+        homeTeamId: form.homeTeamId.trim() || null,
+        awayTeamId: form.awayTeamId.trim() || null,
         homeTeamCode: form.homeTeamCode.trim() || null,
         awayTeamCode: form.awayTeamCode.trim() || null,
         kickoffAt: new Date(form.kickoffAt).toISOString(),
@@ -319,6 +379,21 @@ export function AdminMatchesPage() {
                 {expectedAwaySlot ? (
                   <Chip label={`Slot visitante esperado: ${expectedAwaySlot}`} variant='outlined' />
                 ) : null}
+              </Stack>
+            ) : null}
+
+            {isEditing && editingMatch && editingMatch.stage !== 'group_stage' ? (
+              <Stack direction='row' spacing={1} flexWrap='wrap' useFlexGap>
+                <Chip
+                  label={form.homeTeamId ? 'Local: override manual' : 'Local: automático'}
+                  color={form.homeTeamId ? 'warning' : 'default'}
+                  variant='outlined'
+                />
+                <Chip
+                  label={form.awayTeamId ? 'Visitante: override manual' : 'Visitante: automático'}
+                  color={form.awayTeamId ? 'warning' : 'default'}
+                  variant='outlined'
+                />
               </Stack>
             ) : null}
 
@@ -409,6 +484,22 @@ export function AdminMatchesPage() {
                     </MenuItem>
                   ))}
                 </TextField>
+
+                {isEditing && editingMatch && editingMatch.stage !== 'group_stage' ? (
+                  <Stack direction='row' spacing={1} flexWrap='wrap' useFlexGap>
+                    {expectedHomeSlot ? (
+                      <Button variant='outlined' size='small' onClick={() => handleResetTeamOverride('home')}>
+                        Restaurar slot local
+                      </Button>
+                    ) : null}
+
+                    {expectedAwaySlot ? (
+                      <Button variant='outlined' size='small' onClick={() => handleResetTeamOverride('away')}>
+                        Restaurar slot visitante
+                      </Button>
+                    ) : null}
+                  </Stack>
+                ) : null}
 
                 <TextField
                   label='Código local'
