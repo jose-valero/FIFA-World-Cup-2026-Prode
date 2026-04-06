@@ -1,6 +1,7 @@
-import * as React from 'react';
+// import * as React from 'react';
 import { Alert, Card, CardContent, Chip, CircularProgress, Stack, Typography } from '@mui/material';
-import { getAppSettings } from '../appSettings.api';
+import { useAppSettings } from '../useAppSettings';
+import { useMatches } from '../../matches/useMatches';
 
 function formatCloseDate(value: string | null) {
   if (!value) return 'Sin fecha límite definida';
@@ -18,39 +19,55 @@ function isPredictionsClosed(predictionsOpen: boolean, predictionsCloseAt: strin
   return new Date(predictionsCloseAt).getTime() <= Date.now();
 }
 
+function getCurrentPhase(matches: Array<{ stage: string; status: string }>) {
+  if (matches.length === 0) {
+    return 'Sin partidos cargados';
+  }
+
+  const hasLiveKnockout = matches.some((match) => match.stage !== 'group_stage' && match.status !== 'scheduled');
+
+  if (hasLiveKnockout) {
+    return 'Eliminación';
+  }
+
+  const hasKnockoutMatches = matches.some((match) => match.stage !== 'group_stage');
+
+  if (hasKnockoutMatches) {
+    return 'Eliminación';
+  }
+
+  return 'Grupos';
+}
+
 export function CompetitionStatusCard() {
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [errorMessage, setErrorMessage] = React.useState('');
-  const [predictionsOpen, setPredictionsOpen] = React.useState(true);
-  const [predictionsCloseAt, setPredictionsCloseAt] = React.useState<string | null>(null);
+  const {
+    data: settings = null,
+    isLoading: isSettingsLoading,
+    isError: isSettingsError,
+    error: settingsError
+  } = useAppSettings();
 
-  React.useEffect(() => {
-    async function loadSettings() {
-      setIsLoading(true);
-      setErrorMessage('');
+  const {
+    data: matches = [],
+    isLoading: isMatchesLoading,
+    isError: isMatchesError,
+    error: matchesError
+  } = useMatches();
 
-      try {
-        const settings = await getAppSettings();
-        setPredictionsOpen(settings?.predictions_open ?? true);
-        setPredictionsCloseAt(settings?.predictions_close_at ?? null);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'No se pudo cargar el estado de la quiniela';
-        setErrorMessage(message);
-      } finally {
-        setIsLoading(false);
-      }
-    }
+  const isLoading = isSettingsLoading || isMatchesLoading;
+  const isError = isSettingsError || isMatchesError;
+  const firstError = settingsError || matchesError;
 
-    void loadSettings();
-  }, []);
-
+  const predictionsOpen = settings?.predictions_open ?? true;
+  const predictionsCloseAt = settings?.predictions_close_at ?? null;
   const closed = isPredictionsClosed(predictionsOpen, predictionsCloseAt);
+  const currentPhase = getCurrentPhase(matches);
 
   return (
     <Card
       elevation={0}
       sx={{
-        borderRadius: 2,
+        borderRadius: 4,
         border: '1px solid',
         borderColor: 'divider'
       }}
@@ -71,8 +88,10 @@ export function CompetitionStatusCard() {
             <Stack alignItems='center' sx={{ py: 2 }}>
               <CircularProgress />
             </Stack>
-          ) : errorMessage ? (
-            <Alert severity='error'>{errorMessage}</Alert>
+          ) : isError ? (
+            <Alert severity='error'>
+              {firstError instanceof Error ? firstError.message : 'No se pudo cargar el estado de la quiniela'}
+            </Alert>
           ) : (
             <Stack spacing={2}>
               <Stack direction='row' spacing={1} flexWrap='wrap' useFlexGap>
@@ -80,7 +99,7 @@ export function CompetitionStatusCard() {
                   label={closed ? 'Pronósticos cerrados' : 'Pronósticos abiertos'}
                   color={closed ? 'warning' : 'primary'}
                 />
-                <Chip label='Fase actual: Grupos' variant='outlined' color={'primary'} />
+                <Chip label={`Fase actual: ${currentPhase}`} variant='outlined' color='primary' />
               </Stack>
 
               <Typography variant='body2' color='text.secondary'>

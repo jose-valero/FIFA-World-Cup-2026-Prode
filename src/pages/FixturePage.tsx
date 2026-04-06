@@ -21,13 +21,13 @@ import {
   ToggleButtonGroup,
   Typography
 } from '@mui/material';
-import { getMatches } from '../features/matches/matches.api';
 import type { Match } from '../features/matches/types';
 import { KnockoutBracket } from '../features/tournament/components/KnockoutBracket';
 import { buildProjectedKnockoutMatches } from '../features/tournament/buildProjectedKnockoutMatches';
 import { TeamFlag } from '../features/teams/components/TeamFlag';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { MatchVs } from '../features/matches/components/MatchVs';
+import { useMatches } from '../features/matches/useMatches';
 
 type FixtureViewMode = 'group_stage' | 'knockout';
 
@@ -277,35 +277,47 @@ function isGroupCompleted(matches: Match[]) {
 }
 
 export function FixturePage() {
-  const [matches, setMatches] = React.useState<Match[]>([]);
+  // const [matches, setMatches] = React.useState<Match[]>([]);
   const [fixtureView, setFixtureView] = React.useState<FixtureViewMode>('group_stage');
   const [didInitView, setDidInitView] = React.useState(false);
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [errorMessage, setErrorMessage] = React.useState('');
+  // const [isLoading, setIsLoading] = React.useState(true);
+  // const [errorMessage, setErrorMessage] = React.useState('');
+
+  const { data: matches = [], isLoading, isError, error } = useMatches();
+
+  const errorMessage = isError ? (error instanceof Error ? error.message : 'No se pudo cargar el fixture') : '';
 
   React.useEffect(() => {
-    async function loadData() {
-      setIsLoading(true);
-      setErrorMessage('');
+    if (didInitView) return;
+    if (matches.length === 0) return;
 
-      try {
-        const matchesData = await getMatches();
-        setMatches(matchesData);
+    setFixtureView(getInitialFixtureView(matches));
+    setDidInitView(true);
+  }, [didInitView, matches]);
 
-        if (!didInitView) {
-          setFixtureView(getInitialFixtureView(matchesData));
-          setDidInitView(true);
-        }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'No se pudo cargar el fixture';
-        setErrorMessage(message);
-      } finally {
-        setIsLoading(false);
-      }
-    }
+  // React.useEffect(() => {
+  //   async function loadData() {
+  //     setIsLoading(true);
+  //     setErrorMessage('');
 
-    void loadData();
-  }, [didInitView]);
+  //     try {
+  //       const matchesData = await getMatches();
+  //       setMatches(matchesData);
+
+  //       if (!didInitView) {
+  //         setFixtureView(getInitialFixtureView(matchesData));
+  //         setDidInitView(true);
+  //       }
+  //     } catch (error) {
+  //       const message = error instanceof Error ? error.message : 'No se pudo cargar el fixture';
+  //       setErrorMessage(message);
+  //     } finally {
+  //       setIsLoading(false);
+  //     }
+  //   }
+
+  //   void loadData();
+  // }, [didInitView]);
 
   const standings = React.useMemo(() => buildClientGroupStandings(matches), [matches]);
   const groupedMatches = groupMatchesByCode(matches);

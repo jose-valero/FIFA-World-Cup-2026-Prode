@@ -2,11 +2,11 @@ import * as React from 'react';
 import { Alert, Button, Card, CardContent, Chip, CircularProgress, Grid, Stack, Typography } from '@mui/material';
 import { Link as RouterLink } from 'react-router';
 import { useAuth } from '../features/auth/useAuth';
-import { getMatches } from '../features/matches/matches.api';
+import { useMatches } from '../features/matches/useMatches';
+import { usePredictionsByUser } from '../features/predictions/usePredictionsByUser';
+import { useLeaderboard } from '../features/leaderboard/useLeaderboard';
+import { useAppSettings } from '../features/settings/useAppSettings';
 import type { Match } from '../features/matches/types';
-import { getPredictionsByUser, type PredictionRow } from '../features/predictions/predictions.api';
-import { getLeaderboard, type LeaderboardRow } from '../features/leaderboard/leaderboard.api';
-import { getAppSettings, type AppSettings } from '../features/settings/appSettings.api';
 
 function formatDateTime(value: string | null | undefined) {
   if (!value) return 'Sin fecha definida';
@@ -57,45 +57,39 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
 export function DashboardPage() {
   const { user } = useAuth();
 
-  const [matches, setMatches] = React.useState<Match[]>([]);
-  const [predictions, setPredictions] = React.useState<PredictionRow[]>([]);
-  const [leaderboard, setLeaderboard] = React.useState<LeaderboardRow[]>([]);
-  const [settings, setSettings] = React.useState<AppSettings | null>(null);
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [errorMessage, setErrorMessage] = React.useState('');
+  const {
+    data: matches = [],
+    isLoading: isMatchesLoading,
+    isError: isMatchesError,
+    error: matchesError
+  } = useMatches();
 
-  React.useEffect(() => {
-    async function loadData() {
-      if (!user?.id) {
-        setIsLoading(false);
-        return;
-      }
+  const {
+    data: predictions = [],
+    isLoading: isPredictionsLoading,
+    isError: isPredictionsError,
+    error: predictionsError
+  } = usePredictionsByUser(user?.id!); // :D  que contradiccion no? que crack TS
 
-      setIsLoading(true);
-      setErrorMessage('');
+  const {
+    data: leaderboard = [],
+    isLoading: isLeaderboardLoading,
+    isError: isLeaderboardError,
+    error: leaderboardError
+  } = useLeaderboard();
 
-      try {
-        const [matchesData, predictionsData, leaderboardData, settingsData] = await Promise.all([
-          getMatches(),
-          getPredictionsByUser(user.id),
-          getLeaderboard(),
-          getAppSettings()
-        ]);
+  const {
+    data: settings = null,
+    isLoading: isSettingsLoading,
+    isError: isSettingsError,
+    error: settingsError
+  } = useAppSettings();
 
-        setMatches(matchesData);
-        setPredictions(predictionsData);
-        setLeaderboard(leaderboardData);
-        setSettings(settingsData);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'No se pudo cargar el resumen';
-        setErrorMessage(message);
-      } finally {
-        setIsLoading(false);
-      }
-    }
+  const isLoading = isMatchesLoading || isPredictionsLoading || isLeaderboardLoading || isSettingsLoading;
 
-    void loadData();
-  }, [user?.id]);
+  const isError = isMatchesError || isPredictionsError || isLeaderboardError || isSettingsError;
+
+  const firstError = matchesError || predictionsError || leaderboardError || settingsError;
 
   const predictedMatchIds = React.useMemo(() => {
     return new Set(predictions.map((prediction) => prediction.match_id));
@@ -143,8 +137,12 @@ export function DashboardPage() {
     );
   }
 
-  if (errorMessage) {
-    return <Alert severity='error'>{errorMessage}</Alert>;
+  if (isError) {
+    return (
+      <Alert severity='error'>
+        {firstError instanceof Error ? firstError.message : 'No se pudo cargar el resumen'}
+      </Alert>
+    );
   }
 
   return (
@@ -202,7 +200,7 @@ export function DashboardPage() {
                   </Grid>
 
                   <Grid size={{ xs: 12, sm: 4 }}>
-                    <StatCard label='Aciertos de resultado' value={currentUserRow?.outcome_hits ?? 0} />
+                    <StatCard label='Aciertos de signo' value={currentUserRow?.outcome_hits ?? 0} />
                   </Grid>
 
                   <Grid size={{ xs: 12, sm: 4 }}>

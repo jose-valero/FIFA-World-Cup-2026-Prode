@@ -19,8 +19,9 @@ import {
   Typography,
   alpha
 } from '@mui/material';
-import { getLeaderboard, type LeaderboardRow } from '../features/leaderboard/leaderboard.api';
+import { type LeaderboardRow } from '../features/leaderboard/leaderboard.api';
 import { useAuth } from '../features/auth/useAuth';
+import { useLeaderboard } from '../features/leaderboard/useLeaderboard';
 
 function getInitial(name: string) {
   return name.trim().charAt(0).toUpperCase() || 'U';
@@ -130,29 +131,7 @@ function PodiumCard({
 
 export function LeaderboardPage() {
   const { user } = useAuth();
-
-  const [rows, setRows] = React.useState<LeaderboardRow[]>([]);
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [errorMessage, setErrorMessage] = React.useState('');
-
-  React.useEffect(() => {
-    async function loadLeaderboard() {
-      setIsLoading(true);
-      setErrorMessage('');
-
-      try {
-        const data = await getLeaderboard();
-        setRows(data);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'No se pudo cargar el leaderboard';
-        setErrorMessage(message);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    void loadLeaderboard();
-  }, []);
+  const { data: rows = [], isLoading, isError, error } = useLeaderboard();
 
   const currentUserPosition = React.useMemo(() => {
     if (!user?.id) return null;
@@ -187,7 +166,9 @@ export function LeaderboardPage() {
         </CardContent>
       </Card>
 
-      {errorMessage ? <Alert severity='error'>{errorMessage}</Alert> : null}
+      {isError ? (
+        <Alert severity='error'>{error instanceof Error ? error.message : 'No se pudo cargar el leaderboard'}</Alert>
+      ) : null}
 
       {isLoading ? (
         <Stack alignItems='center' sx={{ py: 6 }}>

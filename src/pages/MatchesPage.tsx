@@ -2,10 +2,8 @@ import * as React from 'react';
 import { Alert, Card, CardContent, CircularProgress, Stack, Typography } from '@mui/material';
 import { MatchCard } from '../features/matches/components/MatchCard';
 import { PredictionDialog } from '../features/matches/components/PredictionDialog';
-import { getMatches } from '../features/matches/matches.api';
 import type { Match } from '../features/matches/types';
-import { getPredictionsByUser, upsertPrediction } from '../features/predictions/predictions.api';
-import { getAppSettings } from '../features/settings/appSettings.api';
+import { upsertPrediction } from '../features/predictions/predictions.api';
 import { useAuth } from '../features/auth/useAuth';
 
 import { MatchFiltersCard } from '../features/matches/components/MatchFiltersCard';
@@ -15,6 +13,11 @@ import {
   getUniqueStageOptions,
   type MatchListFilters
 } from '../features/matches/listFilters';
+import { useQueryClient } from '@tanstack/react-query';
+import { useMatches } from '../features/matches/useMatches';
+import { usePredictionsByUser } from '../features/predictions/usePredictionsByUser';
+import { useAppSettings } from '../features/settings/useAppSettings';
+import { queryKeys } from '../lib/react-query/queryKeys';
 
 type MatchPredictionMap = Record<
   string,
@@ -58,23 +61,61 @@ function getMatchLockMessage(match: Match, predictionsClosed: boolean) {
 
 export function MatchesPage() {
   const { user } = useAuth();
+  // por ahora solo para mutar
+  const queryClient = useQueryClient();
 
-  const [matches, setMatches] = React.useState<Match[]>([]);
+  // const [matches, setMatches] = React.useState<Match[]>([]);
   const [selectedMatch, setSelectedMatch] = React.useState<Match | null>(null);
-  const [predictions, setPredictions] = React.useState<MatchPredictionMap>({});
-  const [predictionsOpen, setPredictionsOpen] = React.useState(true);
-  const [predictionsCloseAt, setPredictionsCloseAt] = React.useState<string | null>(null);
-  const [isLoading, setIsLoading] = React.useState(true);
   const [errorMessage, setErrorMessage] = React.useState('');
-
-  const selectedPrediction = selectedMatch ? predictions[selectedMatch.id] : undefined;
-  const predictionsClosed = isPredictionsClosed(predictionsOpen, predictionsCloseAt);
-
   const [filters, setFilters] = React.useState<MatchListFilters>({
     stage: '',
     groupCode: '',
     teamQuery: ''
   });
+
+  const {
+    data: matches = [],
+    isLoading: isMatchesLoading,
+    isError: isMatchesError,
+    error: matchesError
+  } = useMatches();
+  const {
+    data: predictionRows = [],
+    isLoading: isPredictionsLoading,
+    isError: isPredictionsError,
+    error: predictionsError
+  } = usePredictionsByUser(user?.id!);
+  const {
+    data: settings = null,
+    isLoading: isSettingsLoading,
+    isError: isSettingsError,
+    error: settingsError
+  } = useAppSettings();
+
+  const isLoading = isMatchesLoading || isPredictionsLoading || isSettingsLoading;
+  const isError = isMatchesError || isPredictionsError || isSettingsError;
+  const firstError = matchesError || predictionsError || settingsError;
+
+  const predictions = React.useMemo(() => {
+    return predictionRows.reduce<MatchPredictionMap>((acc, row) => {
+      acc[row.match_id] = {
+        homeScore: row.home_score,
+        awayScore: row.away_score
+      };
+      return acc;
+    }, {});
+  }, [predictionRows]);
+
+  const selectedPrediction = selectedMatch ? predictions[selectedMatch.id] : undefined;
+  const predictionsClosed = isPredictionsClosed(
+    settings?.predictions_open ?? true,
+    settings?.predictions_close_at ?? null
+  );
+
+  // const [predictions, setPredictions] = React.useState<MatchPredictionMap>({});
+  // const [predictionsOpen, setPredictionsOpen] = React.useState(true);
+  // const [predictionsCloseAt, setPredictionsCloseAt] = React.useState<string | null>(null);
+  // const [isLoading, setIsLoading] = React.useState(true);
 
   const stageOptions = React.useMemo(() => getUniqueStageOptions(matches), [matches]);
   const groupOptions = React.useMemo(() => getUniqueGroupOptions(matches), [matches]);
@@ -83,45 +124,45 @@ export function MatchesPage() {
     return filterMatches(matches, filters);
   }, [matches, filters]);
 
-  React.useEffect(() => {
-    async function loadPageData() {
-      if (!user?.id) {
-        setIsLoading(false);
-        return;
-      }
+  // React.useEffect(() => {
+  //   async function loadPageData() {
+  //     if (!user?.id) {
+  //       setIsLoading(false);
+  //       return;
+  //     }
 
-      setIsLoading(true);
-      setErrorMessage('');
+  //     setIsLoading(true);
+  //     setErrorMessage('');
 
-      try {
-        const [matchesData, predictionRows, settings] = await Promise.all([
-          getMatches(),
-          getPredictionsByUser(user.id),
-          getAppSettings()
-        ]);
+  //     try {
+  //       const [matchesData, predictionRows, settings] = await Promise.all([
+  //         getMatches(),
+  //         getPredictionsByUser(user.id),
+  //         getAppSettings()
+  //       ]);
 
-        const nextPredictions = predictionRows.reduce<MatchPredictionMap>((acc, row) => {
-          acc[row.match_id] = {
-            homeScore: row.home_score,
-            awayScore: row.away_score
-          };
-          return acc;
-        }, {});
+  //       const nextPredictions = predictionRows.reduce<MatchPredictionMap>((acc, row) => {
+  //         acc[row.match_id] = {
+  //           homeScore: row.home_score,
+  //           awayScore: row.away_score
+  //         };
+  //         return acc;
+  //       }, {});
 
-        setMatches(matchesData);
-        setPredictions(nextPredictions);
-        setPredictionsOpen(settings?.predictions_open ?? true);
-        setPredictionsCloseAt(settings?.predictions_close_at ?? null);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'No se pudieron cargar los partidos';
-        setErrorMessage(message);
-      } finally {
-        setIsLoading(false);
-      }
-    }
+  //       setMatches(matchesData);
+  //       setPredictions(nextPredictions);
+  //       setPredictionsOpen(settings?.predictions_open ?? true);
+  //       setPredictionsCloseAt(settings?.predictions_close_at ?? null);
+  //     } catch (error) {
+  //       const message = error instanceof Error ? error.message : 'No se pudieron cargar los partidos';
+  //       setErrorMessage(message);
+  //     } finally {
+  //       setIsLoading(false);
+  //     }
+  //   }
 
-    void loadPageData();
-  }, [user?.id]);
+  //   void loadPageData();
+  // }, [user?.id]);
 
   const handleOpenPrediction = (match: Match) => {
     const lockMessage = getMatchLockMessage(match, predictionsClosed);
@@ -166,13 +207,43 @@ export function MatchesPage() {
         awayScore: payload.awayScore
       });
 
-      setPredictions((prev) => ({
-        ...prev,
-        [payload.matchId]: {
-          homeScore: payload.homeScore,
-          awayScore: payload.awayScore
+      queryClient.setQueryData(
+        queryKeys.predictions(user.id),
+        (
+          prev:
+            | Array<{
+                id?: string;
+                user_id: string;
+                match_id: string;
+                home_score: number;
+                away_score: number;
+              }>
+            | undefined
+        ) => {
+          const next = prev ? [...prev] : [];
+
+          const existingIndex = next.findIndex((row) => row.match_id === payload.matchId);
+
+          if (existingIndex >= 0) {
+            next[existingIndex] = {
+              ...next[existingIndex],
+              home_score: payload.homeScore,
+              away_score: payload.awayScore
+            };
+            return next;
+          }
+
+          return [
+            ...next,
+            {
+              user_id: user.id,
+              match_id: payload.matchId,
+              home_score: payload.homeScore,
+              away_score: payload.awayScore
+            }
+          ];
         }
-      }));
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo guardar el pronóstico';
       setErrorMessage(message);
@@ -201,9 +272,14 @@ export function MatchesPage() {
           </CardContent>
         </Card>
 
-        {predictionsClosed ? <Alert severity='warning'>La carga de pronósticos está cerrada.</Alert> : null}
-
         {errorMessage ? <Alert severity='error'>{errorMessage}</Alert> : null}
+        {isError ? (
+          <Alert severity='error'>
+            {firstError instanceof Error ? firstError.message : 'No se pudieron cargar los partidos'}
+          </Alert>
+        ) : null}
+
+        {predictionsClosed ? <Alert severity='warning'>La carga de pronósticos está cerrada.</Alert> : null}
 
         <MatchFiltersCard
           title='Filtrar partidos'

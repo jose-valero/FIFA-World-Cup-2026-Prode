@@ -22,15 +22,7 @@ import {
   TextField,
   Typography
 } from '@mui/material';
-import {
-  createAdminMatch,
-  deleteAdminMatch,
-  getAdminMatches,
-  updateAdminMatch,
-  type AdminMatchRow,
-  type AdminMatchStatus
-} from '../features/admin/adminMatches.api';
-import { getTeams, type TeamRow } from '../features/teams/teams.api';
+import { type AdminMatchRow, type AdminMatchStatus } from '../features/admin/adminMatches.api';
 
 import { MatchFiltersCard } from '../features/matches/components/MatchFiltersCard';
 import {
@@ -42,6 +34,13 @@ import {
 import { getStatusLabel } from '../features/matches/helpers/getStatusLabel';
 import { getStatusColor } from '../features/matches/helpers/getStatusColor';
 import { MatchVs } from '../features/matches/components/MatchVs';
+import { useAdminMatches } from '../features/admin/useAdminMatches';
+import { useTeams } from '../features/teams/useTeams';
+import {
+  useCreateAdminMatch,
+  useDeleteAdminMatch,
+  useUpdateAdminMatch
+} from '../features/admin/useAdminMatchMutations';
 
 type FormState = {
   id: string;
@@ -244,15 +243,35 @@ function getDefaultGroupNameForStage(stage: TournamentStage) {
 }
 
 export function AdminMatchesPage() {
-  const [matches, setMatches] = React.useState<AdminMatchRow[]>([]);
-  const [teams, setTeams] = React.useState<TeamRow[]>([]);
+  // const [matches, setMatches] = React.useState<AdminMatchRow[]>([]);
+  // const [teams, setTeams] = React.useState<TeamRow[]>([]);
   const [form, setForm] = React.useState<FormState>(emptyForm);
   const [editingMatch, setEditingMatch] = React.useState<AdminMatchRow | null>(null);
   const [isEditing, setIsEditing] = React.useState(false);
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [isSaving, setIsSaving] = React.useState(false);
+  // const [isLoading, setIsLoading] = React.useState(true);
+  // const [isSaving, setIsSaving] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState('');
   const [successMessage, setSuccessMessage] = React.useState('');
+
+  const {
+    data: matches = [],
+    isLoading: isMatchesLoading,
+    isError: isMatchesError,
+    error: matchesError
+  } = useAdminMatches();
+
+  const { data: teams = [], isLoading: isTeamsLoading, isError: isTeamsError, error: teamsError } = useTeams();
+
+  const createMatchMutation = useCreateAdminMatch();
+  const updateMatchMutation = useUpdateAdminMatch();
+  const deleteMatchMutation = useDeleteAdminMatch();
+
+  const isLoading = isMatchesLoading || isTeamsLoading;
+  const isSaving = createMatchMutation.isPending || updateMatchMutation.isPending;
+  const isDeleting = deleteMatchMutation.isPending;
+
+  const queryError = matchesError || teamsError;
+  const hasQueryError = isMatchesError || isTeamsError;
 
   const [filters, setFilters] = React.useState<MatchListFilters & { status: string }>({
     stage: '',
@@ -262,27 +281,6 @@ export function AdminMatchesPage() {
   });
 
   const [matchPendingDelete, setMatchPendingDelete] = React.useState<AdminMatchRow | null>(null);
-  const [isDeleting, setIsDeleting] = React.useState(false);
-
-  const loadData = React.useCallback(async () => {
-    setIsLoading(true);
-    setErrorMessage('');
-
-    try {
-      const [matchesData, teamsData] = await Promise.all([getAdminMatches(), getTeams()]);
-      setMatches(matchesData);
-      setTeams(teamsData);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'No se pudieron cargar los datos';
-      setErrorMessage(message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  React.useEffect(() => {
-    void loadData();
-  }, [loadData]);
 
   const handleFormChange = (field: keyof FormState, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -407,14 +405,12 @@ export function AdminMatchesPage() {
   const handleConfirmDelete = async () => {
     if (!matchPendingDelete) return;
 
-    setIsDeleting(true);
+    // setIsDeleting(true);
     setErrorMessage('');
     setSuccessMessage('');
 
     try {
-      await deleteAdminMatch(matchPendingDelete.id);
-
-      setMatches((prev) => prev.filter((match) => match.id !== matchPendingDelete.id));
+      await deleteMatchMutation.mutateAsync(matchPendingDelete.id);
       setSuccessMessage('Partido eliminado correctamente.');
 
       if (form.id === matchPendingDelete.id) {
@@ -425,9 +421,9 @@ export function AdminMatchesPage() {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo eliminar el partido';
       setErrorMessage(message);
-    } finally {
+    } /* finally {
       setIsDeleting(false);
-    }
+    } */
   };
 
   const handleCloseDeleteDialog = () => {
@@ -457,7 +453,7 @@ export function AdminMatchesPage() {
     const parsedMatchday = form.matchday.trim() === '' ? null : Number(form.matchday);
     const parsedGroupOrder = form.groupOrder.trim() === '' ? null : Number(form.groupOrder);
 
-    setIsSaving(true);
+    // setIsSaving(true);
 
     try {
       const payload = {
@@ -479,21 +475,20 @@ export function AdminMatchesPage() {
       };
 
       if (isEditing) {
-        await updateAdminMatch(payload);
+        await updateMatchMutation.mutateAsync(payload);
         setSuccessMessage('Partido actualizado correctamente.');
       } else {
-        await createAdminMatch(payload);
+        await createMatchMutation.mutateAsync(payload);
         setSuccessMessage('Partido creado correctamente.');
       }
 
-      await loadData();
       resetForm();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo guardar el partido';
       setErrorMessage(message);
-    } finally {
+    } /* finally {
       setIsSaving(false);
-    }
+    } */
   };
 
   const expectedHomeSlot = editingMatch ? buildSourceSlot(editingMatch, 'home') : null;
@@ -537,6 +532,11 @@ export function AdminMatchesPage() {
 
       {errorMessage ? <Alert severity='error'>{errorMessage}</Alert> : null}
       {successMessage ? <Alert severity='success'>{successMessage}</Alert> : null}
+      {hasQueryError ? (
+        <Alert severity='error'>
+          {queryError instanceof Error ? queryError.message : 'No se pudieron cargar los datos del admin'}
+        </Alert>
+      ) : null}
 
       <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
         <CardContent sx={{ p: { xs: 3, md: 4 } }}>

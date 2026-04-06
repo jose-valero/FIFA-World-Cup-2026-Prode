@@ -56,6 +56,7 @@ export interface UpsertAdminMatchInput {
   awayTeamId: string | null;
 }
 
+// esto no se usa, pendiente
 export async function getAdminMatches(): Promise<AdminMatchRow[]> {
   const { data, error } = await supabase
     .from('matches')

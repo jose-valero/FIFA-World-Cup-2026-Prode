@@ -1,4 +1,3 @@
-import * as React from 'react';
 import {
   Alert,
   Box,
@@ -21,9 +20,9 @@ import BoltRoundedIcon from '@mui/icons-material/BoltRounded';
 import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded';
 import VerifiedRoundedIcon from '@mui/icons-material/VerifiedRounded';
 import { Link as RouterLink } from 'react-router';
-import { getAppSettings } from '../features/settings/appSettings.api';
-import { getLeaderboard } from '../features/leaderboard/leaderboard.api';
-import { getMatches } from '../features/matches/matches.api';
+import { useAppSettings } from '../features/settings/useAppSettings';
+import { useLeaderboard } from '../features/leaderboard/useLeaderboard';
+import { useMatches } from '../features/matches/useMatches';
 import type { Match } from '../features/matches/types';
 
 const howItWorks = [
@@ -149,49 +148,30 @@ function StatCard({ label, value, helper }: { label: string; value: string | num
 }
 
 export function HomePage() {
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [errorMessage, setErrorMessage] = React.useState('');
-  const [leaderboard, setLeaderboard] = React.useState<
-    Array<{
-      user_id: string;
-      display_name: string;
-      total_points: number;
-      exact_hits: number;
-      outcome_hits: number;
-      scored_predictions: number;
-    }>
-  >([]);
-  const [matches, setMatches] = React.useState<Match[]>([]);
-  const [settings, setSettings] = React.useState<{
-    predictions_open: boolean;
-    predictions_close_at: string | null;
-  } | null>(null);
+  const {
+    data: leaderboard = [],
+    isLoading: isLeaderboardLoading,
+    isError: isLeaderboardError,
+    error: leaderboardError
+  } = useLeaderboard();
 
-  React.useEffect(() => {
-    async function loadData() {
-      setIsLoading(true);
-      setErrorMessage('');
+  const {
+    data: matches = [],
+    isLoading: isMatchesLoading,
+    isError: isMatchesError,
+    error: matchesError
+  } = useMatches();
 
-      try {
-        const [leaderboardData, matchesData, settingsData] = await Promise.all([
-          getLeaderboard(),
-          getMatches(),
-          getAppSettings()
-        ]);
+  const {
+    data: settings = null,
+    isLoading: isSettingsLoading,
+    isError: isSettingsError,
+    error: settingsError
+  } = useAppSettings();
 
-        setLeaderboard(leaderboardData);
-        setMatches(matchesData);
-        setSettings(settingsData);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'No se pudo cargar la portada';
-        setErrorMessage(message);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    void loadData();
-  }, []);
+  const isLoading = isLeaderboardLoading || isMatchesLoading || isSettingsLoading;
+  const isError = isLeaderboardError || isMatchesError || isSettingsError;
+  const firstError = leaderboardError || matchesError || settingsError;
 
   const predictionsClosed = isPredictionsClosed(
     settings?.predictions_open ?? true,
@@ -214,7 +194,11 @@ export function HomePage() {
   return (
     <Box component='section'>
       <Stack spacing={4}>
-        {errorMessage ? <Alert severity='error'>{errorMessage}</Alert> : null}
+        {isError ? (
+          <Alert severity='error'>
+            {firstError instanceof Error ? firstError.message : 'No se pudo cargar la portada'}
+          </Alert>
+        ) : null}
 
         <Paper
           elevation={0}

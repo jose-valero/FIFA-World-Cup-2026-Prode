@@ -13,9 +13,9 @@ import {
 } from '@mui/material';
 import { Link as RouterLink } from 'react-router';
 import { useAuth } from '../features/auth/useAuth';
-import { getPredictionsByUser } from '../features/predictions/predictions.api';
-import { getMatches } from '../features/matches/matches.api';
-import { getLeaderboard } from '../features/leaderboard/leaderboard.api';
+import { useMatches } from '../features/matches/useMatches';
+import { useLeaderboard } from '../features/leaderboard/useLeaderboard';
+import { usePredictionsByUser } from '../features/predictions/usePredictionsByUser';
 import type { Match } from '../features/matches/types';
 
 import { MatchFiltersCard } from '../features/matches/components/MatchFiltersCard';
@@ -147,20 +147,26 @@ function SummaryCard({ label, value }: { label: string; value: string | number }
 export function PredictionsPage() {
   const { user } = useAuth();
 
-  const [matches, setMatches] = React.useState<Match[]>([]);
-  const [predictions, setPredictions] = React.useState<UserPrediction[]>([]);
-  const [leaderboard, setLeaderboard] = React.useState<
-    Array<{
-      user_id: string;
-      display_name: string;
-      total_points: number;
-      exact_hits: number;
-      outcome_hits: number;
-      scored_predictions: number;
-    }>
-  >([]);
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [errorMessage, setErrorMessage] = React.useState('');
+  const {
+    data: matches = [],
+    isLoading: isMatchesLoading,
+    isError: isMatchesError,
+    error: matchesError
+  } = useMatches();
+
+  const {
+    data: predictionRows = [],
+    isLoading: isPredictionsLoading,
+    isError: isPredictionsError,
+    error: predictionsError
+  } = usePredictionsByUser(user?.id!);
+
+  const {
+    data: leaderboard = [],
+    isLoading: isLeaderboardLoading,
+    isError: isLeaderboardError,
+    error: leaderboardError
+  } = useLeaderboard();
 
   const [filters, setFilters] = React.useState<MatchListFilters>({
     stage: '',
@@ -168,42 +174,17 @@ export function PredictionsPage() {
     teamQuery: ''
   });
 
-  React.useEffect(() => {
-    async function loadData() {
-      if (!user?.id) {
-        setIsLoading(false);
-        return;
-      }
+  const isLoading = isMatchesLoading || isPredictionsLoading || isLeaderboardLoading;
+  const isError = isMatchesError || isPredictionsError || isLeaderboardError;
+  const firstError = matchesError || predictionsError || leaderboardError;
 
-      setIsLoading(true);
-      setErrorMessage('');
-
-      try {
-        const [matchesData, predictionRows, leaderboardRows] = await Promise.all([
-          getMatches(),
-          getPredictionsByUser(user.id),
-          getLeaderboard()
-        ]);
-
-        setMatches(matchesData);
-        setPredictions(
-          predictionRows.map((row) => ({
-            matchId: row.match_id,
-            homeScore: row.home_score,
-            awayScore: row.away_score
-          }))
-        );
-        setLeaderboard(leaderboardRows);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'No se pudieron cargar tus pronósticos';
-        setErrorMessage(message);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    void loadData();
-  }, [user?.id]);
+  const predictions = React.useMemo(() => {
+    return predictionRows.map((row) => ({
+      matchId: row.match_id,
+      homeScore: row.home_score,
+      awayScore: row.away_score
+    }));
+  }, [predictionRows]);
 
   const matchMap = React.useMemo(() => {
     return new Map(matches.map((match) => [match.id, match]));
@@ -294,7 +275,11 @@ export function PredictionsPage() {
         </CardContent>
       </Card>
 
-      {errorMessage ? <Alert severity='error'>{errorMessage}</Alert> : null}
+      {isError ? (
+        <Alert severity='error'>
+          {firstError instanceof Error ? firstError.message : 'No se pudieron cargar tus pronósticos'}
+        </Alert>
+      ) : null}
 
       {isLoading ? (
         <Stack alignItems='center' sx={{ py: 6 }}>
@@ -324,7 +309,7 @@ export function PredictionsPage() {
           />
 
           {filteredPredictionItems.length === 0 && predictionItems.length > 0 ? (
-            <Alert severity={'warning'}>No se encontraron pronósticos que coincidan con los filtros aplicados.</Alert>
+            <Alert severity='warning'>No se encontraron pronósticos que coincidan con los filtros aplicados.</Alert>
           ) : null}
 
           {predictionItems.length === 0 ? (
@@ -345,7 +330,7 @@ export function PredictionsPage() {
                       Ir a partidos
                     </Button>
 
-                    <Button component={RouterLink} to='/app/leaderboard' variant='text'>
+                    <Button component={RouterLink} to='/leaderboard' variant='text'>
                       Ver ranking
                     </Button>
                   </Stack>

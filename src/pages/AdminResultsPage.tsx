@@ -7,18 +7,14 @@ import {
   CardContent,
   CircularProgress,
   MenuItem,
-  Snackbar,
   Stack,
   TextField,
   Typography
 } from '@mui/material';
-import {
-  getAdminMatches,
-  syncQualifiedTeamsIntoKnockout,
-  updateOfficialResult,
-  type AdminMatchRow,
-  type AdminMatchStatus
-} from '../features/admin/adminResults.api';
+import { type AdminMatchRow, type AdminMatchStatus } from '../features/admin/adminResults.api';
+import { useAdminResults } from '../features/admin/useAdminResults';
+import { useUpdateOfficialResultMutation } from '../features/admin/useAdminResultMutations';
+import { MatchVs } from '../features/matches/components/MatchVs';
 
 type DraftMap = Record<
   string,
@@ -80,38 +76,17 @@ function validateOfficialResultDraft(input: {
 }
 
 export function AdminResultsPage() {
-  const [matches, setMatches] = React.useState<AdminMatchRow[]>([]);
+  const { data: matches = [], isLoading, isError, error } = useAdminResults();
+
+  const updateOfficialResultMutation = useUpdateOfficialResultMutation();
+
   const [drafts, setDrafts] = React.useState<DraftMap>({});
-  const [isLoading, setIsLoading] = React.useState(true);
   const [errorMessage, setErrorMessage] = React.useState('');
   const [successMessage, setSuccessMessage] = React.useState('');
-  const [open, setOpen] = React.useState<boolean>(false);
 
-  const [isSyncingKnockout, setIsSyncingKnockout] = React.useState(false);
-
-  const handleClose = (): void => {
-    setOpen(false);
-    //content
-  };
-
-  async function loadMatches() {
-    setIsLoading(true);
-    setErrorMessage('');
-
-    try {
-      const data = await getAdminMatches();
-      setMatches(data);
-      setDrafts(buildInitialDrafts(data));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'No se pudieron cargar los partidos';
-      setErrorMessage(message);
-    } finally {
-      setIsLoading(false);
-    }
-  }
   React.useEffect(() => {
-    void loadMatches();
-  }, []);
+    setDrafts(buildInitialDrafts(matches));
+  }, [matches]);
 
   const handleDraftChange = (
     matchId: string,
@@ -163,28 +138,12 @@ export function AdminResultsPage() {
     }
 
     try {
-      await updateOfficialResult({
+      await updateOfficialResultMutation.mutateAsync({
         matchId,
         status: draft.status,
         officialHomeScore: parsedHome,
         officialAwayScore: parsedAway
       });
-      // await syncQualifiedTeamsIntoKnockout();
-      // // creo que no necesito esto en esta vista
-      // await loadMatches();
-      setOpen(true);
-      setMatches((prev) =>
-        prev.map((match) =>
-          match.id === matchId
-            ? {
-                ...match,
-                status: draft.status,
-                official_home_score: parsedHome,
-                official_away_score: parsedAway
-              }
-            : match
-        )
-      );
 
       setDrafts((prev) => ({
         ...prev,
@@ -195,33 +154,16 @@ export function AdminResultsPage() {
         }
       }));
 
-      setSuccessMessage('Resultado guardado correctamente.');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'No se pudo actualizar el resultado';
+      setSuccessMessage('Resultado guardado y cruces sincronizados correctamente.');
+    } catch (mutationError) {
+      const message = mutationError instanceof Error ? mutationError.message : 'No se pudo actualizar el resultado';
       setErrorMessage(message);
-    }
-  };
-
-  const handleSyncKnockout = async () => {
-    setErrorMessage('');
-    setSuccessMessage('');
-    setIsSyncingKnockout(true);
-
-    try {
-      await syncQualifiedTeamsIntoKnockout();
-      await loadMatches();
-      setSuccessMessage('Knockout sincronizado correctamente.');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'No se pudo sincronizar el knockout';
-      setErrorMessage(message);
-    } finally {
-      setIsSyncingKnockout(false);
     }
   };
 
   return (
     <Stack spacing={3}>
-      <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+      <Card elevation={0} sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider' }}>
         <CardContent sx={{ p: { xs: 3, md: 4 } }}>
           <Stack spacing={1}>
             <Typography variant='h4' fontWeight={800}>
@@ -232,12 +174,12 @@ export function AdminResultsPage() {
         </CardContent>
       </Card>
 
-      <Button variant='outlined' onClick={() => void handleSyncKnockout()} disabled={isSyncingKnockout}>
-        {isSyncingKnockout ? 'Sincronizando...' : 'Re-sincronizar knockout'}
-      </Button>
-
       {errorMessage ? <Alert severity='error'>{errorMessage}</Alert> : null}
       {successMessage ? <Alert severity='success'>{successMessage}</Alert> : null}
+
+      {isError ? (
+        <Alert severity='error'>{error instanceof Error ? error.message : 'No se pudieron cargar los partidos'}</Alert>
+      ) : null}
 
       {isLoading ? (
         <Stack alignItems='center' sx={{ py: 6 }}>
@@ -249,13 +191,21 @@ export function AdminResultsPage() {
             const draft = drafts[match.id];
 
             return (
-              <Card key={match.id} elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+              <Card key={match.id} elevation={0} sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider' }}>
                 <CardContent sx={{ p: 3 }}>
                   <Stack spacing={2}>
                     <Box>
-                      <Typography variant='h6' fontWeight={800}>
-                        {match.home_team} vs {match.away_team}
-                      </Typography>
+                      <MatchVs
+                        match={
+                          {
+                            homeTeamCode: match.home_team_code,
+                            awayTeamCode: match.away_team_code,
+                            homeTeam: match.home_team,
+                            awayTeam: match.away_team
+                          } as any
+                        }
+                      />
+
                       <Typography variant='body2' color='text.secondary'>
                         {match.group_name} · {formatKickoff(match.kickoff_at)}
                       </Typography>
@@ -292,7 +242,11 @@ export function AdminResultsPage() {
                         sx={{ maxWidth: 180 }}
                       />
 
-                      <Button variant='contained' onClick={() => void handleSave(match.id)}>
+                      <Button
+                        variant='contained'
+                        onClick={() => void handleSave(match.id)}
+                        disabled={updateOfficialResultMutation.isPending}
+                      >
                         Guardar
                       </Button>
                     </Stack>
@@ -303,11 +257,6 @@ export function AdminResultsPage() {
           })}
         </Stack>
       )}
-      <Snackbar open={open} autoHideDuration={6000} onClose={handleClose}>
-        <Alert onClose={handleClose} severity='success' variant='filled' sx={{ width: '100%' }}>
-          Resultado guardado correctamente
-        </Alert>
-      </Snackbar>
     </Stack>
   );
 }
