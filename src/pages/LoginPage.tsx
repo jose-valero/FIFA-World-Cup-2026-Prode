@@ -49,6 +49,7 @@ export function LoginPage() {
 
     try {
       await signInWithGoogle();
+      navigate(redirectTo, { replace: true });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo iniciar sesión con Google';
       setErrorMessage(message);

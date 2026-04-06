@@ -120,8 +120,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const signInWithGoogle = React.useCallback(async () => {
-    const redirectTo = import.meta.env.VITE_SUPABASE_GOOGLE_REDIRECT_URL || window.location.origin;
+  const signInWithGoogle = React.useCallback(async (next = '/app') => {
+    const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+    // const redirectTo = import.meta.env.VITE_SUPABASE_GOOGLE_REDIRECT_URL || window.location.origin;
+    const redirectTo = `${baseUrl}/auth/callback?next=${encodeURIComponent(next)}`;
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',

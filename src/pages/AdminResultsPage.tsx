@@ -7,12 +7,14 @@ import {
   CardContent,
   CircularProgress,
   MenuItem,
+  Snackbar,
   Stack,
   TextField,
   Typography
 } from '@mui/material';
 import {
   getAdminMatches,
+  syncQualifiedTeamsIntoKnockout,
   updateOfficialResult,
   type AdminMatchRow,
   type AdminMatchStatus
@@ -83,24 +85,31 @@ export function AdminResultsPage() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [errorMessage, setErrorMessage] = React.useState('');
   const [successMessage, setSuccessMessage] = React.useState('');
+  const [open, setOpen] = React.useState<boolean>(false);
 
-  React.useEffect(() => {
-    async function loadMatches() {
-      setIsLoading(true);
-      setErrorMessage('');
+  const [isSyncingKnockout, setIsSyncingKnockout] = React.useState(false);
 
-      try {
-        const data = await getAdminMatches();
-        setMatches(data);
-        setDrafts(buildInitialDrafts(data));
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'No se pudieron cargar los partidos';
-        setErrorMessage(message);
-      } finally {
-        setIsLoading(false);
-      }
+  const handleClose = (): void => {
+    setOpen(false);
+    //content
+  };
+
+  async function loadMatches() {
+    setIsLoading(true);
+    setErrorMessage('');
+
+    try {
+      const data = await getAdminMatches();
+      setMatches(data);
+      setDrafts(buildInitialDrafts(data));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudieron cargar los partidos';
+      setErrorMessage(message);
+    } finally {
+      setIsLoading(false);
     }
-
+  }
+  React.useEffect(() => {
     void loadMatches();
   }, []);
 
@@ -152,13 +161,6 @@ export function AdminResultsPage() {
       setErrorMessage(validationError);
       return;
     }
-    // if (
-    //   (parsedHome !== null && (Number.isNaN(parsedHome) || parsedHome < 0)) ||
-    //   (parsedAway !== null && (Number.isNaN(parsedAway) || parsedAway < 0))
-    // ) {
-    //   setErrorMessage('Los resultados deben ser números válidos mayores o iguales a 0.');
-    //   return;
-    // }
 
     try {
       await updateOfficialResult({
@@ -167,7 +169,10 @@ export function AdminResultsPage() {
         officialHomeScore: parsedHome,
         officialAwayScore: parsedAway
       });
-
+      // await syncQualifiedTeamsIntoKnockout();
+      // // creo que no necesito esto en esta vista
+      // await loadMatches();
+      setOpen(true);
       setMatches((prev) =>
         prev.map((match) =>
           match.id === matchId
@@ -190,10 +195,27 @@ export function AdminResultsPage() {
         }
       }));
 
-      setSuccessMessage('Resultado actualizado correctamente.');
+      setSuccessMessage('Resultado guardado correctamente.');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo actualizar el resultado';
       setErrorMessage(message);
+    }
+  };
+
+  const handleSyncKnockout = async () => {
+    setErrorMessage('');
+    setSuccessMessage('');
+    setIsSyncingKnockout(true);
+
+    try {
+      await syncQualifiedTeamsIntoKnockout();
+      await loadMatches();
+      setSuccessMessage('Knockout sincronizado correctamente.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo sincronizar el knockout';
+      setErrorMessage(message);
+    } finally {
+      setIsSyncingKnockout(false);
     }
   };
 
@@ -209,6 +231,10 @@ export function AdminResultsPage() {
           </Stack>
         </CardContent>
       </Card>
+
+      <Button variant='outlined' onClick={() => void handleSyncKnockout()} disabled={isSyncingKnockout}>
+        {isSyncingKnockout ? 'Sincronizando...' : 'Re-sincronizar knockout'}
+      </Button>
 
       {errorMessage ? <Alert severity='error'>{errorMessage}</Alert> : null}
       {successMessage ? <Alert severity='success'>{successMessage}</Alert> : null}
@@ -277,6 +303,11 @@ export function AdminResultsPage() {
           })}
         </Stack>
       )}
+      <Snackbar open={open} autoHideDuration={6000} onClose={handleClose}>
+        <Alert onClose={handleClose} severity='success' variant='filled' sx={{ width: '100%' }}>
+          Resultado guardado correctamente
+        </Alert>
+      </Snackbar>
     </Stack>
   );
 }

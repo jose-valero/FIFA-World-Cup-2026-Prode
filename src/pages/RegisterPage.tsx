@@ -72,7 +72,7 @@ export function RegisterPage() {
     setIsSubmitting(true);
 
     try {
-      await signInWithGoogle();
+      await signInWithGoogle('/app');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo registrar con Google';
       setErrorMessage(message);

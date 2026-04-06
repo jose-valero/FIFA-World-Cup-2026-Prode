@@ -82,3 +82,13 @@ export async function updateOfficialResult({
     throw error;
   }
 }
+
+export async function syncQualifiedTeamsIntoKnockout() {
+  const { data, error } = await supabase.rpc('sync_qualified_teams_into_knockout');
+
+  if (error) {
+    throw new Error(error.message || 'No se pudo sincronizar el knockout');
+  }
+
+  return data;
+}

@@ -7,7 +7,7 @@ export interface AuthContextValueSchema {
   profile: AuthProfile | null;
   signUpWithEmail: (params: { email: string; password: string; displayName: string }) => Promise<void>;
   signInWithEmail: (params: { email: string; password: string }) => Promise<void>;
-  signInWithGoogle: () => Promise<void>;
+  signInWithGoogle: (next?: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 

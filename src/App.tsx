@@ -17,6 +17,7 @@ import { RequireAdmin } from './features/auth/RequireAdmin';
 import { AdminSettingsPage } from './pages/AdminSettingsPage';
 import { AdminMatchesPage } from './pages/AdminMatchesPage';
 import { FixturePage } from './pages/FixturePage';
+import { AuthCallbackPage } from './pages/AuthCallbackPage';
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
       <Route element={<PublicLayout />}>
         <Route path='/' element={<HomePage />} />
         <Route path='/leaderboard' element={<LeaderboardPage />} />
+        <Route path='/auth/callback' element={<AuthCallbackPage />} />
       </Route>
 
       <Route element={<PublicOnlyRoute />}>
