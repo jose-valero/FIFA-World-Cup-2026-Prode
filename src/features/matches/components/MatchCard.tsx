@@ -33,7 +33,7 @@ function getStatusColor(status: Match['status']) {
 }
 export function MatchCard({ match, predictionSummary, onPredict, isLocked = false, lockMessage }: MatchCardProps) {
   return (
-    <Card elevation={0} sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider' }}>
+    <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
       <CardContent sx={{ p: 3 }}>
         <Stack spacing={2}>
           <Stack

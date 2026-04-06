@@ -233,7 +233,7 @@ function GroupMatchCard({ match }: { match: Match }) {
     <Box
       sx={{
         p: 2,
-        borderRadius: 3,
+        borderRadius: 2,
         border: '1px solid',
         borderColor: 'divider',
         bgcolor: 'background.paper'
@@ -313,7 +313,7 @@ export function FixturePage() {
 
   return (
     <Stack spacing={3}>
-      <Card elevation={0} sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider' }}>
+      <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
         <CardContent sx={{ p: { xs: 3, md: 4 } }}>
           <Stack spacing={2}>
             <Box>
@@ -377,7 +377,7 @@ export function FixturePage() {
                     key={groupCode}
                     elevation={0}
                     sx={{
-                      borderRadius: 4,
+                      borderRadius: 2,
                       border: '1px solid',
                       borderColor: 'divider'
                     }}

@@ -34,7 +34,7 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
       elevation={0}
       sx={{
         height: '100%',
-        borderRadius: 4,
+        borderRadius: 2,
         border: '1px solid',
         borderColor: 'divider'
       }}
@@ -163,7 +163,7 @@ export function DashboardPage() {
             elevation={0}
             sx={{
               height: '100%',
-              borderRadius: 4,
+              borderRadius: 2,
               border: '1px solid',
               borderColor: 'divider'
             }}
@@ -229,7 +229,7 @@ export function DashboardPage() {
             elevation={0}
             sx={{
               height: '100%',
-              borderRadius: 4,
+              borderRadius: 2,
               border: '1px solid',
               borderColor: 'divider'
             }}

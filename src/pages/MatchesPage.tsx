@@ -8,6 +8,14 @@ import { getPredictionsByUser, upsertPrediction } from '../features/predictions/
 import { getAppSettings } from '../features/settings/appSettings.api';
 import { useAuth } from '../features/auth/useAuth';
 
+import { MatchFiltersCard } from '../features/matches/components/MatchFiltersCard';
+import {
+  filterMatches,
+  getUniqueGroupOptions,
+  getUniqueStageOptions,
+  type MatchListFilters
+} from '../features/matches/listFilters';
+
 type MatchPredictionMap = Record<
   string,
   {
@@ -61,6 +69,19 @@ export function MatchesPage() {
 
   const selectedPrediction = selectedMatch ? predictions[selectedMatch.id] : undefined;
   const predictionsClosed = isPredictionsClosed(predictionsOpen, predictionsCloseAt);
+
+  const [filters, setFilters] = React.useState<MatchListFilters>({
+    stage: '',
+    groupCode: '',
+    teamQuery: ''
+  });
+
+  const stageOptions = React.useMemo(() => getUniqueStageOptions(matches), [matches]);
+  const groupOptions = React.useMemo(() => getUniqueGroupOptions(matches), [matches]);
+
+  const filteredMatches = React.useMemo(() => {
+    return filterMatches(matches, filters);
+  }, [matches, filters]);
 
   React.useEffect(() => {
     async function loadPageData() {
@@ -158,10 +179,17 @@ export function MatchesPage() {
     }
   };
 
+  const handleFilterChange = (field: keyof MatchListFilters, value: string) => {
+    setFilters((prev) => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
   return (
     <>
       <Stack spacing={3}>
-        <Card elevation={0} sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider' }}>
+        <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
           <CardContent sx={{ p: { xs: 3, md: 4 } }}>
             <Stack spacing={1}>
               <Typography variant='h4' fontWeight={800}>
@@ -177,6 +205,18 @@ export function MatchesPage() {
 
         {errorMessage ? <Alert severity='error'>{errorMessage}</Alert> : null}
 
+        <MatchFiltersCard
+          title='Filtrar partidos'
+          filters={filters}
+          onChange={(field, value) => handleFilterChange(field as keyof MatchListFilters, value)}
+          stageOptions={stageOptions}
+          groupOptions={groupOptions}
+        />
+
+        {filteredMatches.length === 0 && matches.length > 0 ? (
+          <Alert severity='warning'>No hay partidos que coincidan con los filtros.</Alert>
+        ) : null}
+
         {isLoading ? (
           <Stack alignItems='center' sx={{ py: 6 }}>
             <CircularProgress />
@@ -185,7 +225,7 @@ export function MatchesPage() {
           <Alert severity='info'>No hay partidos cargados todavía.</Alert>
         ) : (
           <Stack spacing={2}>
-            {matches.map((match) => (
+            {filteredMatches.map((match) => (
               <MatchCard
                 key={match.id}
                 match={match}

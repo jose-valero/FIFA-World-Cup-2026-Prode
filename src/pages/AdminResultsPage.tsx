@@ -199,7 +199,7 @@ export function AdminResultsPage() {
 
   return (
     <Stack spacing={3}>
-      <Card elevation={0} sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider' }}>
+      <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
         <CardContent sx={{ p: { xs: 3, md: 4 } }}>
           <Stack spacing={1}>
             <Typography variant='h4' fontWeight={800}>
@@ -223,7 +223,7 @@ export function AdminResultsPage() {
             const draft = drafts[match.id];
 
             return (
-              <Card key={match.id} elevation={0} sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider' }}>
+              <Card key={match.id} elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
                 <CardContent sx={{ p: 3 }}>
                   <Stack spacing={2}>
                     <Box>

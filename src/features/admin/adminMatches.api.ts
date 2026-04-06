@@ -34,6 +34,8 @@ export interface AdminMatchRow {
   away_source_group_rank: number | null;
   away_source_group_set: string | null;
   away_source_match_id: string | null;
+
+  group_code: string | null;
 }
 
 export interface UpsertAdminMatchInput {
@@ -64,6 +66,7 @@ export async function getAdminMatches(): Promise<AdminMatchRow[]> {
       matchday,
       group_order,
       group_name,
+      group_code,
       home_team,
       away_team,
       home_team_id,

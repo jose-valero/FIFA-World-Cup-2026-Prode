@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { getStageLabel, stageOptions, type TournamentStage } from '../features/tournament/stages';
+import { getStageLabel, type TournamentStage } from '../features/tournament/stages';
 import {
   Alert,
   Box,
@@ -22,6 +22,14 @@ import {
   type AdminMatchStatus
 } from '../features/admin/adminMatches.api';
 import { getTeams, type TeamRow } from '../features/teams/teams.api';
+
+import { MatchFiltersCard } from '../features/matches/components/MatchFiltersCard';
+import {
+  getUniqueGroupOptions,
+  getUniqueStageOptions,
+  normalizeText,
+  type MatchListFilters
+} from '../features/matches/listFilters';
 
 type FormState = {
   id: string;
@@ -143,6 +151,13 @@ export function AdminMatchesPage() {
   const [isSaving, setIsSaving] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState('');
   const [successMessage, setSuccessMessage] = React.useState('');
+
+  const [filters, setFilters] = React.useState<MatchListFilters & { status: string }>({
+    stage: '',
+    groupCode: '',
+    teamQuery: '',
+    status: ''
+  });
 
   const loadData = React.useCallback(async () => {
     setIsLoading(true);
@@ -345,9 +360,29 @@ export function AdminMatchesPage() {
   const expectedHomeSlot = editingMatch ? buildSourceSlot(editingMatch, 'home') : null;
   const expectedAwaySlot = editingMatch ? buildSourceSlot(editingMatch, 'away') : null;
 
+  const stageOptions = React.useMemo(() => getUniqueStageOptions(matches), [matches]);
+  const groupOptions = React.useMemo(() => getUniqueGroupOptions(matches), [matches]);
+  const statusOptions = React.useMemo(() => [...new Set(matches.map((match) => match.status))], [matches]);
+
+  const filteredMatches = React.useMemo(() => {
+    return matches.filter((match) => {
+      const matchesStage = !filters.stage || match.stage === filters.stage;
+      const matchesGroup = !filters.groupCode || match.group_code === filters.groupCode;
+      const matchesStatus = !filters.status || match.status === filters.status;
+
+      const teamHaystack = normalizeText(
+        [match.home_team, match.away_team, match.home_team_code, match.away_team_code].filter(Boolean).join(' ')
+      );
+
+      const matchesTeam = !filters.teamQuery || teamHaystack.includes(normalizeText(filters.teamQuery));
+
+      return matchesStage && matchesGroup && matchesStatus && matchesTeam;
+    });
+  }, [matches, filters]);
+
   return (
     <Stack spacing={3}>
-      <Card elevation={0} sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider' }}>
+      <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
         <CardContent sx={{ p: { xs: 3, md: 4 } }}>
           <Stack spacing={1}>
             <Typography variant='h4' fontWeight={800}>
@@ -364,7 +399,7 @@ export function AdminMatchesPage() {
       {errorMessage ? <Alert severity='error'>{errorMessage}</Alert> : null}
       {successMessage ? <Alert severity='success'>{successMessage}</Alert> : null}
 
-      <Card elevation={0} sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider' }}>
+      <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
         <CardContent sx={{ p: { xs: 3, md: 4 } }}>
           <Stack spacing={2}>
             <Typography variant='h5' fontWeight={800}>
@@ -573,17 +608,31 @@ export function AdminMatchesPage() {
         </CardContent>
       </Card>
 
+      <MatchFiltersCard
+        title='Filtrar partidos del admin'
+        filters={filters}
+        onChange={(field, value) =>
+          setFilters((prev) => ({
+            ...prev,
+            [field]: value
+          }))
+        }
+        stageOptions={stageOptions}
+        groupOptions={groupOptions}
+        statusOptions={statusOptions}
+      />
+
       {isLoading ? (
         <Stack alignItems='center' sx={{ py: 6 }}>
           <CircularProgress />
         </Stack>
       ) : (
         <Stack spacing={2}>
-          {matches.map((match) => {
+          {filteredMatches.map((match) => {
             const expectedPair = buildExpectedPairLabel(match);
 
             return (
-              <Card key={match.id} elevation={0} sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider' }}>
+              <Card key={match.id} elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
                 <CardContent sx={{ p: 3 }}>
                   <Stack
                     direction={{ xs: 'column', md: 'row' }}

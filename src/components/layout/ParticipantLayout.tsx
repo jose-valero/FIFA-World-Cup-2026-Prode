@@ -33,7 +33,7 @@ export function ParticipantLayout() {
       <Card
         elevation={0}
         sx={{
-          borderRadius: 4,
+          borderRadius: 2,
           border: '1px solid',
           borderColor: 'divider'
         }}

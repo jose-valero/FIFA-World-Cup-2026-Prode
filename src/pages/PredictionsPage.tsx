@@ -18,6 +18,14 @@ import { getMatches } from '../features/matches/matches.api';
 import { getLeaderboard } from '../features/leaderboard/leaderboard.api';
 import type { Match } from '../features/matches/types';
 
+import { MatchFiltersCard } from '../features/matches/components/MatchFiltersCard';
+import {
+  filterMatches,
+  getUniqueGroupOptions,
+  getUniqueStageOptions,
+  type MatchListFilters
+} from '../features/matches/listFilters';
+
 type UserPrediction = {
   matchId: string;
   homeScore: number;
@@ -115,7 +123,7 @@ function SummaryCard({ label, value }: { label: string; value: string | number }
       elevation={0}
       sx={{
         height: '100%',
-        borderRadius: 4,
+        borderRadius: 2,
         border: '1px solid',
         borderColor: 'divider'
       }}
@@ -152,6 +160,12 @@ export function PredictionsPage() {
   >([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [errorMessage, setErrorMessage] = React.useState('');
+
+  const [filters, setFilters] = React.useState<MatchListFilters>({
+    stage: '',
+    groupCode: '',
+    teamQuery: ''
+  });
 
   React.useEffect(() => {
     async function loadData() {
@@ -211,6 +225,21 @@ export function PredictionsPage() {
     return sortByKickoff(items);
   }, [predictions, matchMap]);
 
+  const stageOptions = React.useMemo(() => {
+    return getUniqueStageOptions(predictionItems.map((item) => item.match).filter(Boolean) as Match[]);
+  }, [predictionItems]);
+
+  const groupOptions = React.useMemo(() => {
+    return getUniqueGroupOptions(predictionItems.map((item) => item.match).filter(Boolean) as Match[]);
+  }, [predictionItems]);
+
+  const filteredPredictionItems = React.useMemo(() => {
+    return predictionItems.filter((item) => {
+      if (!item.match) return false;
+      return filterMatches([item.match], filters).length > 0;
+    });
+  }, [predictionItems, filters]);
+
   const currentUserLeaderboardRow = React.useMemo(() => {
     if (!user?.id) return null;
     return leaderboard.find((row) => row.user_id === user.id) ?? null;
@@ -246,7 +275,7 @@ export function PredictionsPage() {
       <Card
         elevation={0}
         sx={{
-          borderRadius: 4,
+          borderRadius: 2,
           border: '1px solid',
           borderColor: 'divider'
         }}
@@ -280,11 +309,28 @@ export function PredictionsPage() {
             ))}
           </Grid>
 
+          <MatchFiltersCard
+            title='Filtrar pronósticos'
+            filters={filters}
+            onChange={(field, value) =>
+              setFilters((prev) => ({
+                ...prev,
+                [field]: value
+              }))
+            }
+            stageOptions={stageOptions}
+            groupOptions={groupOptions}
+          />
+
+          {filteredPredictionItems.length === 0 && predictionItems.length > 0 ? (
+            <Alert severity={'warning'}>No se encontraron pronósticos que coincidan con los filtros aplicados.</Alert>
+          ) : null}
+
           {predictionItems.length === 0 ? (
             <Card
               elevation={0}
               sx={{
-                borderRadius: 4,
+                borderRadius: 2,
                 border: '1px solid',
                 borderColor: 'divider'
               }}
@@ -307,7 +353,7 @@ export function PredictionsPage() {
             </Card>
           ) : (
             <Stack spacing={2}>
-              {predictionItems.map((item) => {
+              {filteredPredictionItems.map((item) => {
                 const { match, prediction, points, isExactHit, isOutcomeHit } = item;
 
                 return (
@@ -315,7 +361,7 @@ export function PredictionsPage() {
                     key={prediction.matchId}
                     elevation={0}
                     sx={{
-                      borderRadius: 4,
+                      borderRadius: 2,
                       border: '1px solid',
                       borderColor: 'divider'
                     }}

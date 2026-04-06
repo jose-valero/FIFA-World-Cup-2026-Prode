@@ -62,7 +62,7 @@ export function LoginPage() {
         sx={{
           width: '100%',
           maxWidth: 520,
-          borderRadius: 4,
+          borderRadius: 2,
           border: '1px solid',
           borderColor: 'divider'
         }}
