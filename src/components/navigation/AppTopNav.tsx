@@ -3,7 +3,6 @@ import AppBar from '@mui/material/AppBar';
 import Avatar from '@mui/material/Avatar';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import Container from '@mui/material/Container';
 import IconButton from '@mui/material/IconButton';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
@@ -12,9 +11,10 @@ import Typography from '@mui/material/Typography';
 import MenuIcon from '@mui/icons-material/Menu';
 import Tooltip from '@mui/material/Tooltip';
 import { NavLink, useNavigate } from 'react-router';
-import { FullLogo } from '../ui/brand/FullLogo';
 import { useAuth } from '../../features/auth/useAuth';
 import { Divider } from '@mui/material';
+import { BrandLogo } from '../../assets/brand/BrandLogo';
+import { AppContainer } from '../layout/AppContainer';
 
 type NavItem = {
   label: string;
@@ -94,7 +94,7 @@ export default function AppTopNav() {
 
   return (
     <AppBar position='sticky' color='transparent' elevation={0}>
-      <Container maxWidth='lg'>
+      <AppContainer sx={{ py: {} }}>
         <Toolbar disableGutters sx={{ minHeight: 64 }}>
           <Box
             sx={{
@@ -112,7 +112,7 @@ export default function AppTopNav() {
                 color: 'inherit'
               }}
             >
-              <FullLogo />
+              <BrandLogo />
             </NavLink>
           </Box>
 
@@ -280,7 +280,7 @@ export default function AppTopNav() {
             )}
           </Box>
         </Toolbar>
-      </Container>
+      </AppContainer>
     </AppBar>
   );
 }

@@ -1,5 +1,8 @@
 import { Button, Card, CardContent, Chip, Divider, Stack, Typography } from '@mui/material';
 import type { Match } from '../types';
+import { getStatusLabel } from '../helpers/getStatusLabel';
+import { getStatusColor } from '../helpers/getStatusColor';
+import { MatchVs } from './MatchVs';
 
 interface MatchCardProps {
   match: Match;
@@ -9,28 +12,6 @@ interface MatchCardProps {
   lockMessage?: string;
 }
 
-function getStatusLabel(status: Match['status']) {
-  switch (status) {
-    case 'live':
-      return 'En vivo';
-    case 'finished':
-      return 'Finalizado';
-    case 'scheduled':
-    default:
-      return 'Pendiente';
-  }
-}
-function getStatusColor(status: Match['status']) {
-  switch (status) {
-    case 'live':
-      return 'error';
-    case 'finished':
-      return 'success';
-    case 'scheduled':
-    default:
-      return 'warning';
-  }
-}
 export function MatchCard({ match, predictionSummary, onPredict, isLocked = false, lockMessage }: MatchCardProps) {
   return (
     <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
@@ -53,9 +34,7 @@ export function MatchCard({ match, predictionSummary, onPredict, isLocked = fals
                 />
               </Stack>
 
-              <Typography variant='h6' fontWeight={800}>
-                {match.homeTeam} vs {match.awayTeam}
-              </Typography>
+              <MatchVs match={match} />
 
               <Typography variant='body2' color='text.secondary'>
                 {match.kickoff}

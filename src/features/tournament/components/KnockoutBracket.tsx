@@ -330,11 +330,7 @@ export function KnockoutBracket({ matches, onMatchClick }: KnockoutBracketProps)
               height: node.height
             }}
           >
-            <KnockoutMatchNode
-              match={node.match}
-              onClick={onMatchClick}
-              highlighted={/* node.match.id === '103' ||  */ node.match.id === '104'}
-            />
+            <KnockoutMatchNode match={node.match} onClick={onMatchClick} highlighted={node.match.id === '104'} />
           </Box>
         ))}
       </Box>

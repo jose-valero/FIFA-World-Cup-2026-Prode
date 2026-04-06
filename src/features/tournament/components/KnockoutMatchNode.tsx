@@ -1,5 +1,6 @@
 import { Box, Stack, Typography, alpha } from '@mui/material';
 import type { Match } from '../../matches/types';
+import { TeamFlag } from '../../teams/components/TeamFlag';
 
 interface KnockoutMatchNodeProps {
   match: Match;
@@ -31,39 +32,93 @@ function buildSourceSlot(match: Match, side: 'home' | 'away'): string | null {
   }
 }
 
-function buildDisplayedSideLabel(match: Match, side: 'home' | 'away') {
+function buildDisplayedSideData(match: Match, side: 'home' | 'away') {
   const teamName = side === 'home' ? match.homeTeam : match.awayTeam;
+  const teamCode = side === 'home' ? match.homeTeamCode : match.awayTeamCode;
   const slot = buildSourceSlot(match, side);
 
-  if (teamName && teamName.trim() !== '') {
-    return teamName;
+  const hasRealTeam = Boolean(teamName && teamName.trim() !== '' && teamCode);
+
+  if (hasRealTeam) {
+    return {
+      label: teamName!,
+      teamCode,
+      isPlaceholder: false
+    };
   }
 
-  return slot || 'Por definir';
+  return {
+    label: slot || teamName || 'Por definir',
+    teamCode: null,
+    isPlaceholder: true
+  };
 }
 
 function getScoreValue(value: number | null) {
   return value === null ? '—' : String(value);
 }
 
-function MatchRow({ label, score, isWinner }: { label: string; score: string; isWinner: boolean }) {
+function MatchRow({
+  label,
+  teamCode,
+  score,
+  isWinner,
+  isPlaceholder
+}: {
+  label: string;
+  teamCode: string | null;
+  score: string;
+  isWinner: boolean;
+  isPlaceholder: boolean;
+}) {
   return (
     <Stack direction='row' alignItems='center' spacing={1}>
-      <Typography
-        variant='body2'
-        sx={{
-          flex: 1,
-          minWidth: 0,
-          fontSize: 13,
-          lineHeight: 1.1,
-          fontWeight: isWinner ? 800 : 700,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap'
-        }}
-      >
-        {label}
-      </Typography>
+      <Stack direction='row' alignItems='center' spacing={1} sx={{ flex: 1, minWidth: 0 }}>
+        {isPlaceholder ? (
+          <Box
+            sx={(theme) => ({
+              px: 0.75,
+              py: 0.25,
+              minWidth: 38,
+              borderRadius: '999px',
+              border: '1px solid',
+              borderColor: 'divider',
+              bgcolor: alpha(theme.palette.primary.main, 0.08),
+              textAlign: 'center'
+            })}
+          >
+            <Typography
+              variant='caption'
+              sx={{
+                display: 'block',
+                fontSize: 10,
+                lineHeight: 1.1,
+                fontWeight: 800
+              }}
+            >
+              {label}
+            </Typography>
+          </Box>
+        ) : (
+          <TeamFlag teamCode={teamCode} teamName={label} size={16} />
+        )}
+
+        <Typography
+          variant='body2'
+          sx={{
+            flex: 1,
+            minWidth: 0,
+            fontSize: 13,
+            lineHeight: 1.1,
+            fontWeight: isWinner ? 800 : 700,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          {label}
+        </Typography>
+      </Stack>
 
       <Typography
         variant='body2'
@@ -82,8 +137,8 @@ function MatchRow({ label, score, isWinner }: { label: string; score: string; is
 }
 
 export function KnockoutMatchNode({ match, onClick, highlighted = false }: KnockoutMatchNodeProps) {
-  const homeLabel = buildDisplayedSideLabel(match, 'home');
-  const awayLabel = buildDisplayedSideLabel(match, 'away');
+  const homeSide = buildDisplayedSideData(match, 'home');
+  const awaySide = buildDisplayedSideData(match, 'away');
   const clickable = Boolean(onClick);
 
   const homeScore = match.officialHomeScore;
@@ -126,8 +181,21 @@ export function KnockoutMatchNode({ match, onClick, highlighted = false }: Knock
       })}
     >
       <Stack spacing={1.75} sx={{ width: '100%' }}>
-        <MatchRow label={homeLabel} score={getScoreValue(homeScore)} isWinner={homeWinner} />
-        <MatchRow label={awayLabel} score={getScoreValue(awayScore)} isWinner={awayWinner} />
+        <MatchRow
+          label={homeSide.label}
+          teamCode={homeSide.teamCode}
+          isPlaceholder={homeSide.isPlaceholder}
+          score={getScoreValue(homeScore)}
+          isWinner={homeWinner}
+        />
+
+        <MatchRow
+          label={awaySide.label}
+          teamCode={awaySide.teamCode}
+          isPlaceholder={awaySide.isPlaceholder}
+          score={getScoreValue(awayScore)}
+          isWinner={awayWinner}
+        />
       </Stack>
     </Box>
   );

@@ -1,5 +1,8 @@
 import * as React from 'react';
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Alert,
   Box,
   Card,
@@ -22,6 +25,10 @@ import { getMatches } from '../features/matches/matches.api';
 import type { Match } from '../features/matches/types';
 import { KnockoutBracket } from '../features/tournament/components/KnockoutBracket';
 import { buildProjectedKnockoutMatches } from '../features/tournament/buildProjectedKnockoutMatches';
+import { TeamFlag } from '../features/teams/components/TeamFlag';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import { MatchVs } from '../features/matches/components/MatchVs';
+
 type FixtureViewMode = 'group_stage' | 'knockout';
 
 type ClientGroupStandingRow = {
@@ -250,9 +257,7 @@ function GroupMatchCard({ match }: { match: Match }) {
           {score ? <Chip label={score} size='small' color='primary' /> : null}
         </Stack>
 
-        <Typography fontWeight={800}>
-          {match.homeTeam} vs {match.awayTeam}
-        </Typography>
+        <MatchVs match={match} />
 
         <Typography variant='body2' color='text.secondary'>
           {match.kickoff}
@@ -430,8 +435,13 @@ export function FixturePage() {
                                     >
                                       <TableCell>{row.rank_in_group}</TableCell>
                                       <TableCell>
-                                        <Stack direction='row' spacing={1}>
-                                          <Typography fontWeight={700}>{row.team_name}</Typography>
+                                        <Stack direction='row' spacing={1} alignItems={'center'}>
+                                          <Stack direction='row' spacing={1} alignItems='center'>
+                                            <TeamFlag teamCode={row?.team_code} teamName={row?.team_name} />
+                                            <Typography variant='h6' fontWeight={700}>
+                                              {row?.team_name}
+                                            </Typography>
+                                          </Stack>
                                           <Typography variant='caption' color='text.secondary'>
                                             {row.team_code}
                                           </Typography>
@@ -463,15 +473,24 @@ export function FixturePage() {
                         <Divider />
 
                         <Box>
-                          <Typography variant='overline' color='text.secondary'>
-                            Partidos del grupo
-                          </Typography>
-
-                          <Stack spacing={1.5} sx={{ mt: 1 }}>
-                            {groupMatches.map((match) => (
-                              <GroupMatchCard key={match.id} match={match} />
-                            ))}
-                          </Stack>
+                          <Accordion>
+                            <AccordionSummary
+                              expandIcon={<ExpandMoreIcon />}
+                              aria-controls='panel1-content'
+                              id='panel1-header'
+                            >
+                              <Typography variant='overline' color='text.secondary'>
+                                Partidos del grupo {groupCode}
+                              </Typography>
+                            </AccordionSummary>
+                            <AccordionDetails>
+                              <Stack spacing={1.5} sx={{ mt: 1 }}>
+                                {groupMatches.map((match) => (
+                                  <GroupMatchCard key={match.id} match={match} />
+                                ))}
+                              </Stack>
+                            </AccordionDetails>
+                          </Accordion>
                         </Box>
                       </Stack>
                     </CardContent>

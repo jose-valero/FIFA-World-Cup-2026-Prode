@@ -1,5 +1,9 @@
 import * as React from 'react';
-import { getStageLabel, type TournamentStage } from '../features/tournament/stages';
+import {
+  getStageLabel,
+  stageOptions as tournamentStageOptions,
+  type TournamentStage
+} from '../features/tournament/stages';
 import {
   Alert,
   Box,
@@ -8,6 +12,11 @@ import {
   CardContent,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   MenuItem,
   Stack,
   TextField,
@@ -30,6 +39,9 @@ import {
   normalizeText,
   type MatchListFilters
 } from '../features/matches/listFilters';
+import { getStatusLabel } from '../features/matches/helpers/getStatusLabel';
+import { getStatusColor } from '../features/matches/helpers/getStatusColor';
+import { MatchVs } from '../features/matches/components/MatchVs';
 
 type FormState = {
   id: string;
@@ -141,6 +153,96 @@ function buildExpectedPairLabel(match: AdminMatchRow) {
   return `${home ?? 'TBD'} vs ${away ?? 'TBD'}`;
 }
 
+function isValidDateTimeLocal(value: string) {
+  if (!value.trim()) return false;
+  return !Number.isNaN(new Date(value).getTime());
+}
+
+function normalizeMatchId(value: string) {
+  return value.trim();
+}
+
+function hasManualOverride(match: AdminMatchRow) {
+  if (match.stage === 'group_stage') {
+    return false;
+  }
+
+  const expectedHomeSlot = buildSourceSlot(match, 'home');
+  const expectedAwaySlot = buildSourceSlot(match, 'away');
+
+  const homeLooksManual =
+    Boolean(match.home_team_code) && expectedHomeSlot !== null && match.home_team_code !== expectedHomeSlot;
+
+  const awayLooksManual =
+    Boolean(match.away_team_code) && expectedAwaySlot !== null && match.away_team_code !== expectedAwaySlot;
+
+  return homeLooksManual || awayLooksManual;
+}
+
+function validateAdminMatchForm(input: FormState) {
+  const id = normalizeMatchId(input.id);
+  const homeTeam = input.homeTeam.trim();
+  const awayTeam = input.awayTeam.trim();
+  const homeCode = input.homeTeamCode.trim();
+  const awayCode = input.awayTeamCode.trim();
+  const groupName = input.groupName.trim();
+
+  if (
+    !id ||
+    !input.stage.trim() ||
+    !groupName ||
+    !homeTeam ||
+    !awayTeam ||
+    !input.kickoffAt.trim() ||
+    !input.stadium.trim() ||
+    !input.city.trim()
+  ) {
+    return 'Completa todos los campos obligatorios.';
+  }
+
+  if (/\s/.test(id)) {
+    return 'El ID del partido no debe contener espacios.';
+  }
+
+  if (!isValidDateTimeLocal(input.kickoffAt)) {
+    return 'La fecha y hora del partido no es válida.';
+  }
+
+  if (homeTeam === awayTeam) {
+    return 'El equipo local y el visitante no pueden ser el mismo.';
+  }
+
+  if (homeCode && awayCode && homeCode === awayCode) {
+    return 'El código local y el código visitante no pueden ser iguales.';
+  }
+
+  const parsedMatchday = input.matchday.trim() === '' ? null : Number(input.matchday);
+  const parsedGroupOrder = input.groupOrder.trim() === '' ? null : Number(input.groupOrder);
+
+  if (
+    (parsedMatchday !== null && (!Number.isInteger(parsedMatchday) || parsedMatchday < 0)) ||
+    (parsedGroupOrder !== null && (!Number.isInteger(parsedGroupOrder) || parsedGroupOrder < 0))
+  ) {
+    return 'Jornada y orden deben ser números enteros válidos mayores o iguales a 0.';
+  }
+
+  if (input.stage === 'group_stage') {
+    if (parsedMatchday === null || parsedGroupOrder === null) {
+      return 'En fase de grupos debes completar jornada y orden.';
+    }
+
+    if (!/^grupo\s+[a-l]$/i.test(groupName)) {
+      return 'En fase de grupos usa un nombre válido como “Grupo A”.';
+    }
+  }
+
+  return null;
+}
+
+function getDefaultGroupNameForStage(stage: TournamentStage) {
+  return stage === 'group_stage' ? 'Grupo A' : getStageLabel(stage);
+}
+
 export function AdminMatchesPage() {
   const [matches, setMatches] = React.useState<AdminMatchRow[]>([]);
   const [teams, setTeams] = React.useState<TeamRow[]>([]);
@@ -158,6 +260,9 @@ export function AdminMatchesPage() {
     teamQuery: '',
     status: ''
   });
+
+  const [matchPendingDelete, setMatchPendingDelete] = React.useState<AdminMatchRow | null>(null);
+  const [isDeleting, setIsDeleting] = React.useState(false);
 
   const loadData = React.useCallback(async () => {
     setIsLoading(true);
@@ -181,6 +286,29 @@ export function AdminMatchesPage() {
 
   const handleFormChange = (field: keyof FormState, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleStageChange = (nextStage: TournamentStage) => {
+    setForm((prev) => {
+      const currentGroupName = prev.groupName.trim();
+      const looksLikeGroup = /^grupo\s+[a-l]$/i.test(currentGroupName);
+
+      let nextGroupName = prev.groupName;
+
+      if (!currentGroupName) {
+        nextGroupName = getDefaultGroupNameForStage(nextStage);
+      } else if (nextStage === 'group_stage' && !looksLikeGroup) {
+        nextGroupName = 'Grupo A';
+      } else if (nextStage !== 'group_stage' && looksLikeGroup) {
+        nextGroupName = getStageLabel(nextStage);
+      }
+
+      return {
+        ...prev,
+        stage: nextStage,
+        groupName: nextGroupName
+      };
+    });
   };
 
   function getExpectedSlotForEditing(editingMatch: AdminMatchRow | null, side: 'home' | 'away') {
@@ -257,6 +385,8 @@ export function AdminMatchesPage() {
     setForm(emptyForm);
     setEditingMatch(null);
     setIsEditing(false);
+    setErrorMessage('');
+    setSuccessMessage('');
   };
 
   const handleEdit = (match: AdminMatchRow) => {
@@ -268,69 +398,78 @@ export function AdminMatchesPage() {
     window.scrollTo({ top: 590, behavior: 'smooth' });
   };
 
-  const handleDelete = async (matchId: string) => {
-    const confirmed = window.confirm('¿Seguro que deseas eliminar este partido?');
-    if (!confirmed) return;
+  const handleRequestDelete = (match: AdminMatchRow) => {
+    setMatchPendingDelete(match);
+    setErrorMessage('');
+    setSuccessMessage('');
+  };
 
+  const handleConfirmDelete = async () => {
+    if (!matchPendingDelete) return;
+
+    setIsDeleting(true);
     setErrorMessage('');
     setSuccessMessage('');
 
     try {
-      await deleteAdminMatch(matchId);
-      setMatches((prev) => prev.filter((match) => match.id !== matchId));
+      await deleteAdminMatch(matchPendingDelete.id);
+
+      setMatches((prev) => prev.filter((match) => match.id !== matchPendingDelete.id));
       setSuccessMessage('Partido eliminado correctamente.');
 
-      if (form.id === matchId) {
+      if (form.id === matchPendingDelete.id) {
         resetForm();
       }
+
+      setMatchPendingDelete(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo eliminar el partido';
       setErrorMessage(message);
+    } finally {
+      setIsDeleting(false);
     }
+  };
+
+  const handleCloseDeleteDialog = () => {
+    if (isDeleting) return;
+    setMatchPendingDelete(null);
   };
 
   const handleSubmit = async () => {
     setErrorMessage('');
     setSuccessMessage('');
 
-    if (
-      !form.id.trim() ||
-      !form.stage.trim() ||
-      !form.groupName.trim() ||
-      !form.homeTeam.trim() ||
-      !form.awayTeam.trim() ||
-      !form.kickoffAt.trim() ||
-      !form.stadium.trim() ||
-      !form.city.trim()
-    ) {
-      setErrorMessage('Completa todos los campos obligatorios.');
+    const validationError = validateAdminMatchForm(form);
+
+    if (validationError) {
+      setErrorMessage(validationError);
+      return;
+    }
+
+    const normalizedId = normalizeMatchId(form.id);
+    const duplicatedMatch = matches.find((match) => match.id === normalizedId);
+
+    if (!isEditing && duplicatedMatch) {
+      setErrorMessage('Ya existe un partido con ese ID.');
       return;
     }
 
     const parsedMatchday = form.matchday.trim() === '' ? null : Number(form.matchday);
     const parsedGroupOrder = form.groupOrder.trim() === '' ? null : Number(form.groupOrder);
 
-    if (
-      (parsedMatchday !== null && (Number.isNaN(parsedMatchday) || parsedMatchday < 0)) ||
-      (parsedGroupOrder !== null && (Number.isNaN(parsedGroupOrder) || parsedGroupOrder < 0))
-    ) {
-      setErrorMessage('Jornada y orden deben ser números válidos mayores o iguales a 0.');
-      return;
-    }
-
     setIsSaving(true);
 
     try {
       const payload = {
-        id: form.id.trim(),
-        stage: form.stage.trim() as TournamentStage,
+        id: normalizedId,
+        stage: form.stage,
         matchday: parsedMatchday,
         groupOrder: parsedGroupOrder,
         groupName: form.groupName.trim(),
         homeTeam: form.homeTeam.trim(),
         awayTeam: form.awayTeam.trim(),
-        homeTeamId: form.homeTeamId.trim() || null,
-        awayTeamId: form.awayTeamId.trim() || null,
+        homeTeamId: form.homeTeamId || null,
+        awayTeamId: form.awayTeamId || null,
         homeTeamCode: form.homeTeamCode.trim() || null,
         awayTeamCode: form.awayTeamCode.trim() || null,
         kickoffAt: new Date(form.kickoffAt).toISOString(),
@@ -360,7 +499,7 @@ export function AdminMatchesPage() {
   const expectedHomeSlot = editingMatch ? buildSourceSlot(editingMatch, 'home') : null;
   const expectedAwaySlot = editingMatch ? buildSourceSlot(editingMatch, 'away') : null;
 
-  const stageOptions = React.useMemo(() => getUniqueStageOptions(matches), [matches]);
+  const stageFilterOptionsOptions = React.useMemo(() => getUniqueStageOptions(matches), [matches]);
   const groupOptions = React.useMemo(() => getUniqueGroupOptions(matches), [matches]);
   const statusOptions = React.useMemo(() => [...new Set(matches.map((match) => match.status))], [matches]);
 
@@ -432,6 +571,38 @@ export function AdminMatchesPage() {
               </Stack>
             ) : null}
 
+            {isEditing && editingMatch ? (
+              <Stack direction='row' spacing={1} flexWrap='wrap' useFlexGap>
+                <Chip label={getStageLabel(editingMatch.stage)} color='primary' variant='outlined' />
+
+                <Chip
+                  label={
+                    editingMatch.status === 'scheduled'
+                      ? 'Pendiente'
+                      : editingMatch.status === 'live'
+                        ? 'En vivo'
+                        : 'Finalizado'
+                  }
+                  color={
+                    editingMatch.status === 'scheduled'
+                      ? 'default'
+                      : editingMatch.status === 'live'
+                        ? 'error'
+                        : 'success'
+                  }
+                  variant='outlined'
+                />
+
+                {editingMatch.stage !== 'group_stage' ? (
+                  <Chip
+                    label={hasManualOverride(editingMatch) ? 'Override manual activo' : 'Emparejamiento automático'}
+                    color={hasManualOverride(editingMatch) ? 'warning' : 'success'}
+                    variant='outlined'
+                  />
+                ) : null}
+              </Stack>
+            ) : null}
+
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
               <TextField
                 label='ID'
@@ -445,10 +616,10 @@ export function AdminMatchesPage() {
                 select
                 label='Etapa'
                 value={form.stage}
-                onChange={(event) => handleFormChange('stage', event.target.value)}
+                onChange={(event) => handleStageChange(event.target.value as TournamentStage)}
                 fullWidth
               >
-                {stageOptions.map((option) => (
+                {tournamentStageOptions.map((option) => (
                   <MenuItem key={option.value} value={option.value}>
                     {option.label}
                   </MenuItem>
@@ -502,6 +673,17 @@ export function AdminMatchesPage() {
               <Typography variant='subtitle1' fontWeight={700}>
                 Equipos
               </Typography>
+              {form.stage !== 'group_stage' ? (
+                <Alert severity='info'>
+                  En cruces eliminatorios puedes dejar el emparejamiento automático según el slot base o forzar
+                  manualmente un país si necesitas corregirlo.
+                </Alert>
+              ) : (
+                <Alert severity='info'>
+                  En fase de grupos asegúrate de que el nombre del grupo, la jornada y el orden estén completos para que
+                  el fixture quede bien ordenado.
+                </Alert>
+              )}
 
               <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
                 <TextField
@@ -519,22 +701,6 @@ export function AdminMatchesPage() {
                     </MenuItem>
                   ))}
                 </TextField>
-
-                {isEditing && editingMatch && editingMatch.stage !== 'group_stage' ? (
-                  <Stack direction='row' spacing={1} flexWrap='wrap' useFlexGap>
-                    {expectedHomeSlot ? (
-                      <Button variant='outlined' size='small' onClick={() => handleResetTeamOverride('home')}>
-                        Restaurar slot local
-                      </Button>
-                    ) : null}
-
-                    {expectedAwaySlot ? (
-                      <Button variant='outlined' size='small' onClick={() => handleResetTeamOverride('away')}>
-                        Restaurar slot visitante
-                      </Button>
-                    ) : null}
-                  </Stack>
-                ) : null}
 
                 <TextField
                   label='Código local'
@@ -567,6 +733,22 @@ export function AdminMatchesPage() {
                 />
               </Stack>
             </Stack>
+
+            {isEditing && editingMatch && editingMatch.stage !== 'group_stage' ? (
+              <Stack direction='row' spacing={1} flexWrap='wrap' useFlexGap>
+                {expectedHomeSlot ? (
+                  <Button variant='outlined' size='small' onClick={() => handleResetTeamOverride('home')}>
+                    Restaurar slot local
+                  </Button>
+                ) : null}
+
+                {expectedAwaySlot ? (
+                  <Button variant='outlined' size='small' onClick={() => handleResetTeamOverride('away')}>
+                    Restaurar slot visitante
+                  </Button>
+                ) : null}
+              </Stack>
+            ) : null}
 
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
               <TextField
@@ -617,7 +799,7 @@ export function AdminMatchesPage() {
             [field]: value
           }))
         }
-        stageOptions={stageOptions}
+        stageOptions={stageFilterOptionsOptions}
         groupOptions={groupOptions}
         statusOptions={statusOptions}
       />
@@ -626,6 +808,19 @@ export function AdminMatchesPage() {
         <Stack alignItems='center' sx={{ py: 6 }}>
           <CircularProgress />
         </Stack>
+      ) : filteredMatches.length === 0 ? (
+        <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+          <CardContent sx={{ p: 3 }}>
+            <Stack spacing={1}>
+              <Typography variant='h6' fontWeight={800}>
+                No hay partidos para mostrar
+              </Typography>
+              <Typography color='text.secondary'>
+                No encontramos partidos con los filtros actuales. Prueba cambiando etapa, grupo, equipo o estado.
+              </Typography>
+            </Stack>
+          </CardContent>
+        </Card>
       ) : (
         <Stack spacing={2}>
           {filteredMatches.map((match) => {
@@ -641,13 +836,44 @@ export function AdminMatchesPage() {
                     alignItems={{ xs: 'flex-start', md: 'center' }}
                   >
                     <Box>
-                      <Typography variant='h6' fontWeight={800}>
-                        {match.home_team} vs {match.away_team}
-                      </Typography>
+                      <Stack spacing={1}>
+                        <Stack direction='row' spacing={1} flexWrap='wrap' useFlexGap alignItems='center'>
+                          <Chip label={getStageLabel(match.stage)} size='small' variant='outlined' />
+                          <Chip
+                            label={getStatusLabel(match.status)}
+                            size='small'
+                            color={getStatusColor(match.status)}
+                            variant='outlined'
+                          />
+                        </Stack>
+
+                        <MatchVs
+                          match={
+                            {
+                              homeTeamCode: match.home_team_code,
+                              awayTeamCode: match.away_team_code,
+                              homeTeam: match.home_team,
+                              awayTeam: match.away_team
+                            } as any
+                          }
+                        />
+
+                        {expectedPair ? (
+                          <Chip label={expectedPair} size='small' color='primary' variant='outlined' />
+                        ) : null}
+
+                        {match.stage !== 'group_stage' ? (
+                          <Chip
+                            label={hasManualOverride(match) ? 'Manual' : 'Automático'}
+                            size='small'
+                            color={hasManualOverride(match) ? 'warning' : 'success'}
+                            variant='outlined'
+                          />
+                        ) : null}
+                      </Stack>
 
                       <Typography variant='body2' color='text.secondary'>
-                        {getStageLabel(match.stage)} · {match.group_name} · Jornada {match.matchday ?? '-'} · Orden{' '}
-                        {match.group_order ?? '-'}
+                        {match.group_name} · Jornada {match.matchday ?? '-'} · Orden {match.group_order ?? '-'}
                       </Typography>
 
                       {expectedPair ? (
@@ -659,10 +885,6 @@ export function AdminMatchesPage() {
                       <Typography variant='body2' color='text.secondary'>
                         {formatKickoff(match.kickoff_at)} · {match.stadium} · {match.city}
                       </Typography>
-
-                      <Typography variant='body2' color='text.secondary'>
-                        Estado: {match.status}
-                      </Typography>
                     </Box>
 
                     <Stack direction='row' spacing={1}>
@@ -670,7 +892,7 @@ export function AdminMatchesPage() {
                         Editar
                       </Button>
 
-                      <Button color='error' variant='outlined' onClick={() => void handleDelete(match.id)}>
+                      <Button color='error' variant='outlined' onClick={() => handleRequestDelete(match)}>
                         Eliminar
                       </Button>
                     </Stack>
@@ -681,6 +903,28 @@ export function AdminMatchesPage() {
           })}
         </Stack>
       )}
+
+      <Dialog open={Boolean(matchPendingDelete)} onClose={handleCloseDeleteDialog} fullWidth maxWidth='xs'>
+        <DialogTitle>Eliminar partido</DialogTitle>
+
+        <DialogContent>
+          <DialogContentText>
+            {matchPendingDelete
+              ? `Vas a eliminar el partido ${matchPendingDelete.home_team} vs ${matchPendingDelete.away_team}. Esta acción no se puede deshacer.`
+              : 'Esta acción no se puede deshacer.'}
+          </DialogContentText>
+        </DialogContent>
+
+        <DialogActions>
+          <Button onClick={handleCloseDeleteDialog} disabled={isDeleting}>
+            Cancelar
+          </Button>
+
+          <Button color='error' variant='contained' onClick={() => void handleConfirmDelete()} disabled={isDeleting}>
+            {isDeleting ? 'Eliminando...' : 'Eliminar'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   );
 }

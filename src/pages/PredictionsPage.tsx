@@ -25,6 +25,7 @@ import {
   getUniqueStageOptions,
   type MatchListFilters
 } from '../features/matches/listFilters';
+import { MatchVs } from '../features/matches/components/MatchVs';
 
 type UserPrediction = {
   matchId: string;
@@ -389,9 +390,7 @@ export function PredictionsPage() {
                               )}
                             </Stack>
 
-                            <Typography variant='h6' fontWeight={800}>
-                              {match ? `${match.homeTeam} vs ${match.awayTeam}` : `Partido ${prediction.matchId}`}
-                            </Typography>
+                            <MatchVs match={match} />
 
                             {match ? (
                               <>

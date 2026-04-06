@@ -13,6 +13,7 @@ import {
 } from '@mui/material';
 import { Link as RouterLink, useNavigate } from 'react-router';
 import { useAuth } from '../features/auth/useAuth';
+import { BrandLogo } from '../assets/brand/BrandLogo';
 
 export function RegisterPage() {
   const { signUpWithEmail, signInWithGoogle } = useAuth();
@@ -93,6 +94,7 @@ export function RegisterPage() {
       >
         <CardContent sx={{ p: { xs: 3, sm: 4 } }}>
           <Stack component='form' spacing={3} onSubmit={handleSubmit}>
+            <BrandLogo />
             <Box>
               <Typography variant='h4' fontWeight={800}>
                 Crear cuenta

@@ -14,6 +14,7 @@ import {
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../features/auth/useAuth';
 import GoogleIcon from '@mui/icons-material/Google';
+import { BrandLogo } from '../assets/brand/BrandLogo';
 export function LoginPage() {
   const { signInWithEmail, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
@@ -69,6 +70,7 @@ export function LoginPage() {
       >
         <CardContent sx={{ p: { xs: 3, sm: 4 } }}>
           <Stack component='form' spacing={3} onSubmit={handleSubmit}>
+            <BrandLogo />
             <Box>
               <Typography variant='h4' fontWeight={800}>
                 Iniciar sesión
