@@ -527,7 +527,6 @@ export function DashboardPage() {
                         </Stack>
                         <Typography variant='h6' fontWeight={800}>
                           <MatchVs match={nextPendingMatch} />
-                          {nextPendingMatch.homeTeam} vs {nextPendingMatch.awayTeam}
                         </Typography>
 
                         <Typography variant='body2' color='text.secondary'>
