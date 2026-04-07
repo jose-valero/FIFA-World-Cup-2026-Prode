@@ -1,24 +1,19 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter } from 'react-router';
-import { CssBaseline, ThemeProvider } from '@mui/material';
-import App from './App';
-import { appTheme } from './styles/theme';
-import { AuthProvider } from './features/auth/AuthProvider';
-import { QueryClientProvider } from '@tanstack/react-query';
-import { queryClient } from './lib/react-query/queryClient';
+import { RouterProvider } from 'react-router';
+import { AuthProvider } from './app/providers/AuthProvider';
+import { appRouter } from './app/router/appRouter';
+import { RQ_Provider } from './app/providers/RQ_Provider';
+import { MUI_ThemeProvider } from './app/providers/MUI_ThemeProvider';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <ThemeProvider theme={appTheme}>
-        <CssBaseline />
-        <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <App />
-          </AuthProvider>
-        </QueryClientProvider>
-      </ThemeProvider>
-    </BrowserRouter>
+    <MUI_ThemeProvider>
+      <RQ_Provider>
+        <AuthProvider>
+          <RouterProvider router={appRouter} />
+        </AuthProvider>
+      </RQ_Provider>
+    </MUI_ThemeProvider>
   </React.StrictMode>
 );
