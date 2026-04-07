@@ -9,6 +9,7 @@ interface PredictionDialogProps {
   initialAwayScore?: number | null;
   onClose: () => void;
   onSave: (payload: { matchId: string; homeScore: number; awayScore: number }) => void;
+  onDelete?: (matchId: string) => void;
 }
 
 export function PredictionDialog({
@@ -17,11 +18,14 @@ export function PredictionDialog({
   initialHomeScore = null,
   initialAwayScore = null,
   onClose,
-  onSave
+  onSave,
+  onDelete
 }: PredictionDialogProps) {
   const [homeScore, setHomeScore] = React.useState('');
   const [awayScore, setAwayScore] = React.useState('');
   const [errorMessage, setErrorMessage] = React.useState('');
+
+  const hasExistingPrediction = initialHomeScore !== null && initialAwayScore !== null;
 
   React.useEffect(() => {
     if (!open) return;
@@ -64,9 +68,20 @@ export function PredictionDialog({
     onClose();
   };
 
+  const handleDelete = () => {
+    if (!match || !onDelete) return;
+
+    const confirmed = window.confirm('¿Seguro que quieres limpiar este pronóstico?');
+
+    if (!confirmed) return;
+
+    onDelete(match.id);
+    onClose();
+  };
+
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth='xs'>
-      <DialogTitle>Cargar pronóstico</DialogTitle>
+      <DialogTitle>{hasExistingPrediction ? 'Editar pronóstico' : 'Cargar pronóstico'}</DialogTitle>
 
       <DialogContent>
         <Stack spacing={3} sx={{ pt: 1 }}>
@@ -87,7 +102,6 @@ export function PredictionDialog({
               fullWidth
               value={homeScore}
               onChange={(event) => setHomeScore(event.target.value)}
-              // inputProps={{ min: 0, step: 1 }}
               slotProps={{ htmlInput: { min: 0, step: 1 } }}
             />
 
@@ -97,7 +111,6 @@ export function PredictionDialog({
               fullWidth
               value={awayScore}
               onChange={(event) => setAwayScore(event.target.value)}
-              // inputProps={{ min: 0, step: 1 }}
               slotProps={{ htmlInput: { min: 0, step: 1 } }}
             />
           </Stack>
@@ -110,11 +123,21 @@ export function PredictionDialog({
         </Stack>
       </DialogContent>
 
-      <DialogActions sx={{ px: 3, pb: 3 }}>
-        <Button onClick={onClose}>Cancelar</Button>
-        <Button onClick={handleSave} variant='contained'>
-          Guardar pronóstico
-        </Button>
+      <DialogActions sx={{ px: 3, pb: 3, justifyContent: 'space-between' }}>
+        <Stack direction='row' spacing={1}>
+          {hasExistingPrediction && onDelete ? (
+            <Button onClick={handleDelete} color='error' variant='outlined'>
+              Limpiar pronóstico
+            </Button>
+          ) : null}
+        </Stack>
+
+        <Stack direction='row' spacing={1}>
+          <Button onClick={onClose}>Cancelar</Button>
+          <Button onClick={handleSave} variant='contained'>
+            Guardar pronóstico
+          </Button>
+        </Stack>
       </DialogActions>
     </Dialog>
   );

@@ -3,7 +3,7 @@ import { Alert, CircularProgress, Stack, Typography } from '@mui/material';
 import { MatchCard } from '../features/matches/components/MatchCard';
 import { PredictionDialog } from '../features/matches/components/PredictionDialog';
 import type { Match } from '../features/matches/types';
-import { upsertPrediction } from '../features/predictions/predictions.api';
+import { deletePrediction, upsertPrediction } from '../features/predictions/predictions.api';
 import { useAuth } from '../features/auth/useAuth';
 import { MatchFiltersCard } from '../features/matches/components/MatchFiltersCard';
 import {
@@ -242,11 +242,69 @@ export function MatchesPage() {
     }
   };
 
+  const handleDeletePrediction = async (matchId: string) => {
+    if (!user?.id) return;
+
+    const match = matches.find((item) => item.id === matchId);
+
+    if (!match) {
+      setErrorMessage('No se encontró el partido.');
+      return;
+    }
+
+    const lockMessage = getMatchLockMessage(match, predictionsClosed);
+
+    if (lockMessage) {
+      setErrorMessage(lockMessage);
+      return;
+    }
+
+    setErrorMessage('');
+
+    try {
+      await deletePrediction({
+        userId: user.id,
+        matchId
+      });
+
+      queryClient.setQueryData(
+        queryKeys.predictions(user.id),
+        (
+          prev:
+            | Array<{
+                id?: string;
+                user_id: string;
+                match_id: string;
+                home_score: number;
+                away_score: number;
+              }>
+            | undefined
+        ) => {
+          if (!prev) return [];
+          return prev.filter((row) => row.match_id !== matchId);
+        }
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo limpiar el pronóstico';
+      setErrorMessage(message);
+    }
+  };
+
   const handleFilterChange = (field: keyof MatchListFilters, value: string) => {
     setFilters((prev) => ({
       ...prev,
       [field]: value
     }));
+  };
+
+  const handleClearPredictionFromCard = (match: Match) => {
+    const confirmed = window.confirm(
+      `¿Seguro que quieres limpiar tu pronóstico para ${match.homeTeam} vs ${match.awayTeam}?`
+    );
+
+    if (!confirmed) return;
+
+    void handleDeletePrediction(match.id);
   };
 
   const clearRequestedMatchParam = React.useCallback(() => {
@@ -307,6 +365,7 @@ export function MatchesPage() {
                 match={match}
                 predictionSummary={buildPredictionSummary(predictions[match.id])}
                 onPredict={handleOpenPrediction}
+                onClearPrediction={handleClearPredictionFromCard}
                 isLocked={isMatchLocked(match, predictionsClosed)}
                 lockMessage={getMatchLockMessage(match, predictionsClosed) || undefined}
               />
@@ -323,6 +382,9 @@ export function MatchesPage() {
         onClose={handleClosePrediction}
         onSave={(payload) => {
           void handleSavePrediction(payload);
+        }}
+        onDelete={(matchId) => {
+          void handleDeletePrediction(matchId);
         }}
       />
     </>

@@ -8,11 +8,21 @@ interface MatchCardProps {
   match: Match;
   predictionSummary?: string | null;
   onPredict: (match: Match) => void;
+  onClearPrediction?: (match: Match) => void;
   isLocked?: boolean;
   lockMessage?: string;
 }
 
-export function MatchCard({ match, predictionSummary, onPredict, isLocked = false, lockMessage }: MatchCardProps) {
+export function MatchCard({
+  match,
+  predictionSummary,
+  onPredict,
+  onClearPrediction,
+  isLocked = false,
+  lockMessage
+}: MatchCardProps) {
+  const hasPrediction = Boolean(predictionSummary);
+
   return (
     <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
       <CardContent sx={{ p: 3 }}>
@@ -68,14 +78,27 @@ export function MatchCard({ match, predictionSummary, onPredict, isLocked = fals
               <Typography fontWeight={700}>{predictionSummary || 'Aún no has cargado un pronóstico'}</Typography>
             </Stack>
 
-            <Button
-              disabled={isLocked}
-              variant={predictionSummary ? 'outlined' : 'contained'}
-              onClick={() => onPredict(match)}
-              sx={{ minWidth: 180 }}
-            >
-              {isLocked ? 'Pronóstico bloqueado' : predictionSummary ? 'Editar pronóstico' : 'Cargar pronóstico'}
-            </Button>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ width: { xs: '100%', md: 'auto' } }}>
+              {hasPrediction && !isLocked && onClearPrediction ? (
+                <Button
+                  color='error'
+                  variant='outlined'
+                  onClick={() => onClearPrediction(match)}
+                  sx={{ minWidth: 180 }}
+                >
+                  Limpiar pronóstico
+                </Button>
+              ) : null}
+
+              <Button
+                disabled={isLocked}
+                variant={hasPrediction ? 'outlined' : 'contained'}
+                onClick={() => onPredict(match)}
+                sx={{ minWidth: 180 }}
+              >
+                {isLocked ? 'Pronóstico bloqueado' : hasPrediction ? 'Editar pronóstico' : 'Cargar pronóstico'}
+              </Button>
+            </Stack>
           </Stack>
         </Stack>
       </CardContent>
