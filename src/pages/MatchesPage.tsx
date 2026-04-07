@@ -236,6 +236,7 @@ export function MatchesPage() {
           ];
         }
       );
+      await queryClient.invalidateQueries({ queryKey: queryKeys.auditPredictions });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo guardar el pronóstico';
       setErrorMessage(message);
@@ -284,6 +285,7 @@ export function MatchesPage() {
           return prev.filter((row) => row.match_id !== matchId);
         }
       );
+      await queryClient.invalidateQueries({ queryKey: queryKeys.auditPredictions });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo limpiar el pronóstico';
       setErrorMessage(message);

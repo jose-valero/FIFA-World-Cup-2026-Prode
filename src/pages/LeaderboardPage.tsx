@@ -28,6 +28,32 @@ function getInitial(name: string) {
   return name.trim().charAt(0).toUpperCase() || 'U';
 }
 
+function getPodiumColor(position: number): 'success' | 'info' | 'warning' | 'default' {
+  switch (position) {
+    case 1:
+      return 'success';
+    case 2:
+      return 'info';
+    case 3:
+      return 'warning';
+    default:
+      return 'default';
+  }
+}
+
+function getPodiumLabel(position: number) {
+  switch (position) {
+    case 1:
+      return 'Top 1';
+    case 2:
+      return 'Top 2';
+    case 3:
+      return 'Top 3';
+    default:
+      return null;
+  }
+}
+
 function PodiumCard({
   row,
   position,
@@ -37,7 +63,8 @@ function PodiumCard({
   position: number;
   isCurrentUser: boolean;
 }) {
-  const isLeader = position === 1;
+  const podiumColor = getPodiumColor(position);
+  const podiumLabel = getPodiumLabel(position);
 
   return (
     <Card
@@ -46,21 +73,44 @@ function PodiumCard({
         height: '100%',
         borderRadius: 2,
         border: '1px solid',
-        borderColor: isLeader ? 'primary.main' : 'divider',
-        background: isLeader
-          ? `linear-gradient(180deg, ${alpha(theme.palette.primary.main, 0.12)} 0%, transparent 100%)`
-          : undefined
+        borderColor:
+          position === 1 ? 'success.main' : position === 2 ? 'info.main' : position === 3 ? 'warning.main' : 'divider',
+        background:
+          position === 1
+            ? `linear-gradient(180deg, ${alpha(theme.palette.success.main, 0.12)} 0%, transparent 100%)`
+            : position === 2
+              ? `linear-gradient(180deg, ${alpha(theme.palette.info.main, 0.12)} 0%, transparent 100%)`
+              : position === 3
+                ? `linear-gradient(180deg, ${alpha(theme.palette.warning.main, 0.12)} 0%, transparent 100%)`
+                : undefined
       })}
     >
       <CardContent sx={{ p: 2.5 }}>
         <Stack spacing={2}>
           <Stack direction='row' spacing={1.5} alignItems='center'>
             <Avatar
-              sx={{
+              sx={(theme) => ({
                 width: 44,
                 height: 44,
-                fontWeight: 800
-              }}
+                fontWeight: 800,
+                border: '2px solid',
+                borderColor:
+                  position === 1
+                    ? theme.palette.success.main
+                    : position === 2
+                      ? theme.palette.info.main
+                      : position === 3
+                        ? theme.palette.warning.main
+                        : theme.palette.divider,
+                boxShadow:
+                  position === 1
+                    ? `0 0 0 4px ${alpha(theme.palette.success.main, 0.12)}`
+                    : position === 2
+                      ? `0 0 0 4px ${alpha(theme.palette.info.main, 0.12)}`
+                      : position === 3
+                        ? `0 0 0 4px ${alpha(theme.palette.warning.main, 0.12)}`
+                        : 'none'
+              })}
             >
               {getInitial(row.display_name)}
             </Avatar>
@@ -80,7 +130,8 @@ function PodiumCard({
                   {row.display_name}
                 </Typography>
 
-                {isCurrentUser ? <Chip label='Tú' size='small' color='primary' /> : null}
+                {podiumLabel ? <Chip label={podiumLabel} size='small' color={podiumColor} /> : null}
+                {isCurrentUser ? <Chip label='Tú' size='small' variant='outlined' /> : null}
               </Stack>
 
               <Typography variant='body2' color='text.secondary'>
@@ -90,7 +141,7 @@ function PodiumCard({
           </Stack>
 
           <Stack direction='row' spacing={1} flexWrap='wrap' useFlexGap>
-            <Chip label={`${row.total_points} pts`} color={isLeader ? 'primary' : 'default'} />
+            <Chip label={`${row.total_points} pts`} color={podiumColor} variant='outlined' />
             <Chip label={`${row.exact_hits} exactos`} variant='outlined' />
             <Chip label={`${row.outcome_hits} signo`} variant='outlined' />
           </Stack>
@@ -174,6 +225,7 @@ export function LeaderboardPage() {
             </Stack>
           ) : null}
 
+          {/* Tabla de clasificacion */}
           <Card
             elevation={0}
             sx={{
@@ -225,29 +277,36 @@ export function LeaderboardPage() {
                     {rows.map((row, index) => {
                       const position = index + 1;
                       const isCurrentUser = Boolean(user?.id && row.user_id === user.id);
-                      const isTopThree = position <= 3;
 
                       return (
                         <TableRow
                           key={row.user_id}
                           hover
                           sx={(theme) => ({
-                            bgcolor: isCurrentUser ? alpha(theme.palette.primary.main, 0.08) : undefined,
+                            bgcolor: isCurrentUser ? alpha(theme.palette.info.main, 0.08) : undefined,
                             '& td:first-of-type': {
                               borderLeft: '4px solid',
-                              borderLeftColor: isCurrentUser
-                                ? 'primary.main'
-                                : isTopThree
-                                  ? 'warning.main'
-                                  : 'transparent',
+                              borderLeftColor:
+                                position === 1
+                                  ? 'success.main'
+                                  : position === 2
+                                    ? 'info.main'
+                                    : position === 3
+                                      ? 'warning.main'
+                                      : 'transparent',
                               pl: 1.5
                             }
                           })}
                         >
                           <TableCell>
-                            <Stack direction='row' spacing={1} alignItems='center'>
+                            <Stack direction='row' spacing={1} alignItems='center' flexWrap='wrap' useFlexGap>
                               <Typography fontWeight={800}>#{position}</Typography>
-                              {isCurrentUser ? <Chip label='Tú' size='small' color='primary' /> : null}
+
+                              {getPodiumLabel(position) ? (
+                                <Chip label={getPodiumLabel(position)} size='small' color={getPodiumColor(position)} />
+                              ) : null}
+
+                              {isCurrentUser ? <Chip label='Tú' size='small' variant='outlined' /> : null}
                             </Stack>
                           </TableCell>
 

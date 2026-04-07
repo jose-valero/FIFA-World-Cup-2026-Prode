@@ -29,7 +29,7 @@ import { useAppSettings } from '../features/settings/useAppSettings';
 import { PageHeader, type PageHeaderBadge } from '../components/ui/PageHeader';
 import { PageFiltersBar } from '../components/ui/PageFiltersBar';
 
-type AuditStatusFilter = '' | 'live' | 'finished';
+type AuditStatusFilter = '' | 'live' | 'finished' | 'scheduled';
 
 type LeaderboardLikeRow = {
   user_id: string;
@@ -332,7 +332,7 @@ export function AuditPage() {
     <Stack spacing={2.5}>
       <PageHeader
         title='Auditoría'
-        description='Consulta los pronósticos visibles de todos los participantes para partidos en vivo o finalizados.'
+        description='Consulta los pronósticos visibles de todos los participantes'
         badges={badges}
       />
 
@@ -408,6 +408,7 @@ export function AuditPage() {
                   onChange={(event) => setStatusFilter(event.target.value as AuditStatusFilter)}
                 >
                   <MenuItem value=''>Todos</MenuItem>
+                  <MenuItem value='scheduled'>Pendiente</MenuItem>
                   <MenuItem value='live'>En vivo</MenuItem>
                   <MenuItem value='finished'>Finalizado</MenuItem>
                 </TextField>

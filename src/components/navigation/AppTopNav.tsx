@@ -122,7 +122,7 @@ export default function AppTopNav() {
           </Box>
 
           <Box sx={{ flexGrow: 1 }} />
-
+          {/* a<sd */}
           <Box sx={{ display: { xs: 'flex', md: 'none' } }}>
             <IconButton
               size='large'
@@ -151,7 +151,7 @@ export default function AppTopNav() {
               ))}
 
               {!isAuthenticated ? (
-                <>
+                <div>
                   <Divider sx={{ my: 0 }} />
                   <MenuItem component={NavLink} to='/login' onClick={handleCloseNavMenu}>
                     <Typography>Login</Typography>
@@ -159,9 +159,9 @@ export default function AppTopNav() {
                   <MenuItem component={NavLink} to='/register' onClick={handleCloseNavMenu}>
                     <Typography fontWeight={700}>Registrarse</Typography>
                   </MenuItem>
-                </>
+                </div>
               ) : (
-                <>
+                <div>
                   <Divider sx={{ my: 0 }} />
                   <MenuItem component={NavLink} to='/app/mis-pronosticos' onClick={handleCloseNavMenu}>
                     <Typography>Mis pronósticos</Typography>
@@ -186,11 +186,11 @@ export default function AppTopNav() {
                   <MenuItem onClick={handleLogout}>
                     <Typography fontWeight={700}>Cerrar sesión</Typography>
                   </MenuItem>
-                </>
+                </div>
               )}
             </Menu>
           </Box>
-
+          {/* asd */}
           <Box
             sx={{
               display: { xs: 'none', md: 'flex' },
