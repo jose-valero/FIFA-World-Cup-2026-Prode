@@ -59,3 +59,15 @@ export async function upsertPrediction({
 
   return data;
 }
+
+export async function deletePrediction(params: { userId: string; matchId: string }) {
+  const { error } = await supabase
+    .from('predictions')
+    .delete()
+    .eq('user_id', params.userId)
+    .eq('match_id', params.matchId);
+
+  if (error) {
+    throw error;
+  }
+}

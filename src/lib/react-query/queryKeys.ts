@@ -5,5 +5,6 @@ export const queryKeys = {
   teams: ['teams'] as const,
   adminMatches: ['admin-matches'] as const,
   adminResults: ['admin-results'] as const,
+  auditPredictions: ['audit-predictions'] as const,
   predictions: (userId: string) => ['predictions', userId] as const
 };

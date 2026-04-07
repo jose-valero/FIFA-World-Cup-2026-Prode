@@ -110,7 +110,6 @@ export function AdminResultsPage() {
       };
     });
   };
-
   const handleSave = async (matchId: string) => {
     const draft = drafts[matchId];
     if (!draft) return;

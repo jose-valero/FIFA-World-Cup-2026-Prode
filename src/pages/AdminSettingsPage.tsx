@@ -5,6 +5,7 @@ import {
   Card,
   CardContent,
   CircularProgress,
+  Divider,
   FormControlLabel,
   Stack,
   Switch,
@@ -16,17 +17,18 @@ import { useUpdateAppSettings } from '../features/settings/useUpdateAppSettings'
 
 export function AdminSettingsPage() {
   const { data: settings = null, isLoading, isError, error } = useAppSettings();
-
   const updateAppSettingsMutation = useUpdateAppSettings();
 
   const [predictionsOpen, setPredictionsOpen] = React.useState(true);
   const [predictionsCloseAt, setPredictionsCloseAt] = React.useState('');
+  const [auditsVisible, setAuditsVisible] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState('');
   const [successMessage, setSuccessMessage] = React.useState('');
 
   React.useEffect(() => {
     setPredictionsOpen(settings?.predictions_open ?? true);
     setPredictionsCloseAt(settings?.predictions_close_at ? settings.predictions_close_at.slice(0, 16) : '');
+    setAuditsVisible(settings?.audits_visible ?? false);
   }, [settings]);
 
   const handleSave = async () => {
@@ -35,8 +37,9 @@ export function AdminSettingsPage() {
 
     try {
       await updateAppSettingsMutation.mutateAsync({
-        predictionsOpen,
-        predictionsCloseAt: predictionsCloseAt ? new Date(predictionsCloseAt).toISOString() : null
+        predictions_open: predictionsOpen,
+        predictions_close_at: predictionsCloseAt ? new Date(predictionsCloseAt).toISOString() : null,
+        audits_visible: auditsVisible
       });
 
       setSuccessMessage('Configuración guardada correctamente.');
@@ -56,7 +59,7 @@ export function AdminSettingsPage() {
             </Typography>
 
             <Typography color='text.secondary'>
-              Controla si la carga de pronósticos está abierta y define una fecha límite global.
+              Controla la apertura de pronósticos y la visibilidad global de la auditoría.
             </Typography>
           </Stack>
         </CardContent>
@@ -77,21 +80,51 @@ export function AdminSettingsPage() {
         <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
           <CardContent sx={{ p: { xs: 3, md: 4 } }}>
             <Stack spacing={3}>
-              <FormControlLabel
-                control={
-                  <Switch checked={predictionsOpen} onChange={(event) => setPredictionsOpen(event.target.checked)} />
-                }
-                label='Pronósticos abiertos'
-              />
+              <Stack spacing={1}>
+                <Typography variant='h6' fontWeight={800}>
+                  Pronósticos
+                </Typography>
 
-              <TextField
-                label='Fecha límite global'
-                type='datetime-local'
-                value={predictionsCloseAt}
-                onChange={(event) => setPredictionsCloseAt(event.target.value)}
-                fullWidth
-                slotProps={{ inputLabel: { shrink: true } }}
-              />
+                <FormControlLabel
+                  control={
+                    <Switch checked={predictionsOpen} onChange={(event) => setPredictionsOpen(event.target.checked)} />
+                  }
+                  label='Pronósticos abiertos'
+                />
+
+                <TextField
+                  label='Fecha límite global'
+                  type='datetime-local'
+                  value={predictionsCloseAt}
+                  onChange={(event) => setPredictionsCloseAt(event.target.value)}
+                  fullWidth
+                  slotProps={{ inputLabel: { shrink: true } }}
+                />
+
+                <Typography variant='body2' color='text.secondary'>
+                  Si la fecha límite se cumple, ya no se podrán crear ni editar pronósticos.
+                </Typography>
+              </Stack>
+
+              <Divider />
+
+              <Stack spacing={1}>
+                <Typography variant='h6' fontWeight={800}>
+                  Auditoría
+                </Typography>
+
+                <FormControlLabel
+                  control={
+                    <Switch checked={auditsVisible} onChange={(event) => setAuditsVisible(event.target.checked)} />
+                  }
+                  label='Mostrar auditorías'
+                />
+
+                <Typography variant='body2' color='text.secondary'>
+                  Cuando está activado, los usuarios autenticados podrán ver pronósticos ajenos solo en partidos en vivo
+                  o finalizados.
+                </Typography>
+              </Stack>
 
               <Stack direction='row' spacing={2}>
                 <Button

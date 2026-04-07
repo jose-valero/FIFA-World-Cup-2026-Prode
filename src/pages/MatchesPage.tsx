@@ -1,11 +1,10 @@
 import * as React from 'react';
-import { Alert, Card, CardContent, CircularProgress, Stack, Typography } from '@mui/material';
+import { Alert, CircularProgress, Stack, Typography } from '@mui/material';
 import { MatchCard } from '../features/matches/components/MatchCard';
 import { PredictionDialog } from '../features/matches/components/PredictionDialog';
 import type { Match } from '../features/matches/types';
 import { upsertPrediction } from '../features/predictions/predictions.api';
 import { useAuth } from '../features/auth/useAuth';
-
 import { MatchFiltersCard } from '../features/matches/components/MatchFiltersCard';
 import {
   filterMatches,
@@ -18,6 +17,7 @@ import { useMatches } from '../features/matches/useMatches';
 import { usePredictionsByUser } from '../features/predictions/usePredictionsByUser';
 import { useAppSettings } from '../features/settings/useAppSettings';
 import { queryKeys } from '../lib/react-query/queryKeys';
+import { useSearchParams } from 'react-router';
 
 type MatchPredictionMap = Record<
   string,
@@ -61,10 +61,12 @@ function getMatchLockMessage(match: Match, predictionsClosed: boolean) {
 
 export function MatchesPage() {
   const { user } = useAuth();
-  // por ahora solo para mutar
   const queryClient = useQueryClient();
 
-  // const [matches, setMatches] = React.useState<Match[]>([]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedMatchId = searchParams.get('matchId');
+  const handledRequestedMatchIdRef = React.useRef<string | null>(null);
+
   const [selectedMatch, setSelectedMatch] = React.useState<Match | null>(null);
   const [errorMessage, setErrorMessage] = React.useState('');
   const [filters, setFilters] = React.useState<MatchListFilters>({
@@ -79,12 +81,14 @@ export function MatchesPage() {
     isError: isMatchesError,
     error: matchesError
   } = useMatches();
+
   const {
     data: predictionRows = [],
     isLoading: isPredictionsLoading,
     isError: isPredictionsError,
     error: predictionsError
   } = usePredictionsByUser(user?.id!);
+
   const {
     data: settings = null,
     isLoading: isSettingsLoading,
@@ -107,15 +111,11 @@ export function MatchesPage() {
   }, [predictionRows]);
 
   const selectedPrediction = selectedMatch ? predictions[selectedMatch.id] : undefined;
+
   const predictionsClosed = isPredictionsClosed(
     settings?.predictions_open ?? true,
     settings?.predictions_close_at ?? null
   );
-
-  // const [predictions, setPredictions] = React.useState<MatchPredictionMap>({});
-  // const [predictionsOpen, setPredictionsOpen] = React.useState(true);
-  // const [predictionsCloseAt, setPredictionsCloseAt] = React.useState<string | null>(null);
-  // const [isLoading, setIsLoading] = React.useState(true);
 
   const stageOptions = React.useMemo(() => getUniqueStageOptions(matches), [matches]);
   const groupOptions = React.useMemo(() => getUniqueGroupOptions(matches), [matches]);
@@ -124,45 +124,37 @@ export function MatchesPage() {
     return filterMatches(matches, filters);
   }, [matches, filters]);
 
-  // React.useEffect(() => {
-  //   async function loadPageData() {
-  //     if (!user?.id) {
-  //       setIsLoading(false);
-  //       return;
-  //     }
+  React.useEffect(() => {
+    if (!requestedMatchId) {
+      handledRequestedMatchIdRef.current = null;
+      return;
+    }
 
-  //     setIsLoading(true);
-  //     setErrorMessage('');
+    if (isLoading) return;
+    if (handledRequestedMatchIdRef.current === requestedMatchId) return;
 
-  //     try {
-  //       const [matchesData, predictionRows, settings] = await Promise.all([
-  //         getMatches(),
-  //         getPredictionsByUser(user.id),
-  //         getAppSettings()
-  //       ]);
+    const match = matches.find((item) => item.id === requestedMatchId);
 
-  //       const nextPredictions = predictionRows.reduce<MatchPredictionMap>((acc, row) => {
-  //         acc[row.match_id] = {
-  //           homeScore: row.home_score,
-  //           awayScore: row.away_score
-  //         };
-  //         return acc;
-  //       }, {});
+    if (!match) {
+      setErrorMessage('No se encontró el partido solicitado.');
+      handledRequestedMatchIdRef.current = requestedMatchId;
+      clearRequestedMatchParam();
+      return;
+    }
 
-  //       setMatches(matchesData);
-  //       setPredictions(nextPredictions);
-  //       setPredictionsOpen(settings?.predictions_open ?? true);
-  //       setPredictionsCloseAt(settings?.predictions_close_at ?? null);
-  //     } catch (error) {
-  //       const message = error instanceof Error ? error.message : 'No se pudieron cargar los partidos';
-  //       setErrorMessage(message);
-  //     } finally {
-  //       setIsLoading(false);
-  //     }
-  //   }
+    const lockMessage = getMatchLockMessage(match, predictionsClosed);
 
-  //   void loadPageData();
-  // }, [user?.id]);
+    if (lockMessage) {
+      setErrorMessage(lockMessage);
+      handledRequestedMatchIdRef.current = requestedMatchId;
+      clearRequestedMatchParam();
+      return;
+    }
+
+    setErrorMessage('');
+    setSelectedMatch(match);
+    handledRequestedMatchIdRef.current = requestedMatchId;
+  }, [requestedMatchId, isLoading, matches, predictionsClosed]);
 
   const handleOpenPrediction = (match: Match) => {
     const lockMessage = getMatchLockMessage(match, predictionsClosed);
@@ -178,6 +170,7 @@ export function MatchesPage() {
 
   const handleClosePrediction = () => {
     setSelectedMatch(null);
+    clearRequestedMatchParam();
   };
 
   const handleSavePrediction = async (payload: { matchId: string; homeScore: number; awayScore: number }) => {
@@ -221,7 +214,6 @@ export function MatchesPage() {
             | undefined
         ) => {
           const next = prev ? [...prev] : [];
-
           const existingIndex = next.findIndex((row) => row.match_id === payload.matchId);
 
           if (existingIndex >= 0) {
@@ -257,22 +249,29 @@ export function MatchesPage() {
     }));
   };
 
+  const clearRequestedMatchParam = React.useCallback(() => {
+    if (!requestedMatchId) return;
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('matchId');
+    setSearchParams(nextParams, { replace: true });
+  }, [requestedMatchId, searchParams, setSearchParams]);
+
   return (
     <>
-      <Stack spacing={3}>
-        <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
-          <CardContent sx={{ p: { xs: 3, md: 4 } }}>
-            <Stack spacing={1}>
-              <Typography variant='h4' fontWeight={800}>
-                Partidos
-              </Typography>
+      <Stack spacing={2.5}>
+        <Stack spacing={0.5}>
+          <Typography variant='h5' fontWeight={800}>
+            Partidos
+          </Typography>
 
-              <Typography color='text.secondary'>Vista operativa para cargar y editar pronósticos.</Typography>
-            </Stack>
-          </CardContent>
-        </Card>
+          <Typography variant='body2' color='text.secondary'>
+            Elige un partido para cargar o editar tu pronóstico.
+          </Typography>
+        </Stack>
 
         {errorMessage ? <Alert severity='error'>{errorMessage}</Alert> : null}
+
         {isError ? (
           <Alert severity='error'>
             {firstError instanceof Error ? firstError.message : 'No se pudieron cargar los partidos'}
@@ -287,6 +286,7 @@ export function MatchesPage() {
           onChange={(field, value) => handleFilterChange(field as keyof MatchListFilters, value)}
           stageOptions={stageOptions}
           groupOptions={groupOptions}
+          collapsible
         />
 
         {filteredMatches.length === 0 && matches.length > 0 ? (

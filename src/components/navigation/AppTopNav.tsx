@@ -3,18 +3,19 @@ import AppBar from '@mui/material/AppBar';
 import Avatar from '@mui/material/Avatar';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Divider from '@mui/material/Divider';
 import IconButton from '@mui/material/IconButton';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import Toolbar from '@mui/material/Toolbar';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import MenuIcon from '@mui/icons-material/Menu';
-import Tooltip from '@mui/material/Tooltip';
 import { NavLink, useNavigate } from 'react-router';
 import { useAuth } from '../../features/auth/useAuth';
-import { Divider } from '@mui/material';
 import { BrandLogo } from '../../assets/brand/BrandLogo';
 import { AppContainer } from '../layout/AppContainer';
+import { useAppSettings } from '../../features/settings/useAppSettings';
 
 type NavItem = {
   label: string;
@@ -43,6 +44,9 @@ export default function AppTopNav() {
   const { user, profile, signOut } = useAuth();
   const navigate = useNavigate();
 
+  const { data: settings = null } = useAppSettings();
+  const showAuditLink = settings?.audits_visible ?? false;
+
   const [anchorElNav, setAnchorElNav] = React.useState<null | HTMLElement>(null);
   const [anchorElUser, setAnchorElUser] = React.useState<null | HTMLElement>(null);
 
@@ -52,15 +56,16 @@ export default function AppTopNav() {
 
   const publicNavItems: NavItem[] = [
     { label: 'Inicio', to: '/' },
-    // { label: 'Ranking', to: '/leaderboard' },
-    { label: 'Login', to: '/login' }
+    { label: 'Ranking', to: '/ranking' }
   ];
 
   const privateNavItems: NavItem[] = [
     { label: 'Inicio', to: '/' },
-    { label: 'Fixture', to: 'app/fixture' },
-    { label: 'Ranking', to: 'app/leaderboard' },
-    { label: 'Dashboard', to: '/app' }
+    { label: 'Ranking', to: '/ranking' },
+    { label: 'Carga tu pronóstico', to: '/app/predictions/matches' },
+    { label: 'Fixture', to: '/app/fixture' },
+    { label: 'Dashboard', to: '/app/dashboard' },
+    ...(showAuditLink ? [{ label: 'Auditorías', to: '/app/audits' }] : [])
   ];
 
   const navItems = isAuthenticated ? privateNavItems : publicNavItems;
@@ -94,7 +99,7 @@ export default function AppTopNav() {
 
   return (
     <AppBar position='sticky' color='transparent' elevation={0}>
-      <AppContainer sx={{ py: {} }}>
+      <AppContainer sx={{ marginY: 1 }}>
         <Toolbar disableGutters sx={{ minHeight: 64 }}>
           <Box
             sx={{
@@ -133,14 +138,8 @@ export default function AppTopNav() {
             <Menu
               id='main-navigation-menu'
               anchorEl={anchorElNav}
-              anchorOrigin={{
-                vertical: 'bottom',
-                horizontal: 'right'
-              }}
-              transformOrigin={{
-                vertical: 'top',
-                horizontal: 'right'
-              }}
+              anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+              transformOrigin={{ vertical: 'top', horizontal: 'right' }}
               open={Boolean(anchorElNav)}
               onClose={handleCloseNavMenu}
               sx={{ display: { xs: 'block', md: 'none' } }}
@@ -150,35 +149,44 @@ export default function AppTopNav() {
                   <Typography textAlign='center'>{item.label}</Typography>
                 </MenuItem>
               ))}
-              {isAuthenticated && isAdmin ? <Divider sx={{ my: 0 }} /> : null}
-              {isAuthenticated && isAdmin ? (
-                <MenuItem component={NavLink} to='/admin/results' onClick={handleCloseNavMenu}>
-                  <Typography textAlign='center'>Admin · Resultados</Typography>
-                </MenuItem>
-              ) : null}
-
-              {isAuthenticated && isAdmin ? (
-                <MenuItem component={NavLink} to='/admin/matches' onClick={handleCloseUserMenu}>
-                  Admin · Partidos
-                </MenuItem>
-              ) : null}
-
-              {isAuthenticated && isAdmin ? (
-                <MenuItem component={NavLink} to='/admin/settings' onClick={handleCloseNavMenu}>
-                  <Divider sx={{ my: 0 }} />
-                  <Typography textAlign='center'>Admin · Configuración</Typography>
-                </MenuItem>
-              ) : null}
-              {isAuthenticated && isAdmin ? <Divider sx={{ my: 0 }} /> : null}
 
               {!isAuthenticated ? (
-                <MenuItem component={NavLink} to='/register' onClick={handleCloseNavMenu}>
-                  <Typography fontWeight={700}>Registrarse</Typography>
-                </MenuItem>
+                <>
+                  <Divider sx={{ my: 0 }} />
+                  <MenuItem component={NavLink} to='/login' onClick={handleCloseNavMenu}>
+                    <Typography>Login</Typography>
+                  </MenuItem>
+                  <MenuItem component={NavLink} to='/register' onClick={handleCloseNavMenu}>
+                    <Typography fontWeight={700}>Registrarse</Typography>
+                  </MenuItem>
+                </>
               ) : (
-                <MenuItem onClick={handleLogout}>
-                  <Typography fontWeight={700}>Cerrar sesión</Typography>
-                </MenuItem>
+                <>
+                  <Divider sx={{ my: 0 }} />
+                  <MenuItem component={NavLink} to='/app/mis-pronosticos' onClick={handleCloseNavMenu}>
+                    <Typography>Mis pronósticos</Typography>
+                  </MenuItem>
+
+                  {isAdmin ? (
+                    <>
+                      <Divider sx={{ my: 0 }} />
+                      <MenuItem component={NavLink} to='/admin/results' onClick={handleCloseNavMenu}>
+                        <Typography>Admin · Resultados</Typography>
+                      </MenuItem>
+                      <MenuItem component={NavLink} to='/admin/matches' onClick={handleCloseNavMenu}>
+                        <Typography>Admin · Partidos</Typography>
+                      </MenuItem>
+                      <MenuItem component={NavLink} to='/admin/settings' onClick={handleCloseNavMenu}>
+                        <Typography>Admin · Configuración</Typography>
+                      </MenuItem>
+                    </>
+                  ) : null}
+
+                  <Divider sx={{ my: 0 }} />
+                  <MenuItem onClick={handleLogout}>
+                    <Typography fontWeight={700}>Cerrar sesión</Typography>
+                  </MenuItem>
+                </>
               )}
             </Menu>
           </Box>
@@ -209,20 +217,36 @@ export default function AppTopNav() {
             ))}
 
             {!isAuthenticated ? (
-              <Button
-                component={NavLink}
-                to='/register'
-                variant='contained'
-                sx={{
-                  ml: 1,
-                  px: 2,
-                  py: 1,
-                  borderRadius: 2,
-                  fontWeight: 700
-                }}
-              >
-                Registrarse
-              </Button>
+              <>
+                <Button
+                  component={NavLink}
+                  to='/login'
+                  color='inherit'
+                  sx={{
+                    ml: 1,
+                    px: 2,
+                    py: 1,
+                    borderRadius: 2,
+                    fontWeight: 600
+                  }}
+                >
+                  Login
+                </Button>
+
+                <Button
+                  component={NavLink}
+                  to='/register'
+                  variant='contained'
+                  sx={{
+                    px: 2,
+                    py: 1,
+                    borderRadius: 2,
+                    fontWeight: 700
+                  }}
+                >
+                  Registrarse
+                </Button>
+              </>
             ) : (
               <>
                 <Typography variant='body2' color='text.secondary' sx={{ ml: 1, mr: 0.5, maxWidth: 180 }} noWrap>
@@ -247,24 +271,30 @@ export default function AppTopNav() {
                 <Menu
                   sx={{ mt: '45px' }}
                   anchorEl={anchorElUser}
-                  anchorOrigin={{
-                    vertical: 'top',
-                    horizontal: 'right'
-                  }}
-                  transformOrigin={{
-                    vertical: 'top',
-                    horizontal: 'right'
-                  }}
+                  anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+                  transformOrigin={{ vertical: 'top', horizontal: 'right' }}
                   open={Boolean(anchorElUser)}
                   onClose={handleCloseUserMenu}
                 >
-                  <MenuItem component={NavLink} to='/app' onClick={handleCloseUserMenu}>
+                  <MenuItem component={NavLink} to='/app/dashboard' onClick={handleCloseUserMenu}>
                     Dashboard
                   </MenuItem>
+
+                  <MenuItem component={NavLink} to='/app/mis-pronosticos' onClick={handleCloseUserMenu}>
+                    Mis pronósticos
+                  </MenuItem>
+
+                  {isAdmin ? <Divider sx={{ my: 0 }} /> : null}
 
                   {isAdmin ? (
                     <MenuItem component={NavLink} to='/admin/results' onClick={handleCloseUserMenu}>
                       Admin · Resultados
+                    </MenuItem>
+                  ) : null}
+
+                  {isAdmin ? (
+                    <MenuItem component={NavLink} to='/admin/matches' onClick={handleCloseUserMenu}>
+                      Admin · Partidos
                     </MenuItem>
                   ) : null}
 
@@ -274,6 +304,7 @@ export default function AppTopNav() {
                     </MenuItem>
                   ) : null}
 
+                  <Divider sx={{ my: 0 }} />
                   <MenuItem onClick={handleLogout}>Cerrar sesión</MenuItem>
                 </Menu>
               </>

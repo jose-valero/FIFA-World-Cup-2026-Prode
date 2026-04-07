@@ -18,13 +18,16 @@ import { AdminSettingsPage } from './pages/AdminSettingsPage';
 import { AdminMatchesPage } from './pages/AdminMatchesPage';
 import { FixturePage } from './pages/FixturePage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
+import { AuditPage } from './pages/AuditPage';
+import { PredictionsHubPage } from './pages/PredictionsHubPage';
 
 function App() {
   return (
     <Routes>
       <Route element={<PublicLayout />}>
         <Route path='/' element={<HomePage />} />
-        <Route path='/leaderboard' element={<LeaderboardPage />} />
+        <Route path='/ranking' element={<LeaderboardPage />} />
+        <Route path='/leaderboard' element={<Navigate to='/ranking' replace />} />
         <Route path='/auth/callback' element={<AuthCallbackPage />} />
       </Route>
 
@@ -37,13 +40,23 @@ function App() {
 
       <Route element={<RequireAuth />}>
         <Route element={<PrivateLayout />}>
-          <Route path='/app/fixture' element={<FixturePage />} />
-          <Route path='/app/leaderboard' element={<Navigate to='/leaderboard' replace />} />
-
           <Route element={<ParticipantLayout />}>
-            <Route path='/app' element={<DashboardPage />} />
-            <Route path='/app/matches' element={<MatchesPage />} />
-            <Route path='/app/predictions' element={<PredictionsPage />} />
+            <Route path='/app' element={<Navigate to='/app/dashboard' replace />} />
+            <Route path='/app/dashboard' element={<DashboardPage />} />
+
+            <Route path='/app/predictions' element={<PredictionsHubPage />}>
+              <Route index element={<Navigate to='/app/predictions/matches' replace />} />
+              <Route path='matches' element={<MatchesPage />} />
+              <Route path='my-predictions' element={<PredictionsPage />} />
+            </Route>
+
+            <Route path='/app/matches' element={<Navigate to='/app/predictions/matches' replace />} />
+            <Route path='/app/my-predictions' element={<Navigate to='/app/predictions/my-predictions' replace />} />
+
+            <Route path='/app/fixture' element={<FixturePage />} />
+            <Route path='/app/audits' element={<AuditPage />} />
+
+            <Route path='/app/leaderboard' element={<Navigate to='/ranking' replace />} />
 
             <Route element={<RequireAdmin />}>
               <Route path='/admin/matches' element={<AdminMatchesPage />} />

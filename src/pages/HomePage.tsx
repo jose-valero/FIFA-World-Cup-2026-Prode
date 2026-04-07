@@ -608,6 +608,9 @@ export function HomePage() {
                       ✔ Ranking global actualizado con resultados oficiales
                     </Typography>
                     <Typography variant='body2' color='text.secondary'>
+                      ✔ Auditorias para ver los resultados y transparencia
+                    </Typography>
+                    <Typography variant='body2' color='text.secondary'>
                       ✔ Vista clara de tus pronósticos y rendimiento
                     </Typography>
                     <Typography variant='body2' color='text.secondary'>

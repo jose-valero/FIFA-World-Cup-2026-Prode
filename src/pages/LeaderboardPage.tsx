@@ -22,35 +22,10 @@ import {
 import { type LeaderboardRow } from '../features/leaderboard/leaderboard.api';
 import { useAuth } from '../features/auth/useAuth';
 import { useLeaderboard } from '../features/leaderboard/useLeaderboard';
+import { PageHeader, type PageHeaderBadge } from '../components/ui/PageHeader';
 
 function getInitial(name: string) {
   return name.trim().charAt(0).toUpperCase() || 'U';
-}
-
-function StatCard({ label, value }: { label: string; value: string | number }) {
-  return (
-    <Card
-      elevation={0}
-      sx={{
-        height: '100%',
-        borderRadius: 2,
-        border: '1px solid',
-        borderColor: 'divider'
-      }}
-    >
-      <CardContent sx={{ p: 3 }}>
-        <Stack spacing={1}>
-          <Typography variant='body2' color='text.secondary'>
-            {label}
-          </Typography>
-
-          <Typography variant='h4' fontWeight={800}>
-            {value}
-          </Typography>
-        </Stack>
-      </CardContent>
-    </Card>
-  );
 }
 
 function PodiumCard({
@@ -77,7 +52,7 @@ function PodiumCard({
           : undefined
       })}
     >
-      <CardContent sx={{ p: 3 }}>
+      <CardContent sx={{ p: 2.5 }}>
         <Stack spacing={2}>
           <Stack direction='row' spacing={1.5} alignItems='center'>
             <Avatar
@@ -143,28 +118,31 @@ export function LeaderboardPage() {
   const leaderPoints = rows[0]?.total_points ?? 0;
   const topThree = rows.slice(0, 3);
 
-  return (
-    <Stack spacing={3}>
-      <Card
-        elevation={0}
-        sx={{
-          borderRadius: 2,
-          border: '1px solid',
-          borderColor: 'divider'
-        }}
-      >
-        <CardContent sx={{ p: { xs: 3, md: 4 } }}>
-          <Stack spacing={1}>
-            <Typography variant='h4' fontWeight={800}>
-              Tabla global
-            </Typography>
+  const badges: PageHeaderBadge[] = [
+    {
+      label: `${rows.length} participantes`,
+      color: 'primary',
+      variant: 'outlined'
+    },
+    {
+      label: `Líder: ${leaderPoints} pts`,
+      color: 'primary',
+      variant: 'filled'
+    },
+    {
+      label: `Tu posición: ${currentUserPosition ? `#${currentUserPosition}` : '-'}`,
+      color: 'default',
+      variant: 'outlined'
+    }
+  ];
 
-            <Typography color='text.secondary'>
-              Ranking general de participantes según los resultados oficiales cargados.
-            </Typography>
-          </Stack>
-        </CardContent>
-      </Card>
+  return (
+    <Stack spacing={2.5}>
+      <PageHeader
+        title='Tabla global'
+        description='Ranking general de participantes según los resultados oficiales cargados.'
+        badges={badges}
+      />
 
       {isError ? (
         <Alert severity='error'>{error instanceof Error ? error.message : 'No se pudo cargar el leaderboard'}</Alert>
@@ -176,27 +154,13 @@ export function LeaderboardPage() {
         </Stack>
       ) : (
         <>
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 12, md: 4 }}>
-              <StatCard label='Participantes' value={rows.length} />
-            </Grid>
-
-            <Grid size={{ xs: 12, md: 4 }}>
-              <StatCard label='Puntaje líder' value={`${leaderPoints} pts`} />
-            </Grid>
-
-            <Grid size={{ xs: 12, md: 4 }}>
-              <StatCard label='Tu posición' value={currentUserPosition ? `#${currentUserPosition}` : '-'} />
-            </Grid>
-          </Grid>
-
           {topThree.length > 0 ? (
-            <Stack spacing={2}>
+            <Stack spacing={1.5}>
               <Typography variant='h5' fontWeight={800}>
                 Top 3
               </Typography>
 
-              <Grid container spacing={2}>
+              <Grid container spacing={1.5}>
                 {topThree.map((row, index) => (
                   <Grid key={row.user_id} size={{ xs: 12, md: 4 }}>
                     <PodiumCard

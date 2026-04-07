@@ -129,13 +129,13 @@ function SummaryCard({ label, value }: { label: string; value: string | number }
         borderColor: 'divider'
       }}
     >
-      <CardContent sx={{ p: 3 }}>
-        <Stack spacing={1}>
+      <CardContent sx={{ p: 2.25 }}>
+        <Stack spacing={0.75}>
           <Typography variant='body2' color='text.secondary'>
             {label}
           </Typography>
 
-          <Typography variant='h4' fontWeight={800}>
+          <Typography variant='h5' fontWeight={800}>
             {value}
           </Typography>
         </Stack>
@@ -253,27 +253,16 @@ export function PredictionsPage() {
   ];
 
   return (
-    <Stack spacing={3}>
-      <Card
-        elevation={0}
-        sx={{
-          borderRadius: 2,
-          border: '1px solid',
-          borderColor: 'divider'
-        }}
-      >
-        <CardContent sx={{ p: { xs: 3, md: 4 } }}>
-          <Stack spacing={1}>
-            <Typography variant='h4' fontWeight={800}>
-              Mis pronósticos
-            </Typography>
+    <Stack spacing={2.5}>
+      <Stack spacing={0.5}>
+        <Typography variant='h5' fontWeight={800}>
+          Mis pronósticos
+        </Typography>
 
-            <Typography color='text.secondary'>
-              Revisa lo que ya cargaste, compara con los resultados oficiales y mira cuántos puntos vas sumando.
-            </Typography>
-          </Stack>
-        </CardContent>
-      </Card>
+        <Typography variant='body2' color='text.secondary'>
+          Revisa lo que ya cargaste y cómo se compara con los resultados oficiales.
+        </Typography>
+      </Stack>
 
       {isError ? (
         <Alert severity='error'>
@@ -287,7 +276,7 @@ export function PredictionsPage() {
         </Stack>
       ) : (
         <>
-          <Grid container spacing={2}>
+          <Grid container spacing={1.5}>
             {summaryStats.map((item) => (
               <Grid key={item.label} size={{ xs: 12, sm: 6, lg: 3 }}>
                 <SummaryCard label={item.label} value={item.value} />
@@ -306,6 +295,7 @@ export function PredictionsPage() {
             }
             stageOptions={stageOptions}
             groupOptions={groupOptions}
+            collapsible
           />
 
           {filteredPredictionItems.length === 0 && predictionItems.length > 0 ? (
@@ -326,11 +316,11 @@ export function PredictionsPage() {
                   <Typography color='text.secondary'>Aún no has cargado ningún pronóstico.</Typography>
 
                   <Stack direction='row' spacing={1} flexWrap='wrap' useFlexGap>
-                    <Button component={RouterLink} to='/app/matches' variant='contained'>
+                    <Button component={RouterLink} to='/app/predictions/matches' variant='contained'>
                       Ir a partidos
                     </Button>
 
-                    <Button component={RouterLink} to='/leaderboard' variant='text'>
+                    <Button component={RouterLink} to='/ranking' variant='text'>
                       Ver ranking
                     </Button>
                   </Stack>
