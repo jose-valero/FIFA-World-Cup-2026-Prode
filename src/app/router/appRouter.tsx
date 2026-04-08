@@ -8,6 +8,7 @@ import { ParticipantLayout } from '../layout/ParticipantLayout';
 import { PublicOnlyRoute } from '../../modules/auth/guard/PublicOnlyRoute';
 import { RequireAuth } from '../../modules/auth/guard/RequireAuth';
 import { RequireAdmin } from '../../modules/auth/guard/RequireAdmin';
+import { RequireEnabledParticipant } from '../../modules/auth/guard/RequireEnabledParticipant';
 
 import { routes, slugs } from './routes';
 import { NotFoundPage } from '../../shared/components/NotFoundPage';
@@ -100,7 +101,10 @@ export const appRouter = createBrowserRouter([
     element: <PublicLayout />,
     children: [
       { path: routes.home, element: withSuspense(<HomePage />) },
-      { path: routes.leaderboard, element: withSuspense(<LeaderboardPage />) },
+      {
+        element: <RequireEnabledParticipant />,
+        children: [{ path: routes.leaderboard, element: withSuspense(<LeaderboardPage />) }]
+      },
       { path: routes.auth_callback, element: withSuspense(<AuthCallbackPage />) }
     ]
   },
@@ -126,33 +130,43 @@ export const appRouter = createBrowserRouter([
             element: <ParticipantLayout />,
             children: [
               { path: routes.app, element: <Navigate to={routes.dashboard} replace /> },
-              { path: routes.dashboard, element: withSuspense(<DashboardPage />) },
 
               {
-                path: routes.predictions,
-                element: withSuspense(<PredictionsHubPage />),
+                element: <RequireEnabledParticipant />,
                 children: [
-                  { index: true, element: <Navigate to={slugs.matches} replace /> },
-                  { path: slugs.matches, element: withSuspense(<MatchesPage />) },
-                  { path: slugs.my_predictions, element: withSuspense(<PredictionsPage />) }
+                  { path: routes.dashboard, element: withSuspense(<DashboardPage />) },
+
+                  {
+                    path: routes.predictions,
+                    element: withSuspense(<PredictionsHubPage />),
+                    children: [
+                      { index: true, element: <Navigate to={slugs.matches} replace /> },
+                      { path: slugs.matches, element: withSuspense(<MatchesPage />) },
+                      { path: slugs.my_predictions, element: withSuspense(<PredictionsPage />) }
+                    ]
+                  },
+
+                  {
+                    path: `${routes.app}/${slugs.matches}`,
+                    element: <Navigate to={routes.predictionMatches} replace />
+                  },
+                  {
+                    path: `${routes.app}/${slugs.my_predictions}`,
+                    element: <Navigate to={routes.myPredictions} replace />
+                  },
+
+                  {
+                    element: <RequireAdmin />,
+                    children: [
+                      { path: routes.adminMatches, element: withSuspense(<AdminMatchesPage />) },
+                      { path: routes.adminResults, element: withSuspense(<AdminResultsPage />) },
+                      { path: routes.adminSettings, element: withSuspense(<AdminSettingsPage />) }
+                    ]
+                  }
                 ]
               },
 
-              { path: `${routes.app}/${slugs.matches}`, element: <Navigate to={routes.predictionMatches} replace /> },
-              {
-                path: `${routes.app}/${slugs.my_predictions}`,
-                element: <Navigate to={routes.myPredictions} replace />
-              },
-
-              { path: routes.fixture, element: withSuspense(<FixturePage />) },
-              {
-                element: <RequireAdmin />,
-                children: [
-                  { path: routes.adminMatches, element: withSuspense(<AdminMatchesPage />) },
-                  { path: routes.adminResults, element: withSuspense(<AdminResultsPage />) },
-                  { path: routes.adminSettings, element: withSuspense(<AdminSettingsPage />) }
-                ]
-              }
+              { path: routes.fixture, element: withSuspense(<FixturePage />) }
             ]
           }
         ]

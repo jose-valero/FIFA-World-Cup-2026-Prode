@@ -7,6 +7,7 @@ export interface LeaderboardRow {
   exact_hits: number;
   outcome_hits: number;
   scored_predictions: number;
+  is_disabled: boolean;
 }
 
 export async function getLeaderboard(): Promise<LeaderboardRow[]> {

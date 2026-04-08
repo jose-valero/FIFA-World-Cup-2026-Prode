@@ -12,6 +12,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import MenuIcon from '@mui/icons-material/Menu';
 import { NavLink, useNavigate } from 'react-router';
+
 import { useAuth } from '../../modules/auth/hooks/useAuth';
 import { BrandLogo } from '../../assets/brand/BrandLogo';
 import { AppContainer } from './AppContainer';
@@ -49,11 +50,17 @@ export default function AppTopNav() {
 
   const isAuthenticated = Boolean(user);
   const isAdmin = Boolean(profile?.is_admin);
+  const isDisabled = Boolean(profile?.is_disabled);
   const displayName = getDisplayName(user);
 
   const publicNavItems: NavItem[] = [
     { label: 'Inicio', to: routes.home },
     { label: 'Ranking', to: routes.leaderboard }
+  ];
+
+  const disabledNavItems: NavItem[] = [
+    { label: 'Inicio', to: routes.home },
+    { label: 'Fixture', to: routes.fixture }
   ];
 
   const privateNavItems: NavItem[] = [
@@ -64,7 +71,7 @@ export default function AppTopNav() {
     { label: 'Dashboard', to: routes.dashboard }
   ];
 
-  const navItems = isAuthenticated ? privateNavItems : publicNavItems;
+  const navItems = !isAuthenticated ? publicNavItems : isDisabled ? disabledNavItems : privateNavItems;
 
   const handleOpenNavMenu = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorElNav(event.currentTarget);
@@ -118,7 +125,7 @@ export default function AppTopNav() {
           </Box>
 
           <Box sx={{ flexGrow: 1 }} />
-          {/* a<sd */}
+
           <Box sx={{ display: { xs: 'flex', md: 'none' } }}>
             <IconButton
               size='large'
@@ -149,34 +156,45 @@ export default function AppTopNav() {
               {!isAuthenticated ? (
                 <div>
                   <Divider sx={{ my: 0 }} />
-                  <MenuItem component={NavLink} to='/login' onClick={handleCloseNavMenu}>
+                  <MenuItem component={NavLink} to={routes.login} onClick={handleCloseNavMenu}>
                     <Typography>Login</Typography>
                   </MenuItem>
-                  <MenuItem component={NavLink} to='/register' onClick={handleCloseNavMenu}>
+                  <MenuItem component={NavLink} to={routes.register} onClick={handleCloseNavMenu}>
                     <Typography fontWeight={700}>Registrarse</Typography>
                   </MenuItem>
                 </div>
               ) : (
                 <div>
-                  <Divider sx={{ my: 0 }} />
-                  <MenuItem component={NavLink} to='/app/mis-pronosticos' onClick={handleCloseNavMenu}>
-                    <Typography>Mis pronósticos</Typography>
-                  </MenuItem>
+                  {!isDisabled ? (
+                    <div>
+                      <Divider sx={{ my: 0 }} />
+                      <MenuItem component={NavLink} to={routes.myPredictions} onClick={handleCloseNavMenu}>
+                        <Typography>Mis pronósticos</Typography>
+                      </MenuItem>
 
-                  {isAdmin ? (
+                      {isAdmin ? (
+                        <>
+                          <Divider sx={{ my: 0 }} />
+                          <MenuItem component={NavLink} to={routes.adminResults} onClick={handleCloseNavMenu}>
+                            <Typography>Admin · Resultados</Typography>
+                          </MenuItem>
+                          <MenuItem component={NavLink} to={routes.adminMatches} onClick={handleCloseNavMenu}>
+                            <Typography>Admin · Partidos</Typography>
+                          </MenuItem>
+                          <MenuItem component={NavLink} to={routes.adminSettings} onClick={handleCloseNavMenu}>
+                            <Typography>Admin · Configuración</Typography>
+                          </MenuItem>
+                        </>
+                      ) : null}
+                    </div>
+                  ) : (
                     <>
                       <Divider sx={{ my: 0 }} />
-                      <MenuItem component={NavLink} to='/admin/results' onClick={handleCloseNavMenu}>
-                        <Typography>Admin · Resultados</Typography>
-                      </MenuItem>
-                      <MenuItem component={NavLink} to='/admin/matches' onClick={handleCloseNavMenu}>
-                        <Typography>Admin · Partidos</Typography>
-                      </MenuItem>
-                      <MenuItem component={NavLink} to='/admin/settings' onClick={handleCloseNavMenu}>
-                        <Typography>Admin · Configuración</Typography>
+                      <MenuItem disabled>
+                        <Typography color='text.secondary'>Cuenta deshabilitada</Typography>
                       </MenuItem>
                     </>
-                  ) : null}
+                  )}
 
                   <Divider sx={{ my: 0 }} />
                   <MenuItem onClick={handleLogout}>
@@ -186,7 +204,7 @@ export default function AppTopNav() {
               )}
             </Menu>
           </Box>
-          {/* asd */}
+
           <Box
             sx={{
               display: { xs: 'none', md: 'flex' },
@@ -216,7 +234,7 @@ export default function AppTopNav() {
               <>
                 <Button
                   component={NavLink}
-                  to='/login'
+                  to={routes.login}
                   color='inherit'
                   sx={{
                     ml: 1,
@@ -231,7 +249,7 @@ export default function AppTopNav() {
 
                 <Button
                   component={NavLink}
-                  to='/register'
+                  to={routes.register}
                   variant='contained'
                   sx={{
                     px: 2,
@@ -272,33 +290,41 @@ export default function AppTopNav() {
                   open={Boolean(anchorElUser)}
                   onClose={handleCloseUserMenu}
                 >
-                  <MenuItem component={NavLink} to='/app/dashboard' onClick={handleCloseUserMenu}>
-                    Dashboard
-                  </MenuItem>
+                  {!isDisabled ? (
+                    <div>
+                      <MenuItem component={NavLink} to={routes.dashboard} onClick={handleCloseUserMenu}>
+                        Dashboard
+                      </MenuItem>
 
-                  <MenuItem component={NavLink} to='/app/mis-pronosticos' onClick={handleCloseUserMenu}>
-                    Mis pronósticos
-                  </MenuItem>
+                      <MenuItem component={NavLink} to={routes.myPredictions} onClick={handleCloseUserMenu}>
+                        Mis pronósticos
+                      </MenuItem>
 
-                  {isAdmin ? <Divider sx={{ my: 0 }} /> : null}
+                      {isAdmin ? <Divider sx={{ my: 0 }} /> : null}
 
-                  {isAdmin ? (
-                    <MenuItem component={NavLink} to='/admin/results' onClick={handleCloseUserMenu}>
-                      Admin · Resultados
+                      {isAdmin ? (
+                        <MenuItem component={NavLink} to={routes.adminResults} onClick={handleCloseUserMenu}>
+                          Admin · Resultados
+                        </MenuItem>
+                      ) : null}
+
+                      {isAdmin ? (
+                        <MenuItem component={NavLink} to={routes.adminMatches} onClick={handleCloseUserMenu}>
+                          Admin · Partidos
+                        </MenuItem>
+                      ) : null}
+
+                      {isAdmin ? (
+                        <MenuItem component={NavLink} to={routes.adminSettings} onClick={handleCloseUserMenu}>
+                          Admin · Configuración
+                        </MenuItem>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <MenuItem disabled>
+                      <Typography color='text.secondary'>Cuenta deshabilitada</Typography>
                     </MenuItem>
-                  ) : null}
-
-                  {isAdmin ? (
-                    <MenuItem component={NavLink} to='/admin/matches' onClick={handleCloseUserMenu}>
-                      Admin · Partidos
-                    </MenuItem>
-                  ) : null}
-
-                  {isAdmin ? (
-                    <MenuItem component={NavLink} to='/admin/settings' onClick={handleCloseUserMenu}>
-                      Admin · Configuración
-                    </MenuItem>
-                  ) : null}
+                  )}
 
                   <Divider sx={{ my: 0 }} />
                   <MenuItem onClick={handleLogout}>Cerrar sesión</MenuItem>

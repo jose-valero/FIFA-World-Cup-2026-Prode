@@ -1,4 +1,4 @@
-import type { Match } from '../types';
+import type { Match } from '../../modules/matches/types/types';
 
 export function getStatusColor(status: Match['status']) {
   switch (status) {

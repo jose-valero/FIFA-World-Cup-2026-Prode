@@ -15,4 +15,7 @@ export interface AuthProfile {
   id: string;
   display_name: string;
   is_admin: boolean;
+  is_disabled: boolean;
+  created_at?: string;
+  updated_at?: string;
 }

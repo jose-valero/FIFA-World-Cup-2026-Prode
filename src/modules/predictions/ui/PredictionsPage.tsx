@@ -25,6 +25,8 @@ import {
 import { MatchFiltersCard } from '../../../shared/components/MatchFiltersCard';
 import { MatchVs } from '../../../shared/components/MatchVs';
 import type { Match } from '../../matches/types/types';
+import { getStatusLabel } from '../../../shared/utils/getStatusLabel';
+import { getStatusColor } from '../../../shared/utils/getStatusColor';
 
 type UserPrediction = {
   matchId: string;
@@ -39,30 +41,6 @@ type PredictionWithMatch = {
   isExactHit: boolean;
   isOutcomeHit: boolean;
 };
-
-function getStatusLabel(status: Match['status']) {
-  switch (status) {
-    case 'live':
-      return 'En vivo';
-    case 'finished':
-      return 'Finalizado';
-    case 'scheduled':
-    default:
-      return 'Pendiente';
-  }
-}
-
-function getStatusColor(status: Match['status']) {
-  switch (status) {
-    case 'live':
-      return 'error';
-    case 'finished':
-      return 'success';
-    case 'scheduled':
-    default:
-      return 'warning';
-  }
-}
 
 function getPredictionOutcome(homeScore: number, awayScore: number) {
   if (homeScore > awayScore) return 'home';

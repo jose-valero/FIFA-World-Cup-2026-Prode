@@ -1,4 +1,4 @@
-import type { Match } from '../matches/types';
+import type { Match } from '../../matches/types/types';
 
 export const mockKnockoutMatches: Match[] = [
   {

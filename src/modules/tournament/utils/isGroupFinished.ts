@@ -1,4 +1,4 @@
-import type { Match } from '../matches/types';
+import type { Match } from '../../matches/types/types';
 
 export function isGroupFinished(groupCode: string, matches: Match[]) {
   const groupMatches = matches.filter((match) => match.stage === 'group_stage' && match.groupCode === groupCode);

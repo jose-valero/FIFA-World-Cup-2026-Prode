@@ -34,6 +34,8 @@ import { KnockoutBracket } from '../../tournament/components/KnockoutBracket';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import type { Match } from '../../matches/types/types';
 import { TeamFlag } from '../../../shared/components/TeamFlag';
+import { getStatusLabel } from '../../../shared/utils/getStatusLabel';
+import { getStatusColor } from '../../../shared/utils/getStatusColor';
 type FixtureViewMode = 'group_stage' | 'knockout';
 type GroupStageStatusFilter = '' | 'scheduled' | 'live' | 'finished';
 
@@ -52,30 +54,6 @@ type ClientGroupStandingRow = {
   points: number;
   rank_in_group: number;
 };
-
-function getStatusLabel(status: Match['status']) {
-  switch (status) {
-    case 'live':
-      return 'En vivo';
-    case 'finished':
-      return 'Finalizado';
-    case 'scheduled':
-    default:
-      return 'Pendiente';
-  }
-}
-
-function getStatusColor(status: Match['status']) {
-  switch (status) {
-    case 'live':
-      return 'error';
-    case 'finished':
-      return 'success';
-    case 'scheduled':
-    default:
-      return 'warning';
-  }
-}
 
 function sortMatches(matches: Match[]) {
   return [...matches].sort((a, b) => {
