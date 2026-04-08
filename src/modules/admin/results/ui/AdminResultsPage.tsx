@@ -15,8 +15,8 @@ import {
 import { useAdminResults } from '../hooks/useAdminResults';
 import { MatchVs } from '../../../../shared/components/MatchVs';
 import { useUpdateOfficialResultMutation } from '../hooks/useAdminResultMutations';
-import { PageFiltersBar } from '../../../../shared/components/PageFiltersBar';
 import type { AdminMatchRow, AdminMatchStatus } from '../types/admin.results.types';
+import { PageFiltersBar } from '../../../../shared/components/PageFiltersBar';
 
 type DraftMap = Record<
   string,
@@ -142,14 +142,13 @@ export function AdminResultsPage() {
   const [drafts, setDrafts] = React.useState<DraftMap>({});
   const [errorMessage, setErrorMessage] = React.useState('');
   const [successMessage, setSuccessMessage] = React.useState('');
+  const [savingMatchId, setSavingMatchId] = React.useState<string | null>(null);
   const [filters, setFilters] = React.useState<Filters>({
     stage: '',
     group: '',
     status: '',
     teamQuery: ''
   });
-
-  const [savingMatchId, setSavingMatchId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (!matchesData) return;
@@ -369,6 +368,7 @@ export function AdminResultsPage() {
           {filteredMatches.map((match) => {
             const draft = drafts[match.id];
             const isDirty = hasDraftChanged(match, draft);
+            const isSavingThisRow = savingMatchId === match.id;
 
             return (
               <Card key={match.id} elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
@@ -425,9 +425,9 @@ export function AdminResultsPage() {
                       <Button
                         variant='contained'
                         onClick={() => void handleSave(match.id)}
-                        disabled={savingMatchId === match.id || !isDirty}
+                        disabled={isSavingThisRow || !isDirty}
                       >
-                        {savingMatchId === match.id ? 'Guardando' : 'Guardar'}
+                        {isSavingThisRow ? 'Guardando...' : 'Guardar'}
                       </Button>
                     </Stack>
                   </Stack>

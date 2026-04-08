@@ -1,7 +1,14 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { syncQualifiedTeamsIntoKnockout, updateOfficialResult } from '../api/adminResults.api';
 import { queryKeys } from '../../../../lib/react-query/queryKeys';
-import type { AdminMatchRow, UpdateOfficialResultInput } from '../types/admin.results.types';
+import type { AdminMatchRow, AdminMatchStatus } from '../types/admin.results.types';
+
+type UpdateOfficialResultInput = {
+  matchId: string;
+  status: AdminMatchStatus;
+  officialHomeScore: number | null;
+  officialAwayScore: number | null;
+};
 
 function shouldSyncKnockout(input: UpdateOfficialResultInput) {
   return input.status === 'finished';
@@ -37,12 +44,11 @@ export function useUpdateOfficialResultMutation() {
         );
       });
 
-      queryClient.invalidateQueries({ queryKey: queryKeys.matches });
-      queryClient.invalidateQueries({ queryKey: queryKeys.leaderboard });
-
-      if (shouldSyncKnockout(input)) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.adminMatches });
-      }
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.matches }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.leaderboard }),
+        ...(shouldSyncKnockout(input) ? [queryClient.invalidateQueries({ queryKey: queryKeys.adminMatches })] : [])
+      ]);
     }
   });
 }
