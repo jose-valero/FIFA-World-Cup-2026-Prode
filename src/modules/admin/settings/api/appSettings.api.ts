@@ -20,9 +20,6 @@ export async function getAppSettings(): Promise<AppSettings | null> {
 
   return data;
 }
-// predictionsOpen: boolean;
-// predictionsCloseAt: string | null;
-// auditsVisible: boolean;
 
 export async function updateAppSettings(input: Omit<AppSettings, 'key'>): Promise<void> {
   const { error } = await supabase

@@ -22,7 +22,6 @@ import {
   TextField,
   Typography
 } from '@mui/material';
-// import { type AdminMatchRow, type AdminMatchStatus } from '../../../../features/admin/adminMatches.api';
 
 import { MatchFiltersCard } from '../../../../shared/components/MatchFiltersCard';
 import {
@@ -34,38 +33,14 @@ import {
 import { getStatusLabel } from '../../../../shared/utils/getStatusLabel';
 import { getStatusColor } from '../../../../shared/utils/getStatusColor';
 import { MatchVs } from '../../../../shared/components/MatchVs';
-// import { useAdminMatches } from '../features/admin/useAdminMatches';
 import { useTeams } from '../../../teams/hooks/useTeams';
-import type { AdminMatchRow, AdminMatchStatus } from '../api/adminMatches.api';
 import { useCreateAdminMatch, useDeleteAdminMatch, useUpdateAdminMatch } from '../hooks/useAdminMatchMutations';
 import { useAdminMatches } from '../hooks/useAdminMatches';
-// import { useAdminMatches } from '../hooks/useAdminMatches';
-// import {
-//   useCreateAdminMatch,
-//   useDeleteAdminMatch,
-//   useUpdateAdminMatch
-// } from '../features/admin/useAdminMatchMutations';
+import type { AdminMatchesFormStateSchema, AdminMatchRow } from '../types/admin.match.types';
+import { formatKickoff } from '../../../../shared/utils/formatKickoff';
+import { mapMatchToForm } from '../helpers/mapMatchToForm';
 
-type FormState = {
-  id: string;
-  stage: TournamentStage;
-  matchday: string;
-  groupOrder: string;
-  groupName: string;
-  homeTeam: string;
-  awayTeam: string;
-
-  homeTeamId: string;
-  awayTeamId: string;
-  homeTeamCode: string;
-  awayTeamCode: string;
-  kickoffAt: string;
-  stadium: string;
-  city: string;
-  status: AdminMatchStatus;
-};
-
-const emptyForm: FormState = {
+const emptyForm: AdminMatchesFormStateSchema = {
   id: '',
   stage: 'group_stage',
   matchday: '',
@@ -82,40 +57,6 @@ const emptyForm: FormState = {
   city: '',
   status: 'scheduled'
 };
-
-function formatKickoff(isoDate: string) {
-  return new Intl.DateTimeFormat('es-AR', {
-    dateStyle: 'medium',
-    timeStyle: 'short'
-  }).format(new Date(isoDate));
-}
-
-function toDateTimeLocal(isoDate: string) {
-  const date = new Date(isoDate);
-  const offset = date.getTimezoneOffset();
-  const localDate = new Date(date.getTime() - offset * 60_000);
-  return localDate.toISOString().slice(0, 16);
-}
-
-function mapMatchToForm(match: AdminMatchRow): FormState {
-  return {
-    id: match.id,
-    stage: match.stage,
-    matchday: match.matchday !== null ? String(match.matchday) : '',
-    groupOrder: match.group_order !== null ? String(match.group_order) : '',
-    groupName: match.group_name,
-    homeTeam: match.home_team,
-    awayTeam: match.away_team,
-    homeTeamId: match.home_team_id ?? '',
-    awayTeamId: match.away_team_id ?? '',
-    homeTeamCode: match.home_team_code ?? '',
-    awayTeamCode: match.away_team_code ?? '',
-    kickoffAt: toDateTimeLocal(match.kickoff_at),
-    stadium: match.stadium,
-    city: match.city,
-    status: match.status
-  };
-}
 
 function buildSourceSlot(match: AdminMatchRow, side: 'home' | 'away'): string | null {
   const sourceType = side === 'home' ? match.home_source_type : match.away_source_type;
@@ -182,7 +123,7 @@ function hasManualOverride(match: AdminMatchRow) {
   return homeLooksManual || awayLooksManual;
 }
 
-function validateAdminMatchForm(input: FormState) {
+function validateAdminMatchForm(input: AdminMatchesFormStateSchema) {
   const id = normalizeMatchId(input.id);
   const homeTeam = input.homeTeam.trim();
   const awayTeam = input.awayTeam.trim();
@@ -249,7 +190,7 @@ function getDefaultGroupNameForStage(stage: TournamentStage) {
 export function AdminMatchesPage() {
   // const [matches, setMatches] = React.useState<AdminMatchRow[]>([]);
   // const [teams, setTeams] = React.useState<TeamRow[]>([]);
-  const [form, setForm] = React.useState<FormState>(emptyForm);
+  const [form, setForm] = React.useState<AdminMatchesFormStateSchema>(emptyForm);
   const [editingMatch, setEditingMatch] = React.useState<AdminMatchRow | null>(null);
   const [isEditing, setIsEditing] = React.useState(false);
   // const [isLoading, setIsLoading] = React.useState(true);
@@ -286,7 +227,7 @@ export function AdminMatchesPage() {
 
   const [matchPendingDelete, setMatchPendingDelete] = React.useState<AdminMatchRow | null>(null);
 
-  const handleFormChange = (field: keyof FormState, value: string) => {
+  const handleFormChange = (field: keyof AdminMatchesFormStateSchema, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 

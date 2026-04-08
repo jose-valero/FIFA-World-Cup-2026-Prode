@@ -1,14 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { syncQualifiedTeamsIntoKnockout, updateOfficialResult } from '../api/adminResults.api';
 import { queryKeys } from '../../../../lib/react-query/queryKeys';
-import type { AdminMatchRow, AdminMatchStatus } from '../types/admin.results.types';
-
-type UpdateOfficialResultInput = {
-  matchId: string;
-  status: AdminMatchStatus;
-  officialHomeScore: number | null;
-  officialAwayScore: number | null;
-};
+import type { AdminMatchRow, UpdateOfficialResultInput } from '../types/admin.results.types';
 
 function shouldSyncKnockout(input: UpdateOfficialResultInput) {
   return input.status === 'finished';

@@ -1,5 +1,5 @@
 import { supabase } from '../../../../lib/supabase/client';
-import type { AdminMatchRow, AdminMatchStatus } from '../types/admin.results.types';
+import type { AdminMatchRow, UpdateOfficialResultInput } from '../types/admin.results.types';
 
 export async function getAdminMatches(): Promise<AdminMatchRow[]> {
   const { data, error } = await supabase
@@ -34,13 +34,6 @@ export async function getAdminMatches(): Promise<AdminMatchRow[]> {
   }
 
   return data ?? [];
-}
-
-interface UpdateOfficialResultInput {
-  matchId: string;
-  status: AdminMatchStatus;
-  officialHomeScore: number | null;
-  officialAwayScore: number | null;
 }
 
 export async function updateOfficialResult({

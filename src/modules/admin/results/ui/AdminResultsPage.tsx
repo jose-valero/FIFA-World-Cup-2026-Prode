@@ -15,13 +15,15 @@ import {
 import { useAdminResults } from '../hooks/useAdminResults';
 import { MatchVs } from '../../../../shared/components/MatchVs';
 import { useUpdateOfficialResultMutation } from '../hooks/useAdminResultMutations';
-import type { AdminMatchRow, AdminMatchStatus } from '../types/admin.results.types';
+import type { AdminMatchRow } from '../types/admin.results.types';
 import { PageFiltersBar } from '../../../../shared/components/PageFiltersBar';
+import type { MatchStatus } from '../../../matches/types/types';
+import { formatKickoff } from '../../../../shared/utils/formatKickoff';
 
 type DraftMap = Record<
   string,
   {
-    status: AdminMatchStatus;
+    status: MatchStatus;
     officialHomeScore: string;
     officialAwayScore: string;
   }
@@ -30,18 +32,11 @@ type DraftMap = Record<
 type Filters = {
   stage: string;
   group: string;
-  status: '' | AdminMatchStatus;
+  status: '' | MatchStatus;
   teamQuery: string;
 };
 
 const EMPTY_MATCHES: AdminMatchRow[] = [];
-
-function formatKickoff(isoDate: string) {
-  return new Intl.DateTimeFormat('es-AR', {
-    dateStyle: 'medium',
-    timeStyle: 'short'
-  }).format(new Date(isoDate));
-}
 
 function mergeDraftsWithMatches(prev: DraftMap, matches: AdminMatchRow[]): DraftMap {
   const next = { ...prev };
@@ -58,7 +53,7 @@ function mergeDraftsWithMatches(prev: DraftMap, matches: AdminMatchRow[]): Draft
 }
 
 function validateOfficialResultDraft(input: {
-  status: AdminMatchStatus;
+  status: MatchStatus;
   officialHomeScore: number | null;
   officialAwayScore: number | null;
 }): string | null {
