@@ -23,10 +23,10 @@ import { useAuth } from '../../auth/hooks/useAuth';
 import { useLeaderboard } from '../hooks/useLeaderboard';
 import { PageHeader, type PageHeaderBadge } from '../../../shared/components/PageHeader';
 import type { LeaderboardRow } from '../api/leaderboard.api';
-// import { type LeaderboardRow } from '../features/leaderboard/leaderboard.api';
-// import { useAuth } from '../modules/auth/hooks/useAuth';
-// import { useLeaderboard } from '../features/leaderboard/useLeaderboard';
-// import { PageHeader, type PageHeaderBadge } from '../components/ui/PageHeader';
+
+import { Button } from '@mui/material';
+import { useAppSettings } from '../../admin/settings/hooks/useAppSettings';
+import { ParticipantAuditDrawer } from '../../audits/components/ParticipantAuditDrawer';
 
 function getInitial(name: string) {
   return name.trim().charAt(0).toUpperCase() || 'U';
@@ -162,6 +162,20 @@ function PodiumCard({
 export function LeaderboardPage() {
   const { user } = useAuth();
   const { data: rows = [], isLoading, isError, error } = useLeaderboard();
+  const { data: settings = null } = useAppSettings();
+
+  const auditsVisible = settings?.audits_visible ?? false;
+  const canInspectPredictions = Boolean(user?.id && auditsVisible);
+
+  const [selectedParticipant, setSelectedParticipant] = React.useState<LeaderboardRow | null>(null);
+
+  const handleOpenParticipantAudit = (row: LeaderboardRow) => {
+    setSelectedParticipant(row);
+  };
+
+  const handleCloseParticipantAudit = () => {
+    setSelectedParticipant(null);
+  };
 
   const currentUserPosition = React.useMemo(() => {
     if (!user?.id) return null;
@@ -211,10 +225,6 @@ export function LeaderboardPage() {
         <>
           {topThree.length > 0 ? (
             <Stack spacing={1.5}>
-              <Typography variant='h5' fontWeight={800}>
-                Top 3
-              </Typography>
-
               <Grid container spacing={1.5}>
                 {topThree.map((row, index) => (
                   <Grid key={row.user_id} size={{ xs: 12, md: 4 }}>
@@ -274,6 +284,13 @@ export function LeaderboardPage() {
                           Partidos evaluados
                         </Typography>
                       </TableCell>
+                      {canInspectPredictions ? (
+                        <TableCell align='right'>
+                          <Typography variant='body2' fontWeight={700}>
+                            Auditoria
+                          </Typography>
+                        </TableCell>
+                      ) : null}
                     </TableRow>
                   </TableHead>
 
@@ -353,6 +370,13 @@ export function LeaderboardPage() {
                           <TableCell align='right'>{row.exact_hits}</TableCell>
                           <TableCell align='right'>{row.outcome_hits}</TableCell>
                           <TableCell align='right'>{row.scored_predictions}</TableCell>
+                          {canInspectPredictions ? (
+                            <TableCell align='right' colSpan={canInspectPredictions ? 7 : 6}>
+                              <Button size='small' variant='outlined' onClick={() => handleOpenParticipantAudit(row)}>
+                                Ver pronósticos
+                              </Button>
+                            </TableCell>
+                          ) : null}
                         </TableRow>
                       );
                     })}
@@ -381,6 +405,12 @@ export function LeaderboardPage() {
               ) : null}
             </CardContent>
           </Card>
+          <ParticipantAuditDrawer
+            open={Boolean(selectedParticipant)}
+            onClose={handleCloseParticipantAudit}
+            participant={selectedParticipant}
+            auditsVisible={auditsVisible}
+          />
         </>
       )}
     </Stack>

@@ -15,7 +15,7 @@ import { NavLink, useNavigate } from 'react-router';
 import { useAuth } from '../../modules/auth/hooks/useAuth';
 import { BrandLogo } from '../../assets/brand/BrandLogo';
 import { AppContainer } from './AppContainer';
-import { useAppSettings } from '../../modules/admin/settings/hooks/useAppSettings';
+import { routes } from '../router/routes';
 
 type NavItem = {
   label: string;
@@ -44,9 +44,6 @@ export default function AppTopNav() {
   const { user, profile, signOut } = useAuth();
   const navigate = useNavigate();
 
-  const { data: settings = null } = useAppSettings();
-  const showAuditLink = settings?.audits_visible ?? false;
-
   const [anchorElNav, setAnchorElNav] = React.useState<null | HTMLElement>(null);
   const [anchorElUser, setAnchorElUser] = React.useState<null | HTMLElement>(null);
 
@@ -55,17 +52,16 @@ export default function AppTopNav() {
   const displayName = getDisplayName(user);
 
   const publicNavItems: NavItem[] = [
-    { label: 'Inicio', to: '/' },
-    { label: 'Ranking', to: '/leaderboard' }
+    { label: 'Inicio', to: routes.home },
+    { label: 'Ranking', to: routes.leaderboard }
   ];
 
   const privateNavItems: NavItem[] = [
-    { label: 'Inicio', to: '/' },
-    { label: 'Ranking', to: '/leaderboard' },
-    { label: 'Carga tu pronóstico', to: '/app/predictions/matches' },
-    { label: 'Fixture', to: '/app/fixture' },
-    { label: 'Dashboard', to: '/app/dashboard' },
-    ...(showAuditLink ? [{ label: 'Auditorías', to: '/app/audits' }] : [])
+    { label: 'Inicio', to: routes.home },
+    { label: 'Ranking', to: routes.leaderboard },
+    { label: 'Carga tu pronóstico', to: routes.predictionMatches },
+    { label: 'Fixture', to: routes.fixture },
+    { label: 'Dashboard', to: routes.dashboard }
   ];
 
   const navItems = isAuthenticated ? privateNavItems : publicNavItems;
@@ -91,7 +87,7 @@ export default function AppTopNav() {
 
     try {
       await signOut();
-      navigate('/', { replace: true });
+      navigate(routes.home, { replace: true });
     } catch (error) {
       console.error('Error cerrando sesión:', error);
     }
@@ -109,7 +105,7 @@ export default function AppTopNav() {
             }}
           >
             <NavLink
-              to='/'
+              to={routes.home}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',

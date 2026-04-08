@@ -17,6 +17,7 @@ import { formatPercent } from '../utils/formatPercent';
 import { sortMatchesByKickoff } from '../utils/sortMatchesByKickoff';
 import { formatDateTime } from '../utils/formatDateTime';
 import { isPredictionsClosed } from '../../../shared/utils/isPredictionsClosed';
+import { routes } from '../../../app/router/routes';
 
 export function DashboardPage() {
   const { user, profile } = useAuth();
@@ -261,15 +262,15 @@ export function DashboardPage() {
                 </Stack>
 
                 <Stack direction='row' spacing={1} flexWrap='wrap' useFlexGap>
-                  <Button component={RouterLink} to='/app/predictions/matches' variant='contained'>
+                  <Button component={RouterLink} to={routes.predictionMatches} variant='contained'>
                     Ir a cargar pronósticos
                   </Button>
 
-                  <Button component={RouterLink} to='/app/predictions/my-predictions' variant='outlined'>
+                  <Button component={RouterLink} to={routes.myPredictions} variant='outlined'>
                     Ver mis pronósticos
                   </Button>
 
-                  <Button component={RouterLink} to='/leaderboard' variant='text'>
+                  <Button component={RouterLink} to={routes.leaderboard} variant='text'>
                     Ver ranking
                   </Button>
                 </Stack>
@@ -369,7 +370,7 @@ export function DashboardPage() {
                           <Button
                             size='small'
                             component={RouterLink}
-                            to={`/app/predictions/matches?matchId=${encodeURIComponent(nextPendingMatch.id)}`}
+                            to={`${routes.predictionMatches}?matchId=${encodeURIComponent(nextPendingMatch.id)}`}
                             variant='contained'
                           >
                             Cargar pronóstico de este partido
@@ -412,12 +413,8 @@ export function DashboardPage() {
                 </Box>
 
                 <Stack direction='row' spacing={1} flexWrap='wrap' useFlexGap>
-                  <Button component={RouterLink} to='/app/fixture' variant='outlined'>
+                  <Button component={RouterLink} to={routes.fixture} variant='outlined'>
                     Ver fixture
-                  </Button>
-
-                  <Button component={RouterLink} to='/app/audits' variant='text'>
-                    Ir a auditorías
                   </Button>
                 </Stack>
               </Stack>
@@ -448,15 +445,15 @@ export function DashboardPage() {
               </Stack>
 
               <Stack direction='row' spacing={1} flexWrap='wrap' useFlexGap>
-                <Button component={RouterLink} to='/admin/matches' variant='outlined'>
+                <Button component={RouterLink} to={routes.adminMatches} variant='outlined'>
                   Admin · Partidos
                 </Button>
 
-                <Button component={RouterLink} to='/admin/results' variant='outlined'>
+                <Button component={RouterLink} to={routes.adminResults} variant='outlined'>
                   Admin · Resultados
                 </Button>
 
-                <Button component={RouterLink} to='/admin/settings' variant='outlined'>
+                <Button component={RouterLink} to={routes.adminSettings} variant='outlined'>
                   Admin · Configuración
                 </Button>
               </Stack>

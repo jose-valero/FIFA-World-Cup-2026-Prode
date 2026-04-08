@@ -1,5 +1,4 @@
 export const slugs = {
-  audits: 'audits',
   callback: 'callback',
   dashboard: 'dashboard',
   fixture: 'fixture',
@@ -23,8 +22,6 @@ export const routes = {
   predictionMatches: `/app/${slugs.predictions}/${slugs.matches}`,
   myPredictions: `/app/${slugs.predictions}/${slugs.my_predictions}`,
   fixture: `/app/${slugs.fixture}`,
-  audits: `/app/${slugs.audits}`,
-
   adminMatches: `/admin/${slugs.matches}`,
   adminResults: `/admin/${slugs.results}`,
   adminSettings: `/admin/${slugs.settings}`
