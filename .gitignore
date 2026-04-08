@@ -24,3 +24,9 @@ dist-ssr
 *.sln
 *.sw?
 .files_architecture.md
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example
