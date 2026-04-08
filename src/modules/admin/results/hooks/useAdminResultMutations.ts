@@ -1,11 +1,15 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { syncQualifiedTeamsIntoKnockout, updateOfficialResult } from '../api/adminResults.api';
 import { queryKeys } from '../../../../lib/react-query/queryKeys';
-import type { AdminMatchRow, UpdateOfficialResultInput } from '../types/admin.results.types';
+import type { MatchStatus } from '../../../matches/types/types';
+import type { AdminMatchRow } from '../types/admin.results.types';
 
-function shouldSyncKnockout(input: UpdateOfficialResultInput) {
-  return input.status === 'finished';
-}
+type UpdateOfficialResultInput = {
+  matchId: string;
+  status: MatchStatus;
+  officialHomeScore: number | null;
+  officialAwayScore: number | null;
+};
 
 export function useUpdateOfficialResultMutation() {
   const queryClient = useQueryClient();
@@ -13,11 +17,7 @@ export function useUpdateOfficialResultMutation() {
   return useMutation({
     mutationFn: async (input: UpdateOfficialResultInput) => {
       await updateOfficialResult(input);
-
-      if (shouldSyncKnockout(input)) {
-        await syncQualifiedTeamsIntoKnockout();
-      }
-
+      await syncQualifiedTeamsIntoKnockout();
       return input;
     },
 
@@ -38,9 +38,10 @@ export function useUpdateOfficialResultMutation() {
       });
 
       await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.adminResults }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.adminMatches }),
         queryClient.invalidateQueries({ queryKey: queryKeys.matches }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.leaderboard }),
-        ...(shouldSyncKnockout(input) ? [queryClient.invalidateQueries({ queryKey: queryKeys.adminMatches })] : [])
+        queryClient.invalidateQueries({ queryKey: queryKeys.leaderboard })
       ]);
     }
   });
