@@ -1,5 +1,5 @@
 import { supabase } from '../../../lib/supabase/client';
-import type { TournamentStage } from '../../tournament/utils/stages';
+import type { TournamentStage } from '../../tournament/types/stages.types';
 import type { Match, MatchSourceType, MatchStatus } from '../types/types';
 
 interface MatchRow {

@@ -1,9 +1,5 @@
 import * as React from 'react';
-import {
-  getStageLabel,
-  stageOptions as tournamentStageOptions,
-  type TournamentStage
-} from '../../../tournament/utils/stages';
+import { stageOptions as tournamentStageOptions } from '../../../tournament/constants/stages.const';
 import {
   Alert,
   Box,
@@ -39,6 +35,9 @@ import { useAdminMatches } from '../hooks/useAdminMatches';
 import type { AdminMatchesFormStateSchema, AdminMatchRow } from '../types/admin.match.types';
 import { formatKickoff } from '../../../../shared/utils/formatKickoff';
 import { mapMatchToForm } from '../helpers/mapMatchToForm';
+import type { TournamentStage } from '../../../tournament/types/stages.types';
+import { getStageLabel } from '../../../tournament/utils/getStageLabel';
+import { getDefaultGroupNameForStage } from '../helpers/getDefaultGroupNameForStage';
 
 const emptyForm: AdminMatchesFormStateSchema = {
   id: '',
@@ -183,18 +182,10 @@ function validateAdminMatchForm(input: AdminMatchesFormStateSchema) {
   return null;
 }
 
-function getDefaultGroupNameForStage(stage: TournamentStage) {
-  return stage === 'group_stage' ? 'Grupo A' : getStageLabel(stage);
-}
-
 export function AdminMatchesPage() {
-  // const [matches, setMatches] = React.useState<AdminMatchRow[]>([]);
-  // const [teams, setTeams] = React.useState<TeamRow[]>([]);
   const [form, setForm] = React.useState<AdminMatchesFormStateSchema>(emptyForm);
   const [editingMatch, setEditingMatch] = React.useState<AdminMatchRow | null>(null);
   const [isEditing, setIsEditing] = React.useState(false);
-  // const [isLoading, setIsLoading] = React.useState(true);
-  // const [isSaving, setIsSaving] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState('');
   const [successMessage, setSuccessMessage] = React.useState('');
 

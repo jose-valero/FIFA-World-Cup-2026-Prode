@@ -1,4 +1,4 @@
-import type { TournamentStage } from '../../tournament/utils/stages';
+import type { TournamentStage } from '../../tournament/types/stages.types';
 
 export type MatchStatus = 'scheduled' | 'live' | 'finished';
 export type MatchSourceType = 'team' | 'group_position' | 'best_third_place' | 'match_winner' | 'match_loser';

@@ -1,3 +1,5 @@
+import type { TournamentStage } from '../types/stages.types';
+
 export const stageOptions = [
   { value: 'group_stage', label: 'Fase de grupos' },
   { value: 'round_of_32', label: 'Dieciseisavos' },
@@ -7,8 +9,6 @@ export const stageOptions = [
   { value: 'third_place', label: 'Tercer puesto' },
   { value: 'final', label: 'Final' }
 ] as const;
-
-export type TournamentStage = (typeof stageOptions)[number]['value'];
 
 export const stageLabelMap: Record<TournamentStage, string> = {
   group_stage: 'Fase de grupos',
@@ -29,7 +29,3 @@ export const stageOrder: TournamentStage[] = [
   'third_place',
   'final'
 ];
-
-export function getStageLabel(stage: TournamentStage) {
-  return stageLabelMap[stage];
-}

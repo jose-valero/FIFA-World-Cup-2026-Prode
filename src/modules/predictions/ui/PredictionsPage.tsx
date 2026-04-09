@@ -359,13 +359,25 @@ export function PredictionsPage() {
 
                           <Stack direction='row' spacing={1} flexWrap='wrap' useFlexGap>
                             {points === null ? (
-                              <Chip label='Sin evaluar' color='default' />
+                              <Stack direction={'column'} gap={2}>
+                                <Chip label='Sin evaluar' color='default' />
+                                <Grid size={{ xs: 12, md: 4 }} justifyContent={'center'}>
+                                  <Button variant='outlined' color='error'>
+                                    Borrar Pronostico
+                                  </Button>
+                                </Grid>
+                              </Stack>
                             ) : (
-                              <Chip
-                                label={`${points} pts`}
-                                color={points > 0 ? 'success' : 'default'}
-                                variant={points > 0 ? 'filled' : 'outlined'}
-                              />
+                              <>
+                                <Chip
+                                  label={`${points} pts`}
+                                  color={points > 0 ? 'success' : 'default'}
+                                  variant={points > 0 ? 'filled' : 'outlined'}
+                                />
+                                {/* <Grid size={{ xs: 12, md: 4 }} justifyContent={'center'}>
+                                  <Button>Borrar Pronostico</Button>
+                                </Grid> */}
+                              </>
                             )}
 
                             {isExactHit ? <Chip label='Exacto' color='success' variant='outlined' /> : null}

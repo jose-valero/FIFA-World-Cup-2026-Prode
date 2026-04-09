@@ -1,10 +1,6 @@
 import type { Match } from '../../matches/types/types';
-import { stageOrder, type TournamentStage } from './stages';
-
-export interface StageGroup {
-  stage: TournamentStage;
-  matches: Match[];
-}
+import { stageOrder } from '../constants/stages.const';
+import type { StageGroup } from '../types/stages.types';
 
 export function groupMatchesByStage(matches: Match[]): StageGroup[] {
   const grouped = matches.reduce<Record<string, Match[]>>((acc, match) => {

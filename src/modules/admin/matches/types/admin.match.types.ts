@@ -1,5 +1,5 @@
 import type { MatchStatus } from '../../../matches/types/types';
-import type { TournamentStage } from '../../../tournament/utils/stages';
+import type { TournamentStage } from '../../../tournament/types/stages.types';
 
 export interface AdminMatchRow {
   id: string;

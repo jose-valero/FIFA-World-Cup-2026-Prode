@@ -1,4 +1,5 @@
-import { stageOptions as tournamentStageOptions, type TournamentStage } from '../../tournament/utils/stages';
+import { stageOptions as tournamentStageOptions } from '../../tournament/constants/stages.const';
+import type { TournamentStage } from '../../tournament/types/stages.types';
 import type { Match } from '../types/types';
 
 export type StageFilterValue = TournamentStage | '';

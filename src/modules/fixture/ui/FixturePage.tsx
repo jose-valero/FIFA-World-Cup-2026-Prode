@@ -273,6 +273,7 @@ export function FixturePage() {
   const knockoutMatches = React.useMemo(() => {
     return buildProjectedKnockoutMatches(matches);
   }, [matches]);
+  console.log('🚀 ~ FixturePage.tsx ~ FixturePage ~ knockoutMatches:', knockoutMatches);
 
   const standings = React.useMemo(() => buildClientGroupStandings(matches), [matches]);
   const groupedStandings = groupStandingsByCode(standings);

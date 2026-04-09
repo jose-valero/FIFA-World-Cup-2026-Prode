@@ -1,7 +1,7 @@
 import { Box, Typography } from '@mui/material';
-import { getStageLabel } from '../utils/stages';
 import type { Match } from '../../matches/types/types';
 import { KnockoutMatchNode } from './KnockoutMatchNode';
+import { getStageLabel } from '../utils/getStageLabel';
 
 interface KnockoutBracketProps {
   matches: Match[];
