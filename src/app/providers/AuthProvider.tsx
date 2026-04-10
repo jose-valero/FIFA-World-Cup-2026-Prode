@@ -104,6 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) {
+        console.log('🚀 ~ AuthProvider.tsx ~ AuthProvider ~ error:', error);
         throw error;
       }
     },

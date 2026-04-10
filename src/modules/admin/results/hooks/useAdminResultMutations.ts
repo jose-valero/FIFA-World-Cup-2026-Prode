@@ -11,17 +11,33 @@ type UpdateOfficialResultInput = {
   officialAwayScore: number | null;
 };
 
+type UpdateOfficialResultData = {
+  input: UpdateOfficialResultInput;
+  syncWarning: string | null;
+};
+
 export function useUpdateOfficialResultMutation() {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: async (input: UpdateOfficialResultInput) => {
+  return useMutation<UpdateOfficialResultData, Error, UpdateOfficialResultInput>({
+    mutationFn: async (input): Promise<UpdateOfficialResultData> => {
+      // El guardado del resultado es la operación crítica.
+      // Si falla, lanza y el catch del caller lo maneja.
       await updateOfficialResult(input);
-      await syncQualifiedTeamsIntoKnockout();
-      return input;
+
+      // El sync es best-effort: si falla, el resultado ya está guardado.
+      // No se lanza para que onSuccess siempre invalide los queries.
+      let syncWarning: string | null = null;
+      try {
+        await syncQualifiedTeamsIntoKnockout();
+      } catch (err) {
+        syncWarning = err instanceof Error ? err.message : 'Error desconocido al sincronizar el bracket';
+      }
+
+      return { input, syncWarning };
     },
 
-    onSuccess: async (input) => {
+    onSuccess: async ({ input }) => {
       queryClient.setQueryData<AdminMatchRow[] | undefined>(queryKeys.adminResults, (prev) => {
         if (!prev) return prev;
 
