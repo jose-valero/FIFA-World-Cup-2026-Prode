@@ -1,7 +1,8 @@
 import * as React from 'react';
-import { Alert, CircularProgress, Stack, Typography } from '@mui/material';
+import { Alert, CircularProgress, Snackbar, Stack, Typography } from '@mui/material';
 import { MatchCard } from '../../matches/components/MatchCard';
 import { PredictionDialog } from '../components/PredictionDialog';
+import { ConfirmDeleteDialog } from '../../../shared/components/ConfirmDeleteDialog';
 import { deletePrediction, upsertPrediction } from '../api/predictions.api';
 import { useAuth } from '../../auth/hooks/useAuth';
 import { MatchFiltersCard } from '../../../shared/components/MatchFiltersCard';
@@ -40,7 +41,14 @@ export function MatchesPage() {
   const handledRequestedMatchIdRef = React.useRef<string | null>(null);
 
   const [selectedMatch, setSelectedMatch] = React.useState<Match | null>(null);
+  const [matchToDelete, setMatchToDelete] = React.useState<Match | null>(null);
+  const [isDeletingPrediction, setIsDeletingPrediction] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState('');
+  const [snackbar, setSnackbar] = React.useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
   const [filters, setFilters] = React.useState<MatchListFilters>({
     stage: '',
     groupCode: '',
@@ -215,7 +223,7 @@ export function MatchesPage() {
     }
   };
 
-  const handleDeletePrediction = async (matchId: string) => {
+  const handleDeletePrediction = async (matchId: string, showToast = false) => {
     if (!user?.id) return;
 
     const match = matches.find((item) => item.id === matchId);
@@ -258,9 +266,17 @@ export function MatchesPage() {
         }
       );
       await queryClient.invalidateQueries({ queryKey: queryKeys.auditPredictions });
+
+      if (showToast) {
+        setSnackbar({ open: true, message: 'Pronóstico eliminado correctamente', severity: 'success' });
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo limpiar el pronóstico';
-      setErrorMessage(message);
+      if (showToast) {
+        setSnackbar({ open: true, message, severity: 'error' });
+      } else {
+        setErrorMessage(message);
+      }
     }
   };
 
@@ -272,13 +288,15 @@ export function MatchesPage() {
   };
 
   const handleClearPredictionFromCard = (match: Match) => {
-    const confirmed = window.confirm(
-      `¿Seguro que quieres limpiar tu pronóstico para ${match.homeTeam} vs ${match.awayTeam}?`
-    );
+    setMatchToDelete(match);
+  };
 
-    if (!confirmed) return;
-
-    void handleDeletePrediction(match.id);
+  const handleConfirmDelete = async () => {
+    if (!matchToDelete) return;
+    setIsDeletingPrediction(true);
+    await handleDeletePrediction(matchToDelete.id, true);
+    setIsDeletingPrediction(false);
+    setMatchToDelete(null);
   };
 
   const clearRequestedMatchParam = React.useCallback(() => {
@@ -361,6 +379,34 @@ export function MatchesPage() {
           void handleDeletePrediction(matchId);
         }}
       />
+
+      <ConfirmDeleteDialog
+        open={Boolean(matchToDelete)}
+        title='Limpiar pronóstico'
+        description={
+          matchToDelete
+            ? `¿Seguro que quieres limpiar tu pronóstico para ${matchToDelete.homeTeam} vs ${matchToDelete.awayTeam}?`
+            : undefined
+        }
+        confirmLabel='Limpiar'
+        isLoading={isDeletingPrediction}
+        onConfirm={() => void handleConfirmDelete()}
+        onCancel={() => setMatchToDelete(null)}
+      />
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert
+          severity={snackbar.severity}
+          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </>
   );
 }
