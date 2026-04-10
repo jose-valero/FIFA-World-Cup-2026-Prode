@@ -14,10 +14,7 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   Typography
-  // useMediaQuery,
-  // useTheme
 } from '@mui/material';
-import type { LeaderboardRow } from '../../leaderboard/api/leaderboard.api';
 import { useMatches } from '../../matches/hooks/useMatches';
 import { MatchVs } from '../../../shared/components/MatchVs';
 import { getStatusColor } from '../../../shared/utils/getStatusColor';
@@ -25,6 +22,7 @@ import { getStatusLabel } from '../../../shared/utils/getStatusLabel';
 import { getUniqueGroupOptions, getUniqueStageOptions, type StageFilterValue } from '../../matches/utils/listFilters';
 import type { Match } from '../../matches/types/types';
 import { useAuditPredictionsByUser } from '../hooks/useAuditPredictionsByUser';
+import type { LeaderboardRow } from '../../leaderboard/types/leaderboard.types';
 
 type ParticipantAuditDrawerProps = {
   open: boolean;

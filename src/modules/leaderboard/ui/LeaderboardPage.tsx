@@ -21,102 +21,78 @@ import {
   alpha
 } from '@mui/material';
 
+import { useQuery } from '@tanstack/react-query';
+
 import { useAuth } from '../../auth/hooks/useAuth';
 import { useLeaderboard } from '../hooks/useLeaderboard';
 import { useAppSettings } from '../../admin/settings/hooks/useAppSettings';
 import { useAdminParticipantsOverview } from '../../admin/participants/hooks/useAdminParticipantsOverview';
 import { useSetParticipantDisabled } from '../../admin/participants/hooks/useSetParticipantDisabled';
 import { ParticipantAuditDrawer } from '../../audits/components/ParticipantAuditDrawer';
+import { ParticipantProfileDrawer } from '../components/ParticipantProfileDrawer';
 import { PageHeader, type PageHeaderBadge } from '../../../shared/components/PageHeader';
-import type { LeaderboardRow } from '../api/leaderboard.api';
+import { getTopThreeAvatars } from '../api/leaderboard.api';
+import { queryKeys } from '../../../lib/react-query/queryKeys';
+import type { LeaderboardRow } from '../types/leaderboard.types';
 
 function getInitial(name: string) {
   return name.trim().charAt(0).toUpperCase() || 'U';
 }
 
-function getPodiumColor(position: number): 'success' | 'info' | 'warning' | 'default' {
-  switch (position) {
-    case 1:
-      return 'success';
-    case 2:
-      return 'info';
-    case 3:
-      return 'warning';
-    default:
-      return 'default';
-  }
+const PODIUM = {
+  1: { border: '#D4AF37', bg: 'rgba(212,175,55,0.08)', color: '#B8960C', label: '🥇 #1' },
+  2: { border: '#A8A9AD', bg: 'rgba(168,169,173,0.08)', color: '#757575', label: '🥈 #2' },
+  3: { border: '#CD7F32', bg: 'rgba(205,127,50,0.08)', color: '#A0522D', label: '🥉 #3' }
+} as const;
+
+function getPodiumStyle(position: number) {
+  return PODIUM[position as keyof typeof PODIUM] ?? null;
 }
 
 function getPodiumLabel(position: number) {
-  switch (position) {
-    case 1:
-      return 'Top 1';
-    case 2:
-      return 'Top 2';
-    case 3:
-      return 'Top 3';
-    default:
-      return null;
-  }
+  return getPodiumStyle(position)?.label ?? null;
 }
 
 function PodiumCard({
   row,
   position,
-  isCurrentUser
+  isCurrentUser,
+  avatarUrl
 }: {
   row: LeaderboardRow;
   position: number;
   isCurrentUser: boolean;
+  avatarUrl?: string | null;
 }) {
-  const podiumColor = getPodiumColor(position);
+  const podiumStyle = getPodiumStyle(position);
   const podiumLabel = getPodiumLabel(position);
+
+  if (!podiumStyle) return null;
 
   return (
     <Card
       elevation={0}
-      sx={(theme) => ({
+      sx={{
         height: '100%',
         borderRadius: 2,
-        border: '1px solid',
-        borderColor:
-          position === 1 ? 'success.main' : position === 2 ? 'info.main' : position === 3 ? 'warning.main' : 'divider',
-        background:
-          position === 1
-            ? `linear-gradient(180deg, ${alpha(theme.palette.success.main, 0.12)} 0%, transparent 100%)`
-            : position === 2
-              ? `linear-gradient(180deg, ${alpha(theme.palette.info.main, 0.12)} 0%, transparent 100%)`
-              : position === 3
-                ? `linear-gradient(180deg, ${alpha(theme.palette.warning.main, 0.12)} 0%, transparent 100%)`
-                : undefined
-      })}
+        border: `1px solid ${podiumStyle.border}`,
+        background: `linear-gradient(180deg, ${podiumStyle.bg} 0%, transparent 100%)`,
+        boxShadow: `0 4px 16px 0 ${podiumStyle.border}28`
+      }}
     >
       <CardContent sx={{ p: 2.5 }}>
         <Stack spacing={2}>
           <Stack direction='row' spacing={1.5} alignItems='center'>
             <Avatar
-              sx={(theme) => ({
-                width: 44,
-                height: 44,
+              src={avatarUrl ?? undefined}
+              sx={{
+                width: 52,
+                height: 52,
+                fontSize: 20,
                 fontWeight: 800,
-                border: '2px solid',
-                borderColor:
-                  position === 1
-                    ? theme.palette.success.main
-                    : position === 2
-                      ? theme.palette.info.main
-                      : position === 3
-                        ? theme.palette.warning.main
-                        : theme.palette.divider,
-                boxShadow:
-                  position === 1
-                    ? `0 0 0 4px ${alpha(theme.palette.success.main, 0.12)}`
-                    : position === 2
-                      ? `0 0 0 4px ${alpha(theme.palette.info.main, 0.12)}`
-                      : position === 3
-                        ? `0 0 0 4px ${alpha(theme.palette.warning.main, 0.12)}`
-                        : 'none'
-              })}
+                border: `2px solid ${podiumStyle.border}`,
+                boxShadow: `0 0 0 3px ${podiumStyle.bg}`
+              }}
             >
               {getInitial(row.display_name)}
             </Avatar>
@@ -136,7 +112,18 @@ function PodiumCard({
                   {row.display_name}
                 </Typography>
 
-                {podiumLabel ? <Chip label={podiumLabel} size='small' color={podiumColor} /> : null}
+                {podiumLabel ? (
+                  <Chip
+                    label={podiumLabel}
+                    size='small'
+                    sx={{
+                      borderColor: podiumStyle.border,
+                      color: podiumStyle.color,
+                      fontWeight: 700
+                    }}
+                    variant='outlined'
+                  />
+                ) : null}
                 {isCurrentUser ? <Chip label='Tú' size='small' variant='outlined' /> : null}
               </Stack>
 
@@ -147,9 +134,14 @@ function PodiumCard({
           </Stack>
 
           <Stack direction='row' spacing={1} flexWrap='wrap' useFlexGap>
-            <Chip label={`${row.total_points} pts`} color={podiumColor} variant='outlined' />
-            <Chip label={`${row.exact_hits} exactos`} variant='outlined' />
-            <Chip label={`${row.outcome_hits} signo`} variant='outlined' />
+            <Chip
+              label={`${row.total_points} pts`}
+              size='small'
+              variant='outlined'
+              sx={{ borderColor: podiumStyle.border, color: podiumStyle.color, fontWeight: 700 }}
+            />
+            <Chip label={`${row.exact_hits} exactos`} size='small' variant='outlined' />
+            <Chip label={`${row.outcome_hits} signo`} size='small' variant='outlined' />
           </Stack>
 
           <Typography variant='body2' color='text.secondary'>
@@ -175,6 +167,7 @@ export function LeaderboardPage() {
   const { mutate: setParticipantDisabled, isPending: isSetParticipantDisabledPending } = useSetParticipantDisabled();
 
   const [selectedParticipant, setSelectedParticipant] = React.useState<LeaderboardRow | null>(null);
+  const [profileParticipant, setProfileParticipant] = React.useState<LeaderboardRow | null>(null);
 
   const activeRows = React.useMemo(() => rows.filter((row) => !row.is_disabled), [rows]);
   const disabledRows = React.useMemo(() => rows.filter((row) => row.is_disabled), [rows]);
@@ -193,6 +186,15 @@ export function LeaderboardPage() {
 
   const leaderPoints = activeRows[0]?.total_points ?? 0;
   const topThree = activeRows.slice(0, 3);
+
+  const topThreeIds = React.useMemo(() => topThree.map((r) => r.user_id), [topThree]);
+
+  const { data: topThreeAvatars = new Map() } = useQuery({
+    queryKey: queryKeys.topThreeAvatars(topThreeIds),
+    queryFn: () => getTopThreeAvatars(topThreeIds),
+    enabled: topThreeIds.length > 0,
+    staleTime: 60_000
+  });
 
   const adminMap = React.useMemo(() => {
     return new Map(adminOverview.map((row) => [row.user_id, row]));
@@ -217,11 +219,27 @@ export function LeaderboardPage() {
   ];
 
   const handleOpenParticipantAudit = (row: LeaderboardRow) => {
+    setProfileParticipant(null);
     setSelectedParticipant(row);
   };
 
   const handleCloseParticipantAudit = () => {
     setSelectedParticipant(null);
+  };
+
+  const handleOpenProfile = (row: LeaderboardRow) => {
+    setSelectedParticipant(null);
+    setProfileParticipant(row);
+  };
+
+  const handleCloseProfile = () => {
+    setProfileParticipant(null);
+  };
+
+  const handleSwapToAudit = () => {
+    if (!profileParticipant) return;
+    setSelectedParticipant(profileParticipant);
+    setProfileParticipant(null);
   };
 
   const handleToggleParticipantStatus = (row: LeaderboardRow) => {
@@ -277,6 +295,7 @@ export function LeaderboardPage() {
                       row={row}
                       position={index + 1}
                       isCurrentUser={Boolean(user?.id && row.user_id === user.id)}
+                      avatarUrl={topThreeAvatars.get(row.user_id) ?? null}
                     />
                   </Grid>
                 ))}
@@ -301,7 +320,7 @@ export function LeaderboardPage() {
 
                       <TableCell>
                         <Typography variant='body2' fontWeight={700}>
-                          Usuario
+                          Participante
                         </Typography>
                       </TableCell>
 
@@ -403,13 +422,7 @@ export function LeaderboardPage() {
                                 borderLeft: '4px solid',
                                 borderLeftColor: isDisabledRow
                                   ? theme.palette.action.disabled
-                                  : position === 1
-                                    ? theme.palette.success.main
-                                    : position === 2
-                                      ? theme.palette.info.main
-                                      : position === 3
-                                        ? theme.palette.warning.main
-                                        : 'transparent',
+                                  : ((position ? getPodiumStyle(position)?.border : null) ?? 'transparent'),
                                 pl: 1.5
                               }
                             })}
@@ -421,14 +434,6 @@ export function LeaderboardPage() {
                                 ) : (
                                   <Typography fontWeight={800}>—</Typography>
                                 )}
-
-                                {position && getPodiumLabel(position) ? (
-                                  <Chip
-                                    label={getPodiumLabel(position)}
-                                    size='small'
-                                    color={getPodiumColor(position)}
-                                  />
-                                ) : null}
 
                                 {isCurrentUser ? <Chip label='Tú' size='small' variant='outlined' /> : null}
                               </Stack>
@@ -448,8 +453,10 @@ export function LeaderboardPage() {
                                 </Avatar>
 
                                 <Typography
+                                  onClick={() => handleOpenProfile(row)}
                                   fontWeight={isCurrentUser ? 800 : 700}
                                   sx={{
+                                    cursor: 'pointer',
                                     maxWidth: { xs: 120, sm: 220 },
                                     overflow: 'hidden',
                                     textOverflow: 'ellipsis',
@@ -475,7 +482,7 @@ export function LeaderboardPage() {
                             <TableCell align='right'>{row.scored_predictions}</TableCell>
 
                             {canInspectPredictions ? (
-                              <TableCell align='right'>
+                              <TableCell align='right' onClick={(e) => e.stopPropagation()}>
                                 <Button size='small' variant='outlined' onClick={() => handleOpenParticipantAudit(row)}>
                                   Ver pronósticos
                                 </Button>
@@ -500,7 +507,7 @@ export function LeaderboardPage() {
                             ) : null}
 
                             {isAdmin ? (
-                              <TableCell align='right'>
+                              <TableCell align='right' onClick={(e) => e.stopPropagation()}>
                                 {adminRow?.user_id === user?.id ? (
                                   <Chip label='Tu cuenta' size='small' variant='outlined' />
                                 ) : (
@@ -555,6 +562,15 @@ export function LeaderboardPage() {
           </Card>
         </>
       )}
+
+      <ParticipantProfileDrawer
+        open={Boolean(profileParticipant)}
+        onClose={handleCloseProfile}
+        participant={profileParticipant}
+        position={profileParticipant ? (activePositionMap.get(profileParticipant.user_id) ?? null) : null}
+        canInspectPredictions={canInspectPredictions}
+        onOpenAudit={handleSwapToAudit}
+      />
 
       <ParticipantAuditDrawer
         open={Boolean(selectedParticipant)}
