@@ -25,7 +25,7 @@ function buildSourceSlot(match: Match, side: 'home' | 'away'): string | null {
       return sourceMatchId ? `W${sourceMatchId}` : null;
     case 'match_loser':
       return sourceMatchId ? `L${sourceMatchId}` : null;
-    case 'team':
+    case 'team_id':
       return teamCode || null;
     default:
       return null;
