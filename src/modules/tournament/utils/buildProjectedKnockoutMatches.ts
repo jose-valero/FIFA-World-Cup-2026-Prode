@@ -1,4 +1,5 @@
 import type { Match } from '../../matches/types/types';
+import { sortGroupRows, sortCrossGroupRows, type SortableStandingRow } from './sortGroupStandings';
 
 type GroupStandingRow = {
   groupCode: string;
@@ -155,19 +156,22 @@ const KNOCKOUT_TEMPLATE: Match[] = [
   createTemplateMatch({ id: '104', stage: 'final', home: winner('101'), away: winner('102') })
 ];
 
-function sortRows(rows: GroupStandingRow[]) {
-  return [...rows].sort((a, b) => {
-    if (b.points !== a.points) return b.points - a.points;
-    if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
-    if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
-    return a.teamName.localeCompare(b.teamName);
-  });
+function toSortable(row: GroupStandingRow): GroupStandingRow & SortableStandingRow {
+  return { ...row, sortKey: row.teamCode || row.teamName };
 }
 
 function buildClientGroupStandings(matches: Match[]): GroupStandingRow[] {
-  const groupMatches = matches.filter(
+  const allGroupMatches = matches.filter(
     (match) => match.stage === 'group_stage' && match.groupCode && match.homeTeam && match.awayTeam
   );
+
+  // Pre-index matches by group for H2H lookups during sort
+  const groupMatches_byCode = allGroupMatches.reduce<Map<string, Match[]>>((acc, m) => {
+    const key = m.groupCode as string;
+    if (!acc.has(key)) acc.set(key, []);
+    acc.get(key)!.push(m);
+    return acc;
+  }, new Map());
 
   const table = new Map<string, GroupStandingRow>();
 
@@ -195,7 +199,7 @@ function buildClientGroupStandings(matches: Match[]): GroupStandingRow[] {
     return table.get(key)!;
   }
 
-  for (const match of groupMatches) {
+  for (const match of allGroupMatches) {
     const groupCode = match.groupCode as string;
 
     const home = ensureTeam(groupCode, match.homeTeam, match.homeTeamCode);
@@ -246,7 +250,8 @@ function buildClientGroupStandings(matches: Match[]): GroupStandingRow[] {
   }, {});
 
   return Object.entries(grouped).flatMap(([groupCode, groupRows]) => {
-    const sorted = sortRows(groupRows);
+    const groupMatches = groupMatches_byCode.get(groupCode) ?? [];
+    const sorted = sortGroupRows(groupRows.map(toSortable), groupMatches);
 
     return sorted.map((row, index) => ({
       ...row,
@@ -257,7 +262,8 @@ function buildClientGroupStandings(matches: Match[]): GroupStandingRow[] {
 }
 
 function getQualifiedThirdPlaces(standings: GroupStandingRow[]) {
-  return sortRows(standings.filter((row) => row.rankInGroup === 3)).slice(0, 8);
+  const thirds = standings.filter((row) => row.rankInGroup === 3).map(toSortable);
+  return sortCrossGroupRows(thirds).slice(0, 8);
 }
 
 function assignBestThirdSlots(slotSets: string[], qualifiedThirds: GroupStandingRow[]) {
@@ -373,7 +379,8 @@ function resolveSide(params: {
   const currentName = side === 'home' ? match.homeTeam : match.awayTeam;
   const currentCode = side === 'home' ? match.homeTeamCode : match.awayTeamCode;
 
-  if (sourceType === 'team' || sourceType === null) {
+  //TODO revisar types que siguen chocando con AdminMatchAlgo
+  if (sourceType === 'team_id' || sourceType === null) {
     return {
       name: currentName?.trim() ? currentName : 'Por definir',
       code: currentCode
@@ -403,21 +410,6 @@ function resolveSide(params: {
     };
   }
 
-  // if (sourceType === 'group_position' && groupCode && groupRank) {
-  //   const row = standingsByGroupRank.get(`${groupCode}:${groupRank}`);
-  //   if (row) {
-  //     return {
-  //       name: row.teamName,
-  //       code: row.teamCode
-  //     };
-  //   }
-
-  //   return {
-  //     name: `${groupRank}${groupCode}`,
-  //     code: null
-  //   };
-  // }
-
   if (sourceType === 'best_third_place' && groupSet) {
     if (!isWholeGroupStageFinished) {
       return {
@@ -440,21 +432,6 @@ function resolveSide(params: {
       code: null
     };
   }
-
-  // if (sourceType === 'best_third_place' && groupSet) {
-  //   const row = bestThirdAssignments.get(groupSet);
-  //   if (row) {
-  //     return {
-  //       name: row.teamName,
-  //       code: row.teamCode
-  //     };
-  //   }
-
-  //   return {
-  //     name: `3${groupSet}`,
-  //     code: null
-  //   };
-  // }
 
   if ((sourceType === 'match_winner' || sourceType === 'match_loser') && sourceMatchId) {
     const sourceMatch = projectedById.get(sourceMatchId);

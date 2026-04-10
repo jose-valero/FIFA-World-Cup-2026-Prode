@@ -14,6 +14,12 @@ import { routes, slugs } from './routes';
 import { NotFoundPage } from '../../shared/components/NotFoundPage';
 import { RouteFallback } from '../../shared/components/RouteFallback';
 
+const ProfilePage = lazy(() =>
+  import('../../modules/profile/ui/ProfilePage').then((module) => ({
+    default: module.ProfilePage
+  }))
+);
+
 const HomePage = lazy(() =>
   import('../../modules/home/ui/HomePage').then((module) => ({
     default: module.HomePage
@@ -129,6 +135,7 @@ export const appRouter = createBrowserRouter([
           {
             element: <ParticipantLayout />,
             children: [
+              { path: routes.profile, element: withSuspense(<ProfilePage />) },
               { path: routes.app, element: <Navigate to={routes.dashboard} replace /> },
 
               {

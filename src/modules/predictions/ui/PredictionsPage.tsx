@@ -8,14 +8,18 @@ import {
   CircularProgress,
   Divider,
   Grid,
+  Snackbar,
   Stack,
   Typography
 } from '@mui/material';
+import { ConfirmDeleteDialog } from '../../../shared/components/ConfirmDeleteDialog';
 import { Link as RouterLink } from 'react-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../auth/hooks/useAuth';
 import { useMatches } from '../../matches/hooks/useMatches';
 import { usePredictionsByUser } from '../hooks/usePredictionsByUser';
 import { useLeaderboard } from '../../leaderboard/hooks/useLeaderboard';
+import { useAppSettings } from '../../admin/settings/hooks/useAppSettings';
 import {
   filterMatches,
   getUniqueGroupOptions,
@@ -25,6 +29,11 @@ import {
 import { MatchFiltersCard } from '../../../shared/components/MatchFiltersCard';
 import { MatchVs } from '../../../shared/components/MatchVs';
 import type { Match } from '../../matches/types/types';
+import type { PredictionRow } from '../types/predictions.types';
+import { deletePrediction } from '../api/predictions.api';
+import { isMatchLocked } from '../utils/isMatchLocked';
+import { isPredictionsClosed } from '../../../shared/utils/isPredictionsClosed';
+import { queryKeys } from '../../../lib/react-query/queryKeys';
 import { getStatusLabel } from '../../../shared/utils/getStatusLabel';
 import { getStatusColor } from '../../../shared/utils/getStatusColor';
 
@@ -123,6 +132,7 @@ function SummaryCard({ label, value }: { label: string; value: string | number }
 
 export function PredictionsPage() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   const {
     data: matches = [],
@@ -145,15 +155,30 @@ export function PredictionsPage() {
     error: leaderboardError
   } = useLeaderboard();
 
+  const { data: settings = null } = useAppSettings();
+
   const [filters, setFilters] = React.useState<MatchListFilters>({
     stage: '',
     groupCode: '',
     teamQuery: ''
   });
+  const [errorMessage, setErrorMessage] = React.useState('');
+  const [deletingMatchId, setDeletingMatchId] = React.useState<string | null>(null);
+  const [matchToDelete, setMatchToDelete] = React.useState<{ matchId: string; match: Match } | null>(null);
+  const [snackbar, setSnackbar] = React.useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
 
   const isLoading = isMatchesLoading || isPredictionsLoading || isLeaderboardLoading;
   const isError = isMatchesError || isPredictionsError || isLeaderboardError;
   const firstError = matchesError || predictionsError || leaderboardError;
+
+  const predictionsClosed = isPredictionsClosed(
+    settings?.predictions_open ?? true,
+    settings?.predictions_close_at ?? null
+  );
 
   const predictions = React.useMemo(() => {
     return predictionRows.map((row) => ({
@@ -229,6 +254,44 @@ export function PredictionsPage() {
     { label: 'Exactos', value: currentUserLeaderboardRow?.exact_hits ?? localSummary.exactHits }
   ];
 
+  const handleRequestDelete = (matchId: string, match: Match) => {
+    if (!user?.id) return;
+
+    if (isMatchLocked(match, predictionsClosed)) {
+      setErrorMessage(
+        match.status !== 'scheduled' ? 'Este partido ya no admite cambios.' : 'La carga de pronósticos está cerrada.'
+      );
+      return;
+    }
+
+    setMatchToDelete({ matchId, match });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!user?.id || !matchToDelete) return;
+
+    const { matchId } = matchToDelete;
+    setDeletingMatchId(matchId);
+
+    try {
+      await deletePrediction({ userId: user.id, matchId });
+
+      queryClient.setQueryData(queryKeys.predictions(user.id), (prev: PredictionRow[] | undefined) => {
+        if (!prev) return [];
+        return prev.filter((row) => row.match_id !== matchId);
+      });
+
+      await queryClient.invalidateQueries({ queryKey: queryKeys.auditPredictions });
+      setSnackbar({ open: true, message: 'Pronóstico eliminado correctamente', severity: 'success' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo limpiar el pronóstico';
+      setSnackbar({ open: true, message, severity: 'error' });
+    } finally {
+      setDeletingMatchId(null);
+      setMatchToDelete(null);
+    }
+  };
+
   return (
     <Stack spacing={2.5}>
       <Stack spacing={0.5}>
@@ -246,6 +309,8 @@ export function PredictionsPage() {
           {firstError instanceof Error ? firstError.message : 'No se pudieron cargar tus pronósticos'}
         </Alert>
       ) : null}
+
+      {errorMessage ? <Alert severity='error'>{errorMessage}</Alert> : null}
 
       {isLoading ? (
         <Stack alignItems='center' sx={{ py: 6 }}>
@@ -404,6 +469,20 @@ export function PredictionsPage() {
                             </Stack>
                           </Grid>
                         </Grid>
+
+                        {match && !isMatchLocked(match, predictionsClosed) ? (
+                          <Stack direction='row' justifyContent='flex-end'>
+                            <Button
+                              size='small'
+                              color='error'
+                              variant='outlined'
+                              disabled={deletingMatchId === prediction.matchId}
+                              onClick={() => handleRequestDelete(prediction.matchId, match)}
+                            >
+                              {deletingMatchId === prediction.matchId ? 'Limpiando...' : 'Limpiar pronóstico'}
+                            </Button>
+                          </Stack>
+                        ) : null}
                       </Stack>
                     </CardContent>
                   </Card>
@@ -413,6 +492,31 @@ export function PredictionsPage() {
           )}
         </>
       )}
+
+      <ConfirmDeleteDialog
+        open={Boolean(matchToDelete)}
+        title='Limpiar pronóstico'
+        description={
+          matchToDelete
+            ? `¿Seguro que quieres limpiar tu pronóstico para ${matchToDelete.match.homeTeam} vs ${matchToDelete.match.awayTeam}?`
+            : undefined
+        }
+        confirmLabel='Limpiar'
+        isLoading={deletingMatchId !== null}
+        onConfirm={() => void handleConfirmDelete()}
+        onCancel={() => setMatchToDelete(null)}
+      />
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert severity={snackbar.severity} onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Stack>
   );
 }

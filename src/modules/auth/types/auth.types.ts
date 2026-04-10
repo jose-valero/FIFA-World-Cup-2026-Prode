@@ -9,6 +9,7 @@ export interface AuthContextValueSchema {
   signInWithEmail: (params: { email: string; password: string }) => Promise<void>;
   signInWithGoogle: (next?: string) => Promise<void>;
   signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
 }
 
 export interface AuthProfile {
@@ -16,6 +17,8 @@ export interface AuthProfile {
   display_name: string;
   is_admin: boolean;
   is_disabled: boolean;
+  avatar_url?: string | null;
+  avatar_path?: string | null;
   created_at?: string;
   updated_at?: string;
 }

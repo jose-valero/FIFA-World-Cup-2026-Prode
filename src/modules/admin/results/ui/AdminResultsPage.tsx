@@ -221,7 +221,7 @@ export function AdminResultsPage() {
     try {
       setSavingMatchId(matchId);
 
-      await updateOfficialResultMutation.mutateAsync({
+      const result = await updateOfficialResultMutation.mutateAsync({
         matchId,
         status: draft.status,
         officialHomeScore: parsedHome,
@@ -237,7 +237,13 @@ export function AdminResultsPage() {
         }
       }));
 
-      setSuccessMessage('Resultado guardado y cruces sincronizados correctamente.');
+      if (result.syncWarning) {
+        setErrorMessage(
+          `Resultado guardado, pero el bracket no pudo sincronizarse: ${result.syncWarning}. Guardá cualquier resultado nuevamente para reintentarlo.`
+        );
+      } else {
+        setSuccessMessage('Resultado guardado y cruces sincronizados correctamente.');
+      }
     } catch (mutationError) {
       const message = mutationError instanceof Error ? mutationError.message : 'No se pudo actualizar el resultado';
       setErrorMessage(message);

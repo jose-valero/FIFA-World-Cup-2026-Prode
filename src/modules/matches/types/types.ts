@@ -1,7 +1,7 @@
 import type { TournamentStage } from '../../tournament/utils/stages';
 
 export type MatchStatus = 'scheduled' | 'live' | 'finished';
-export type MatchSourceType = 'team' | 'group_position' | 'best_third_place' | 'match_winner' | 'match_loser';
+export type MatchSourceType = 'team_id' | 'group_position' | 'best_third_place' | 'match_winner' | 'match_loser';
 
 export interface Match {
   id: string;

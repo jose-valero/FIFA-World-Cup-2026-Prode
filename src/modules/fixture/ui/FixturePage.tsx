@@ -27,6 +27,7 @@ import {
 import { MatchVs } from '../../../shared/components/MatchVs';
 import { useMatches } from '../../matches/hooks/useMatches';
 import { buildProjectedKnockoutMatches } from '../../tournament/utils/buildProjectedKnockoutMatches';
+import { sortGroupRows, type SortableStandingRow } from '../../tournament/utils/sortGroupStandings';
 import { getUniqueGroupOptions, matchTeamQuery } from '../../matches/utils/listFilters';
 import { PageHeader, type PageHeaderBadge } from '../../../shared/components/PageHeader';
 import { PageFiltersBar } from '../../../shared/components/PageFiltersBar';
@@ -92,10 +93,31 @@ function getGroupStageLabel(groupCode: string) {
   return `Grupo ${groupCode}`;
 }
 
+function toSortable(row: ClientGroupStandingRow): ClientGroupStandingRow & SortableStandingRow {
+  return {
+    ...row,
+    sortKey: row.team_code || row.team_name,
+    teamCode: row.team_code,
+    teamName: row.team_name,
+    points: row.points,
+    wins: row.wins,
+    goalsFor: row.goals_for,
+    goalDifference: row.goal_difference
+  };
+}
+
 function buildClientGroupStandings(matches: Match[]): ClientGroupStandingRow[] {
-  const groupMatches = matches.filter(
+  const allGroupMatches = matches.filter(
     (match) => match.stage === 'group_stage' && match.groupCode && match.homeTeam && match.awayTeam
   );
+
+  // Pre-index by group for H2H sort
+  const matchesByGroup = allGroupMatches.reduce<Map<string, Match[]>>((acc, m) => {
+    const key = m.groupCode as string;
+    if (!acc.has(key)) acc.set(key, []);
+    acc.get(key)!.push(m);
+    return acc;
+  }, new Map());
 
   const table = new Map<string, ClientGroupStandingRow>();
 
@@ -123,7 +145,7 @@ function buildClientGroupStandings(matches: Match[]): ClientGroupStandingRow[] {
     return table.get(key)!;
   }
 
-  for (const match of groupMatches) {
+  for (const match of allGroupMatches) {
     const groupCode = match.groupCode as string;
 
     const home = ensureTeam(groupCode, match.homeTeam, match.homeTeamCode);
@@ -169,18 +191,13 @@ function buildClientGroupStandings(matches: Match[]): ClientGroupStandingRow[] {
     if (!acc[row.group_code]) {
       acc[row.group_code] = [];
     }
-
     acc[row.group_code].push(row);
     return acc;
   }, {});
 
   return Object.entries(grouped).flatMap(([groupCode, groupRows]) => {
-    const sorted = [...groupRows].sort((a, b) => {
-      if (b.points !== a.points) return b.points - a.points;
-      if (b.goal_difference !== a.goal_difference) return b.goal_difference - a.goal_difference;
-      if (b.goals_for !== a.goals_for) return b.goals_for - a.goals_for;
-      return a.team_name.localeCompare(b.team_name);
-    });
+    const groupMatchesForSort = matchesByGroup.get(groupCode) ?? [];
+    const sorted = sortGroupRows(groupRows.map(toSortable), groupMatchesForSort);
 
     return sorted.map((row, index) => ({
       ...row,
