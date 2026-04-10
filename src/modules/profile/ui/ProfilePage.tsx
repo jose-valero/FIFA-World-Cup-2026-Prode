@@ -29,11 +29,7 @@ export function ProfilePage() {
   const displayName = getDisplayName(profile?.display_name, user?.email ?? null);
   const isDisabled = Boolean(profile?.is_disabled);
 
-  const {
-    data: leaderboardRows = [],
-    isLoading: isLeaderboardLoading,
-    isError: isLeaderboardError
-  } = useLeaderboard();
+  const { data: leaderboardRows = [], isLoading: isLeaderboardLoading, isError: isLeaderboardError } = useLeaderboard();
 
   const activeRows = React.useMemo(() => leaderboardRows.filter((row) => !row.is_disabled), [leaderboardRows]);
 
