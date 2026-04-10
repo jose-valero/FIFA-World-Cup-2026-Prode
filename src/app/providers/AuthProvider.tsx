@@ -3,7 +3,6 @@ import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabase/client';
 import type { AuthContextValueSchema, AuthProfile } from '../../modules/auth/types/auth.types';
 import { getMyProfile } from '../../modules/auth/api/auth.api';
-// import { getMyProfile } from '../../modules/auth/auth.api';
 
 const AuthContext = React.createContext<AuthContextValueSchema | undefined>(undefined);
 
@@ -12,6 +11,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = React.useState<User | null>(null);
   const [profile, setProfile] = React.useState<AuthProfile | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
+
+  const refreshProfile = React.useCallback(async () => {
+    if (!user?.id) {
+      setProfile(null);
+      return;
+    }
+
+    const nextProfile = await getMyProfile(user.id);
+    setProfile(nextProfile);
+  }, [user?.id]);
 
   React.useEffect(() => {
     let mounted = true;
@@ -162,9 +171,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signUpWithEmail,
       signInWithEmail,
       signInWithGoogle,
-      signOut
+      signOut,
+      refreshProfile
     }),
-    [user, session, profile, isLoading, signUpWithEmail, signInWithEmail, signInWithGoogle, signOut]
+    [user, session, profile, isLoading, signUpWithEmail, signInWithEmail, signInWithGoogle, signOut, refreshProfile]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

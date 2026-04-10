@@ -23,22 +23,20 @@ type NavItem = {
   to: string;
 };
 
-function getDisplayName(user: any) {
-  const metadataName = user?.user_metadata?.display_name || user?.user_metadata?.displayName;
-
-  if (metadataName && typeof metadataName === 'string') {
-    return metadataName;
+function getDisplayName(displayName?: string | null, email?: string | null) {
+  if (displayName && typeof displayName === 'string') {
+    return displayName;
   }
 
-  if (user?.email && typeof user.email === 'string') {
-    return user.email.split('@')[0];
+  if (email && typeof email === 'string') {
+    return email.split('@')[0];
   }
 
   return 'Usuario';
 }
 
-function getInitial(name: string) {
-  return name.trim().charAt(0).toUpperCase() || 'U';
+function getInitial(name?: string) {
+  return name?.trim().charAt(0).toUpperCase() || 'U';
 }
 
 export default function AppTopNav() {
@@ -51,7 +49,8 @@ export default function AppTopNav() {
   const isAuthenticated = Boolean(user);
   const isAdmin = Boolean(profile?.is_admin);
   const isDisabled = Boolean(profile?.is_disabled);
-  const displayName = getDisplayName(user);
+  const displayName = getDisplayName(profile?.display_name, user?.email);
+  const avatarUrl = profile?.avatar_url ?? undefined;
 
   const publicNavItems: NavItem[] = [
     { label: 'Inicio', to: routes.home },
@@ -165,6 +164,11 @@ export default function AppTopNav() {
                 </div>
               ) : (
                 <div>
+                  <Divider sx={{ my: 0 }} />
+                  <MenuItem component={NavLink} to={routes.profile} onClick={handleCloseNavMenu}>
+                    <Typography>Mi cuenta</Typography>
+                  </MenuItem>
+
                   {!isDisabled ? (
                     <div>
                       <Divider sx={{ my: 0 }} />
@@ -270,6 +274,7 @@ export default function AppTopNav() {
                 <Tooltip title='Opciones de cuenta'>
                   <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
                     <Avatar
+                      src={avatarUrl}
                       sx={{
                         width: 36,
                         height: 36,
@@ -290,6 +295,10 @@ export default function AppTopNav() {
                   open={Boolean(anchorElUser)}
                   onClose={handleCloseUserMenu}
                 >
+                  <MenuItem component={NavLink} to={routes.profile} onClick={handleCloseUserMenu}>
+                    <Typography>Mi cuenta</Typography>
+                  </MenuItem>
+
                   {!isDisabled ? (
                     <div>
                       <MenuItem component={NavLink} to={routes.dashboard} onClick={handleCloseUserMenu}>
@@ -321,9 +330,12 @@ export default function AppTopNav() {
                       ) : null}
                     </div>
                   ) : (
-                    <MenuItem disabled>
-                      <Typography color='text.secondary'>Cuenta deshabilitada</Typography>
-                    </MenuItem>
+                    <>
+                      <Divider sx={{ my: 0 }} />
+                      <MenuItem disabled>
+                        <Typography color='text.secondary'>Cuenta deshabilitada</Typography>
+                      </MenuItem>
+                    </>
                   )}
 
                   <Divider sx={{ my: 0 }} />
