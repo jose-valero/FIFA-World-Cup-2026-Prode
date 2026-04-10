@@ -8,5 +8,6 @@ export const queryKeys = {
   auditPredictions: ['audit-predictions'] as const,
   auditPredictionsByUser: (userId: string) => ['audit-predictions', 'user', userId] as const,
   predictions: (userId: string) => ['predictions', userId] as const,
-  adminParticipantsOverview: ['admin-participants-overview']
+  adminParticipantsOverview: ['admin-participants-overview'],
+  topThreeAvatars: (userIds: string[]) => ['top-three-avatars', ...userIds.sort()] as const
 };

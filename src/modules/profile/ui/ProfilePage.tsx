@@ -1,41 +1,21 @@
 import * as React from 'react';
 import Alert from '@mui/material/Alert';
-import Avatar from '@mui/material/Avatar';
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
-import Chip from '@mui/material/Chip';
-import CircularProgress from '@mui/material/CircularProgress';
 import Container from '@mui/material/Container';
-import Divider from '@mui/material/Divider';
-import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 
 import { useAuth } from '../../auth/hooks/useAuth';
+import { useLeaderboard } from '../../leaderboard/hooks/useLeaderboard';
 import { removeAvatarFromProfile, uploadAvatarAndSaveProfile, validateAvatarFile } from '../api/profile.api';
+import { PersonalInfoSection } from '../components/PersonalInfoSection';
+import { CompetitiveInfoSection } from '../components/CompetitiveInfoSection';
+import { PerformanceChartSection } from '../components/PerformanceChartSection';
 
 function getDisplayName(displayName?: string | null, email?: string | null) {
   if (displayName && typeof displayName === 'string') return displayName;
   if (email && typeof email === 'string') return email.split('@')[0];
   return 'Usuario';
-}
-
-function getInitial(name?: string) {
-  return name?.trim().charAt(0).toUpperCase() || 'U';
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return '—';
-
-  try {
-    return new Intl.DateTimeFormat('es-AR', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    }).format(new Date(value));
-  } catch {
-    return '—';
-  }
 }
 
 export function ProfilePage() {
@@ -48,6 +28,25 @@ export function ProfilePage() {
 
   const displayName = getDisplayName(profile?.display_name, user?.email ?? null);
   const isDisabled = Boolean(profile?.is_disabled);
+
+  const {
+    data: leaderboardRows = [],
+    isLoading: isLeaderboardLoading,
+    isError: isLeaderboardError
+  } = useLeaderboard();
+
+  const activeRows = React.useMemo(() => leaderboardRows.filter((row) => !row.is_disabled), [leaderboardRows]);
+
+  const myRow = React.useMemo(
+    () => leaderboardRows.find((row) => row.user_id === user?.id) ?? null,
+    [leaderboardRows, user?.id]
+  );
+
+  const myRank = React.useMemo(() => {
+    if (!user?.id || isDisabled) return null;
+    const index = activeRows.findIndex((row) => row.user_id === user.id);
+    return index >= 0 ? index + 1 : null;
+  }, [activeRows, user?.id, isDisabled]);
 
   const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -112,95 +111,37 @@ export function ProfilePage() {
               Mi cuenta
             </Typography>
             <Typography variant='body1' color='text.secondary'>
-              Gestiona tu foto de perfil y consulta tu estado dentro del torneo.
+              Gestiona tu perfil y consultá tu estado dentro del torneo.
             </Typography>
           </Box>
 
           {errorMessage ? <Alert severity='error'>{errorMessage}</Alert> : null}
           {successMessage ? <Alert severity='success'>{successMessage}</Alert> : null}
 
-          <Paper
-            elevation={0}
-            sx={{
-              p: 3,
-              borderRadius: 4,
-              border: (theme) => `1px solid ${theme.palette.divider}`
-            }}
-          >
-            <Stack spacing={3} alignItems='center'>
-              <Avatar
-                src={profile?.avatar_url ?? undefined}
-                sx={{
-                  width: 132,
-                  height: 132,
-                  fontSize: 44,
-                  fontWeight: 800
-                }}
-              >
-                {getInitial(displayName)}
-              </Avatar>
+          <PersonalInfoSection
+            displayName={displayName}
+            email={user?.email}
+            avatarUrl={profile?.avatar_url}
+            createdAt={profile?.created_at}
+            isDisabled={isDisabled}
+            isSubmitting={isSubmitting}
+            isRemoving={isRemoving}
+            onAvatarChange={handleAvatarChange}
+            onRemoveAvatar={handleRemoveAvatar}
+          />
 
-              <Box textAlign='center'>
-                <Typography variant='h6' fontWeight={800}>
-                  {displayName}
-                </Typography>
-                <Typography variant='body2' color='text.secondary'>
-                  {user?.email}
-                </Typography>
-              </Box>
+          <CompetitiveInfoSection
+            isLoading={isLeaderboardLoading}
+            isError={isLeaderboardError}
+            isDisabled={isDisabled}
+            rank={myRank}
+            totalPoints={myRow?.total_points ?? 0}
+            exactHits={myRow?.exact_hits ?? 0}
+            outcomeHits={myRow?.outcome_hits ?? 0}
+            scoredPredictions={myRow?.scored_predictions ?? 0}
+          />
 
-              <Stack direction='row' spacing={1}>
-                <Chip
-                  label={isDisabled ? 'Cuenta deshabilitada' : 'Cuenta habilitada'}
-                  size='small'
-                  color={isDisabled ? 'default' : 'success'}
-                  variant={isDisabled ? 'outlined' : 'filled'}
-                />
-              </Stack>
-
-              <Typography variant='body2' color='text.secondary'>
-                Miembro desde: {formatDate(profile?.created_at)}
-              </Typography>
-
-              <Typography variant='body2' color='text.secondary'>
-                Formatos permitidos: JPG, PNG, WEBP. Tamaño máximo: 1 MB.
-              </Typography>
-
-              <Button component='label' variant='contained' disabled={isSubmitting || isRemoving}>
-                {isSubmitting ? (
-                  <Stack direction='row' spacing={1} alignItems='center'>
-                    <CircularProgress size={18} color='inherit' />
-                    <span>Subiendo foto...</span>
-                  </Stack>
-                ) : (
-                  'Subir nueva foto'
-                )}
-
-                <input hidden type='file' accept='image/png,image/jpeg,image/webp' onChange={handleAvatarChange} />
-              </Button>
-
-              <Button
-                variant='text'
-                color='inherit'
-                size='small'
-                disabled={!profile?.avatar_url || isSubmitting || isRemoving}
-                onClick={handleRemoveAvatar}
-              >
-                {isRemoving ? 'Eliminando foto...' : 'Eliminar foto actual'}
-              </Button>
-
-              <Divider flexItem />
-
-              <Stack spacing={0.5} alignItems='center'>
-                <Typography variant='body2' color='text.secondary'>
-                  Estado competitivo
-                </Typography>
-                <Typography variant='body1' fontWeight={700}>
-                  {isDisabled ? 'Fuera de competencia' : 'Activo'}
-                </Typography>
-              </Stack>
-            </Stack>
-          </Paper>
+          <PerformanceChartSection userId={user?.id ?? null} />
         </Stack>
       </Container>
     </Box>
