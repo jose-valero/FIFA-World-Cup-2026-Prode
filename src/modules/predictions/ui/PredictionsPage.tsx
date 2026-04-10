@@ -259,9 +259,7 @@ export function PredictionsPage() {
 
     if (isMatchLocked(match, predictionsClosed)) {
       setErrorMessage(
-        match.status !== 'scheduled'
-          ? 'Este partido ya no admite cambios.'
-          : 'La carga de pronósticos está cerrada.'
+        match.status !== 'scheduled' ? 'Este partido ya no admite cambios.' : 'La carga de pronósticos está cerrada.'
       );
       return;
     }
@@ -515,10 +513,7 @@ export function PredictionsPage() {
         onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >
-        <Alert
-          severity={snackbar.severity}
-          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-        >
+        <Alert severity={snackbar.severity} onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}>
           {snackbar.message}
         </Alert>
       </Snackbar>
