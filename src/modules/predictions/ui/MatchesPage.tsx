@@ -24,6 +24,7 @@ import { isMatchLocked } from '../utils/isMatchLocked';
 import { isPredictionsClosed } from '../../../shared/utils/isPredictionsClosed';
 import { buildPredictionSummary } from '../utils/buildPredictionSummary';
 import type { Match } from '../../matches/types/types';
+import { sortMatchesByStatusPriority } from '../../../shared/utils/sortMatchesByStatusPriority';
 
 type MatchPredictionMap = Record<
   string,
@@ -103,7 +104,7 @@ export function MatchesPage() {
   const groupOptions = React.useMemo(() => getUniqueGroupOptions(matches), [matches]);
 
   const filteredMatches = React.useMemo(() => {
-    return filterMatches(matches, filters);
+    return sortMatchesByStatusPriority(filterMatches(matches, filters));
   }, [matches, filters]);
 
   React.useEffect(() => {

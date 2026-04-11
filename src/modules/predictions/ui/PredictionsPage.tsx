@@ -37,6 +37,7 @@ import { isPredictionsClosed } from '../../../shared/utils/isPredictionsClosed';
 import { queryKeys } from '../../../lib/react-query/queryKeys';
 import { getStatusLabel } from '../../../shared/utils/getStatusLabel';
 import { getStatusColor } from '../../../shared/utils/getStatusColor';
+import { sortPredictionItems } from '../../../shared/utils/sortMatchesByStatusPriority';
 
 type UserPrediction = {
   matchId: string;
@@ -44,7 +45,7 @@ type UserPrediction = {
   awayScore: number;
 };
 
-type PredictionWithMatch = {
+export type PredictionWithMatch = {
   match: Match | null;
   prediction: UserPrediction;
   points: number | null;
@@ -95,14 +96,6 @@ function getPredictionPoints(prediction: UserPrediction, match: Match | null) {
     isExactHit: false,
     isOutcomeHit
   };
-}
-
-function sortByKickoff(items: PredictionWithMatch[]) {
-  return [...items].sort((a, b) => {
-    const aTime = a.match ? new Date(a.match.kickoffAt).getTime() : Number.MAX_SAFE_INTEGER;
-    const bTime = b.match ? new Date(b.match.kickoffAt).getTime() : Number.MAX_SAFE_INTEGER;
-    return aTime - bTime;
-  });
 }
 
 function SummaryCard({ label, value }: { label: string; value: string | number }) {
@@ -208,7 +201,7 @@ export function PredictionsPage() {
       };
     });
 
-    return sortByKickoff(items);
+    return sortPredictionItems(items);
   }, [predictions, matchMap]);
 
   const stageOptions = React.useMemo(() => {
