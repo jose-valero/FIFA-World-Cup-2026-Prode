@@ -1,17 +1,13 @@
-import { CircularProgress, Stack } from '@mui/material';
 import { Navigate, Outlet } from 'react-router';
 import { useAuth } from '../hooks/useAuth';
 import { routes } from '../../../app/router/routes';
+import { GuardFallback } from './GuardFallback';
 
 export function RequireAdmin() {
   const { user, profile, isLoading } = useAuth();
 
   if (isLoading) {
-    return (
-      <Stack alignItems='center' justifyContent='center' sx={{ minHeight: '50vh' }}>
-        <CircularProgress />
-      </Stack>
-    );
+    return <GuardFallback />;
   }
 
   if (!user) {

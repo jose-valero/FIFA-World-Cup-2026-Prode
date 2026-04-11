@@ -1,10 +1,10 @@
 import { Box } from '@mui/material';
-import { Outlet } from 'react-router';
 import AppTopNav from './AppTopNav';
-import { AppFooter } from './AppFooter';
 import { AppContainer } from './AppContainer';
+import { Outlet } from 'react-router';
+import { AppFooter } from './AppFooter';
 
-export function PublicLayout() {
+export const AppShellLayout = () => {
   return (
     <Box
       sx={{
@@ -22,8 +22,7 @@ export function PublicLayout() {
           <Outlet />
         </AppContainer>
       </Box>
-
       <AppFooter />
     </Box>
   );
-}
+};
