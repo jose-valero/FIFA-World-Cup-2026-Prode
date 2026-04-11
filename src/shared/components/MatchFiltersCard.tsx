@@ -1,6 +1,8 @@
 import { Grid, MenuItem, TextField } from '@mui/material';
 import type { MatchListFilters, StageOption } from '../../modules/matches/utils/listFilters';
 import { PageFiltersBar } from './PageFiltersBar';
+import type { MatchStatus } from '../../modules/matches/types/types';
+import { getStatusLabel } from '../utils/getStatusLabel';
 
 type MatchFiltersCardProps = {
   title?: string;
@@ -10,7 +12,7 @@ type MatchFiltersCardProps = {
   onChange: (field: 'stage' | 'groupCode' | 'teamQuery' | 'status', value: string) => void;
   stageOptions: ReadonlyArray<StageOption>;
   groupOptions: string[];
-  statusOptions?: string[];
+  statusOptions?: MatchStatus[];
   collapsible?: boolean;
 };
 
@@ -84,7 +86,7 @@ export function MatchFiltersCard({
 
               {statusOptions.map((status) => (
                 <MenuItem key={status} value={status}>
-                  {status}
+                  {getStatusLabel(status)}
                 </MenuItem>
               ))}
             </TextField>

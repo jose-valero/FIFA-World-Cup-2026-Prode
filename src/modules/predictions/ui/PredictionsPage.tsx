@@ -24,6 +24,7 @@ import {
   filterMatches,
   getUniqueGroupOptions,
   getUniqueStageOptions,
+  matchStatusOptions,
   type MatchListFilters
 } from '../../matches/utils/listFilters';
 import { MatchFiltersCard } from '../../../shared/components/MatchFiltersCard';
@@ -160,7 +161,8 @@ export function PredictionsPage() {
   const [filters, setFilters] = React.useState<MatchListFilters>({
     stage: '',
     groupCode: '',
-    teamQuery: ''
+    teamQuery: '',
+    status: ''
   });
   const [errorMessage, setErrorMessage] = React.useState('');
   const [deletingMatchId, setDeletingMatchId] = React.useState<string | null>(null);
@@ -294,15 +296,6 @@ export function PredictionsPage() {
 
   return (
     <Stack spacing={2.5}>
-      <Stack spacing={0.5}>
-        <Typography variant='h5' fontWeight={800}>
-          Mis pronósticos
-        </Typography>
-
-        <Typography variant='body2' color='text.secondary'>
-          Revisa lo que ya cargaste y cómo se compara con los resultados oficiales.
-        </Typography>
-      </Stack>
       {isError ? (
         <Alert severity='error'>
           {firstError instanceof Error ? firstError.message : 'No se pudieron cargar tus pronósticos'}
@@ -334,6 +327,7 @@ export function PredictionsPage() {
             }
             stageOptions={stageOptions}
             groupOptions={groupOptions}
+            statusOptions={[...matchStatusOptions]}
             collapsible
           />
 
