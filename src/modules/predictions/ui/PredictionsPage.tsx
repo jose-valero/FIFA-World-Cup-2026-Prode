@@ -303,15 +303,12 @@ export function PredictionsPage() {
           Revisa lo que ya cargaste y cómo se compara con los resultados oficiales.
         </Typography>
       </Stack>
-
       {isError ? (
         <Alert severity='error'>
           {firstError instanceof Error ? firstError.message : 'No se pudieron cargar tus pronósticos'}
         </Alert>
       ) : null}
-
       {errorMessage ? <Alert severity='error'>{errorMessage}</Alert> : null}
-
       {isLoading ? (
         <Stack alignItems='center' sx={{ py: 6 }}>
           <CircularProgress />
@@ -422,20 +419,35 @@ export function PredictionsPage() {
                             ) : null}
                           </Stack>
 
-                          <Stack direction='row' spacing={1} flexWrap='wrap' useFlexGap>
-                            {points === null ? (
-                              <Chip label='Sin evaluar' color='default' />
-                            ) : (
-                              <Chip
-                                label={`${points} pts`}
-                                color={points > 0 ? 'success' : 'default'}
-                                variant={points > 0 ? 'filled' : 'outlined'}
-                              />
-                            )}
+                          <Stack direction='column' spacing={1} flexWrap='wrap' useFlexGap justifyContent={'end'}>
+                            <Stack direction='row' spacing={1} flexWrap='wrap' useFlexGap justifyContent={'center'}>
+                              {points === null ? (
+                                <Chip label='Sin evaluar' color='default' />
+                              ) : (
+                                <Chip
+                                  label={`${points} pts`}
+                                  color={points > 0 ? 'success' : 'default'}
+                                  variant={points > 0 ? 'filled' : 'outlined'}
+                                />
+                              )}
 
-                            {isExactHit ? <Chip label='Exacto' color='success' variant='outlined' /> : null}
-                            {!isExactHit && isOutcomeHit ? (
-                              <Chip label='Acierto de signo' color='primary' variant='outlined' />
+                              {isExactHit ? <Chip label='Exacto' color='success' variant='outlined' /> : null}
+                              {!isExactHit && isOutcomeHit ? (
+                                <Chip label='Acierto de signo' color='primary' variant='outlined' />
+                              ) : null}
+                            </Stack>
+                            {match && !isMatchLocked(match, predictionsClosed) ? (
+                              <Stack direction='row' justifyContent='flex-end'>
+                                <Button
+                                  size='small'
+                                  color='error'
+                                  variant='outlined'
+                                  disabled={deletingMatchId === prediction.matchId}
+                                  onClick={() => handleRequestDelete(prediction.matchId, match)}
+                                >
+                                  {deletingMatchId === prediction.matchId ? 'Limpiando...' : 'Limpiar pronóstico'}
+                                </Button>
+                              </Stack>
                             ) : null}
                           </Stack>
                         </Stack>
@@ -469,20 +481,6 @@ export function PredictionsPage() {
                             </Stack>
                           </Grid>
                         </Grid>
-
-                        {match && !isMatchLocked(match, predictionsClosed) ? (
-                          <Stack direction='row' justifyContent='flex-end'>
-                            <Button
-                              size='small'
-                              color='error'
-                              variant='outlined'
-                              disabled={deletingMatchId === prediction.matchId}
-                              onClick={() => handleRequestDelete(prediction.matchId, match)}
-                            >
-                              {deletingMatchId === prediction.matchId ? 'Limpiando...' : 'Limpiar pronóstico'}
-                            </Button>
-                          </Stack>
-                        ) : null}
                       </Stack>
                     </CardContent>
                   </Card>
@@ -492,7 +490,6 @@ export function PredictionsPage() {
           )}
         </>
       )}
-
       <ConfirmDeleteDialog
         open={Boolean(matchToDelete)}
         title='Limpiar pronóstico'
