@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../../lib/supabase/client';
 import { PersonalInfoSection } from '../../profile/components/PersonalInfoSection';
 import { CompetitiveInfoSection } from '../../profile/components/CompetitiveInfoSection';
-import { PerformanceChartSection } from '../../profile/components/PerformanceChartSection';
+import { PerformanceChartSection } from '../../dashboard/components/PerformanceChartSection';
 import type { LeaderboardRow } from '../types/leaderboard.types';
 
 type ParticipantProfileDrawerProps = {

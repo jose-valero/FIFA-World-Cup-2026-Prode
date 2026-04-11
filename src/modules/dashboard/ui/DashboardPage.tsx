@@ -18,6 +18,7 @@ import { sortMatchesByKickoff } from '../utils/sortMatchesByKickoff';
 import { formatDateTime } from '../utils/formatDateTime';
 import { isPredictionsClosed } from '../../../shared/utils/isPredictionsClosed';
 import { routes } from '../../../app/router/routes';
+import { PerformanceChartSection } from '../components/PerformanceChartSection';
 
 export function DashboardPage() {
   const { user, profile } = useAuth();
@@ -187,6 +188,8 @@ export function DashboardPage() {
           </Grid>
         ))}
       </Grid>
+
+      <PerformanceChartSection userId={user?.id ?? null} />
 
       <Grid container spacing={1.5}>
         <Grid size={{ xs: 12, xl: 7 }}>

@@ -1,16 +1,12 @@
 import * as React from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
-import Container from '@mui/material/Container';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-
 import { useAuth } from '../../auth/hooks/useAuth';
-import { useLeaderboard } from '../../leaderboard/hooks/useLeaderboard';
 import { removeAvatarFromProfile, uploadAvatarAndSaveProfile, validateAvatarFile } from '../api/profile.api';
 import { PersonalInfoSection } from '../components/PersonalInfoSection';
-import { CompetitiveInfoSection } from '../components/CompetitiveInfoSection';
-import { PerformanceChartSection } from '../components/PerformanceChartSection';
+import { AppContainer } from '../../../app/layout/AppContainer';
 
 function getDisplayName(displayName?: string | null, email?: string | null) {
   if (displayName && typeof displayName === 'string') return displayName;
@@ -28,21 +24,6 @@ export function ProfilePage() {
 
   const displayName = getDisplayName(profile?.display_name, user?.email ?? null);
   const isDisabled = Boolean(profile?.is_disabled);
-
-  const { data: leaderboardRows = [], isLoading: isLeaderboardLoading, isError: isLeaderboardError } = useLeaderboard();
-
-  const activeRows = React.useMemo(() => leaderboardRows.filter((row) => !row.is_disabled), [leaderboardRows]);
-
-  const myRow = React.useMemo(
-    () => leaderboardRows.find((row) => row.user_id === user?.id) ?? null,
-    [leaderboardRows, user?.id]
-  );
-
-  const myRank = React.useMemo(() => {
-    if (!user?.id || isDisabled) return null;
-    const index = activeRows.findIndex((row) => row.user_id === user.id);
-    return index >= 0 ? index + 1 : null;
-  }, [activeRows, user?.id, isDisabled]);
 
   const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -100,7 +81,7 @@ export function ProfilePage() {
 
   return (
     <Box sx={{ py: { xs: 3, md: 4 } }}>
-      <Container maxWidth='md'>
+      <AppContainer>
         <Stack spacing={3}>
           <Box>
             <Typography variant='h4' fontWeight={800} gutterBottom>
@@ -113,7 +94,6 @@ export function ProfilePage() {
 
           {errorMessage ? <Alert severity='error'>{errorMessage}</Alert> : null}
           {successMessage ? <Alert severity='success'>{successMessage}</Alert> : null}
-
           <PersonalInfoSection
             displayName={displayName}
             email={user?.email}
@@ -125,21 +105,8 @@ export function ProfilePage() {
             onAvatarChange={handleAvatarChange}
             onRemoveAvatar={handleRemoveAvatar}
           />
-
-          <CompetitiveInfoSection
-            isLoading={isLeaderboardLoading}
-            isError={isLeaderboardError}
-            isDisabled={isDisabled}
-            rank={myRank}
-            totalPoints={myRow?.total_points ?? 0}
-            exactHits={myRow?.exact_hits ?? 0}
-            outcomeHits={myRow?.outcome_hits ?? 0}
-            scoredPredictions={myRow?.scored_predictions ?? 0}
-          />
-
-          <PerformanceChartSection userId={user?.id ?? null} />
         </Stack>
-      </Container>
+      </AppContainer>
     </Box>
   );
 }
