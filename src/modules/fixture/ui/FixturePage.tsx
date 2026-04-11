@@ -37,6 +37,7 @@ import type { Match } from '../../matches/types/types';
 import { TeamFlag } from '../../../shared/components/TeamFlag';
 import { getStatusLabel } from '../../../shared/utils/getStatusLabel';
 import { getStatusColor } from '../../../shared/utils/getStatusColor';
+import { sortMatches } from '../../../shared/utils/sortMatches';
 type FixtureViewMode = 'group_stage' | 'knockout';
 type GroupStageStatusFilter = '' | 'scheduled' | 'live' | 'finished';
 
@@ -55,19 +56,6 @@ type ClientGroupStandingRow = {
   points: number;
   rank_in_group: number;
 };
-
-function sortMatches(matches: Match[]) {
-  return [...matches].sort((a, b) => {
-    const aOrder = a.displayOrder ?? Number.MAX_SAFE_INTEGER;
-    const bOrder = b.displayOrder ?? Number.MAX_SAFE_INTEGER;
-
-    if (aOrder !== bOrder) {
-      return aOrder - bOrder;
-    }
-
-    return new Date(a.kickoffAt).getTime() - new Date(b.kickoffAt).getTime();
-  });
-}
 
 function getInitialFixtureView(matches: Match[]): FixtureViewMode {
   const groupStageMatches = matches.filter((match) => match.stage === 'group_stage');
