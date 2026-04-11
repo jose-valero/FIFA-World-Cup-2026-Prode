@@ -6,7 +6,6 @@ import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 
-
 import { useAuditPredictionsByUser } from '../../audits/hooks/useAuditPredictionsByUser';
 import { useMatches } from '../../matches/hooks/useMatches';
 import type { Match } from '../../matches/types/types';

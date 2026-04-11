@@ -2,16 +2,23 @@ import { stageOptions as tournamentStageOptions, type TournamentStage } from '..
 import type { Match } from '../types/types';
 
 export type StageFilterValue = TournamentStage | '';
+export type MatchStatusFilterValue = Match['status'] | '';
 
 export type MatchListFilters = {
   stage: StageFilterValue;
   groupCode: string;
   teamQuery: string;
+  status: MatchStatusFilterValue;
 };
+
+export const matchStatusOptions: ReadonlyArray<Match['status']> = ['scheduled', 'live', 'finished'];
 
 export type StageOption = (typeof tournamentStageOptions)[number];
 
-type FilterableMatchLike = Pick<Match, 'stage' | 'homeTeam' | 'awayTeam' | 'homeTeamCode' | 'awayTeamCode'> & {
+type FilterableMatchLike = Pick<
+  Match,
+  'stage' | 'homeTeam' | 'awayTeam' | 'homeTeamCode' | 'awayTeamCode' | 'status'
+> & {
   groupCode?: string | null;
   group_code?: string | null;
 };
@@ -57,8 +64,9 @@ export function filterMatches<T extends FilterableMatchLike>(items: T[], filters
 
     const matchesStage = !filters.stage || item.stage === filters.stage;
     const matchesGroup = !filters.groupCode || itemGroupCode === filters.groupCode;
+    const matchesStatus = !filters.status || item.status === filters.status;
     const matchesTeam = matchTeamQuery(item, filters.teamQuery);
 
-    return matchesStage && matchesGroup && matchesTeam;
+    return matchesStage && matchesGroup && matchesStatus && matchesTeam;
   });
 }

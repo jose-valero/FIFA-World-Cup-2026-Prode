@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Alert, CircularProgress, Snackbar, Stack, Typography } from '@mui/material';
+import { Alert, CircularProgress, Snackbar, Stack } from '@mui/material';
 import { MatchCard } from '../../matches/components/MatchCard';
 import { PredictionDialog } from '../components/PredictionDialog';
 import { ConfirmDeleteDialog } from '../../../shared/components/ConfirmDeleteDialog';
@@ -10,6 +10,7 @@ import {
   filterMatches,
   getUniqueGroupOptions,
   getUniqueStageOptions,
+  matchStatusOptions,
   type MatchListFilters
 } from '../../matches/utils/listFilters';
 import { useQueryClient } from '@tanstack/react-query';
@@ -23,6 +24,7 @@ import { isMatchLocked } from '../utils/isMatchLocked';
 import { isPredictionsClosed } from '../../../shared/utils/isPredictionsClosed';
 import { buildPredictionSummary } from '../utils/buildPredictionSummary';
 import type { Match } from '../../matches/types/types';
+import { sortMatchesByStatusPriority } from '../../../shared/utils/sortMatchesByStatusPriority';
 
 type MatchPredictionMap = Record<
   string,
@@ -52,7 +54,8 @@ export function MatchesPage() {
   const [filters, setFilters] = React.useState<MatchListFilters>({
     stage: '',
     groupCode: '',
-    teamQuery: ''
+    teamQuery: '',
+    status: ''
   });
 
   const {
@@ -101,7 +104,7 @@ export function MatchesPage() {
   const groupOptions = React.useMemo(() => getUniqueGroupOptions(matches), [matches]);
 
   const filteredMatches = React.useMemo(() => {
-    return filterMatches(matches, filters);
+    return sortMatchesByStatusPriority(filterMatches(matches, filters));
   }, [matches, filters]);
 
   React.useEffect(() => {
@@ -310,16 +313,6 @@ export function MatchesPage() {
   return (
     <>
       <Stack spacing={2.5}>
-        <Stack spacing={0.5}>
-          <Typography variant='h5' fontWeight={800}>
-            Partidos
-          </Typography>
-
-          <Typography variant='body2' color='text.secondary'>
-            Elige un partido para cargar o editar tu pronóstico.
-          </Typography>
-        </Stack>
-
         {errorMessage ? <Alert severity='error'>{errorMessage}</Alert> : null}
 
         {isError ? (
@@ -336,6 +329,7 @@ export function MatchesPage() {
           onChange={(field, value) => handleFilterChange(field as keyof MatchListFilters, value)}
           stageOptions={stageOptions}
           groupOptions={groupOptions}
+          statusOptions={[...matchStatusOptions]}
           collapsible
         />
 
@@ -400,10 +394,7 @@ export function MatchesPage() {
         onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >
-        <Alert
-          severity={snackbar.severity}
-          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-        >
+        <Alert severity={snackbar.severity} onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}>
           {snackbar.message}
         </Alert>
       </Snackbar>

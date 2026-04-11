@@ -24,6 +24,7 @@ import {
   filterMatches,
   getUniqueGroupOptions,
   getUniqueStageOptions,
+  matchStatusOptions,
   type MatchListFilters
 } from '../../matches/utils/listFilters';
 import { MatchFiltersCard } from '../../../shared/components/MatchFiltersCard';
@@ -36,6 +37,7 @@ import { isPredictionsClosed } from '../../../shared/utils/isPredictionsClosed';
 import { queryKeys } from '../../../lib/react-query/queryKeys';
 import { getStatusLabel } from '../../../shared/utils/getStatusLabel';
 import { getStatusColor } from '../../../shared/utils/getStatusColor';
+import { sortPredictionItems } from '../../../shared/utils/sortMatchesByStatusPriority';
 
 type UserPrediction = {
   matchId: string;
@@ -43,7 +45,7 @@ type UserPrediction = {
   awayScore: number;
 };
 
-type PredictionWithMatch = {
+export type PredictionWithMatch = {
   match: Match | null;
   prediction: UserPrediction;
   points: number | null;
@@ -94,14 +96,6 @@ function getPredictionPoints(prediction: UserPrediction, match: Match | null) {
     isExactHit: false,
     isOutcomeHit
   };
-}
-
-function sortByKickoff(items: PredictionWithMatch[]) {
-  return [...items].sort((a, b) => {
-    const aTime = a.match ? new Date(a.match.kickoffAt).getTime() : Number.MAX_SAFE_INTEGER;
-    const bTime = b.match ? new Date(b.match.kickoffAt).getTime() : Number.MAX_SAFE_INTEGER;
-    return aTime - bTime;
-  });
 }
 
 function SummaryCard({ label, value }: { label: string; value: string | number }) {
@@ -160,7 +154,8 @@ export function PredictionsPage() {
   const [filters, setFilters] = React.useState<MatchListFilters>({
     stage: '',
     groupCode: '',
-    teamQuery: ''
+    teamQuery: '',
+    status: ''
   });
   const [errorMessage, setErrorMessage] = React.useState('');
   const [deletingMatchId, setDeletingMatchId] = React.useState<string | null>(null);
@@ -206,7 +201,7 @@ export function PredictionsPage() {
       };
     });
 
-    return sortByKickoff(items);
+    return sortPredictionItems(items);
   }, [predictions, matchMap]);
 
   const stageOptions = React.useMemo(() => {
@@ -294,24 +289,12 @@ export function PredictionsPage() {
 
   return (
     <Stack spacing={2.5}>
-      <Stack spacing={0.5}>
-        <Typography variant='h5' fontWeight={800}>
-          Mis pronósticos
-        </Typography>
-
-        <Typography variant='body2' color='text.secondary'>
-          Revisa lo que ya cargaste y cómo se compara con los resultados oficiales.
-        </Typography>
-      </Stack>
-
       {isError ? (
         <Alert severity='error'>
           {firstError instanceof Error ? firstError.message : 'No se pudieron cargar tus pronósticos'}
         </Alert>
       ) : null}
-
       {errorMessage ? <Alert severity='error'>{errorMessage}</Alert> : null}
-
       {isLoading ? (
         <Stack alignItems='center' sx={{ py: 6 }}>
           <CircularProgress />
@@ -337,6 +320,7 @@ export function PredictionsPage() {
             }
             stageOptions={stageOptions}
             groupOptions={groupOptions}
+            statusOptions={[...matchStatusOptions]}
             collapsible
           />
 
@@ -422,20 +406,35 @@ export function PredictionsPage() {
                             ) : null}
                           </Stack>
 
-                          <Stack direction='row' spacing={1} flexWrap='wrap' useFlexGap>
-                            {points === null ? (
-                              <Chip label='Sin evaluar' color='default' />
-                            ) : (
-                              <Chip
-                                label={`${points} pts`}
-                                color={points > 0 ? 'success' : 'default'}
-                                variant={points > 0 ? 'filled' : 'outlined'}
-                              />
-                            )}
+                          <Stack direction='column' spacing={1} flexWrap='wrap' useFlexGap justifyContent={'end'}>
+                            <Stack direction='row' spacing={1} flexWrap='wrap' useFlexGap justifyContent={'center'}>
+                              {points === null ? (
+                                <Chip label='Sin evaluar' color='default' />
+                              ) : (
+                                <Chip
+                                  label={`${points} pts`}
+                                  color={points > 0 ? 'success' : 'default'}
+                                  variant={points > 0 ? 'filled' : 'outlined'}
+                                />
+                              )}
 
-                            {isExactHit ? <Chip label='Exacto' color='success' variant='outlined' /> : null}
-                            {!isExactHit && isOutcomeHit ? (
-                              <Chip label='Acierto de signo' color='primary' variant='outlined' />
+                              {isExactHit ? <Chip label='Exacto' color='success' variant='outlined' /> : null}
+                              {!isExactHit && isOutcomeHit ? (
+                                <Chip label='Acierto de signo' color='primary' variant='outlined' />
+                              ) : null}
+                            </Stack>
+                            {match && !isMatchLocked(match, predictionsClosed) ? (
+                              <Stack direction='row' justifyContent='flex-end'>
+                                <Button
+                                  size='small'
+                                  color='error'
+                                  variant='outlined'
+                                  disabled={deletingMatchId === prediction.matchId}
+                                  onClick={() => handleRequestDelete(prediction.matchId, match)}
+                                >
+                                  {deletingMatchId === prediction.matchId ? 'Limpiando...' : 'Limpiar pronóstico'}
+                                </Button>
+                              </Stack>
                             ) : null}
                           </Stack>
                         </Stack>
@@ -469,20 +468,6 @@ export function PredictionsPage() {
                             </Stack>
                           </Grid>
                         </Grid>
-
-                        {match && !isMatchLocked(match, predictionsClosed) ? (
-                          <Stack direction='row' justifyContent='flex-end'>
-                            <Button
-                              size='small'
-                              color='error'
-                              variant='outlined'
-                              disabled={deletingMatchId === prediction.matchId}
-                              onClick={() => handleRequestDelete(prediction.matchId, match)}
-                            >
-                              {deletingMatchId === prediction.matchId ? 'Limpiando...' : 'Limpiar pronóstico'}
-                            </Button>
-                          </Stack>
-                        ) : null}
                       </Stack>
                     </CardContent>
                   </Card>
@@ -492,7 +477,6 @@ export function PredictionsPage() {
           )}
         </>
       )}
-
       <ConfirmDeleteDialog
         open={Boolean(matchToDelete)}
         title='Limpiar pronóstico'

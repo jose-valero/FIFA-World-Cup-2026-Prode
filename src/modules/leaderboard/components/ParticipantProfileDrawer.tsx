@@ -4,8 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { supabase } from '../../../lib/supabase/client';
 import { PersonalInfoSection } from '../../profile/components/PersonalInfoSection';
-import { CompetitiveInfoSection } from '../../profile/components/CompetitiveInfoSection';
-import { PerformanceChartSection } from '../../profile/components/PerformanceChartSection';
+import { PerformanceChartSection } from '../../dashboard/components/PerformanceChartSection';
 import type { LeaderboardRow } from '../types/leaderboard.types';
 
 type ParticipantProfileDrawerProps = {
@@ -26,15 +25,10 @@ export function ParticipantProfileDrawer({
   open,
   onClose,
   participant,
-  position,
   canInspectPredictions,
   onOpenAudit
 }: ParticipantProfileDrawerProps) {
-  const {
-    data: participantProfile = null,
-    isLoading,
-    isError
-  } = useQuery({
+  const { data: participantProfile = null } = useQuery({
     queryKey: ['participant-profile', participant?.user_id ?? ''],
     queryFn: () => fetchParticipantProfile(participant!.user_id),
     enabled: open && Boolean(participant?.user_id),
@@ -63,17 +57,6 @@ export function ParticipantProfileDrawer({
               createdAt={participantProfile?.created_at ?? null}
               isDisabled={participant.is_disabled}
               readonly
-            />
-
-            <CompetitiveInfoSection
-              isLoading={isLoading}
-              isError={isError}
-              isDisabled={participant.is_disabled}
-              rank={position}
-              totalPoints={participant.total_points}
-              exactHits={participant.exact_hits}
-              outcomeHits={participant.outcome_hits}
-              scoredPredictions={participant.scored_predictions}
             />
 
             <PerformanceChartSection userId={participant.user_id} />

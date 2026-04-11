@@ -2,6 +2,7 @@ import { Box, Typography } from '@mui/material';
 import { getStageLabel } from '../utils/stages';
 import type { Match } from '../../matches/types/types';
 import { KnockoutMatchNode } from './KnockoutMatchNode';
+import { sortMatches } from '../../../shared/utils/sortMatches';
 
 interface KnockoutBracketProps {
   matches: Match[];
@@ -45,7 +46,7 @@ const Y = {
   rightSF: [382],
   rightQF: [184, 580],
   right16: [96, 272, 492, 668],
-  right32: [52, 140, 228, 316, 436, 524, 612, 700]
+  right32: [52, 140, 228, 316, 450, 535, 628, 720]
 };
 
 const LEFT_ROUND_OF_32 = ['74', '77', '73', '75', '83', '84', '81', '82'];
@@ -60,19 +61,6 @@ const RIGHT_SEMIS = ['102'];
 
 const FINAL_MATCH = ['104'];
 const THIRD_PLACE_MATCH = ['103'];
-
-function sortMatches(matches: Match[]) {
-  return [...matches].sort((a, b) => {
-    const aOrder = a.displayOrder ?? Number.MAX_SAFE_INTEGER;
-    const bOrder = b.displayOrder ?? Number.MAX_SAFE_INTEGER;
-
-    if (aOrder !== bOrder) {
-      return aOrder - bOrder;
-    }
-
-    return new Date(a.kickoffAt).getTime() - new Date(b.kickoffAt).getTime();
-  });
-}
 
 function getById(matches: Match[], id: string) {
   return matches.find((match) => match.id === id) ?? null;
