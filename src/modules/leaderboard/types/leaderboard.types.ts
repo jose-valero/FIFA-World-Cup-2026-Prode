@@ -1,3 +1,5 @@
+import type { User } from '@supabase/supabase-js';
+import type { AdminParticipantOverviewRow } from '../../admin/participants/api/adminParticipants.api';
 import type { Match } from '../../matches/types/types';
 
 export interface LeaderboardRow {
@@ -13,4 +15,18 @@ export interface LeaderboardRow {
 export interface MatchLeaderboard {
   matches: Match[];
   leaderboard: LeaderboardRow[];
+}
+
+export interface LeaderboardTableProps {
+  displayRows: LeaderboardRow[];
+  adminMap: Map<string, AdminParticipantOverviewRow>;
+  activePositionMap: Map<string, number>;
+  user: User | null;
+  isAdmin: boolean;
+  canInspectPredictions: boolean;
+  isAdminOverviewLoading: boolean;
+  isSetParticipantDisabledPending: boolean;
+  handleOpenProfile: (row: LeaderboardRow) => void;
+  handleOpenParticipantAudit: (row: LeaderboardRow) => void;
+  handleToggleParticipantStatus: (row: LeaderboardRow) => void;
 }
