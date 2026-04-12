@@ -1,4 +1,5 @@
 export const queryKeys = {
+  myProfile: (userId: string) => ['auth', 'profile', userId] as const,
   matches: ['matches'] as const,
   leaderboard: ['leaderboard'] as const,
   appSettings: ['app-settings'] as const,
