@@ -95,6 +95,18 @@ const AdminSettingsPage = lazy(() =>
   }))
 );
 
+const TeamsPage = lazy(() =>
+  import('../../modules/teams/ui/TeamsPage').then((module) => ({
+    default: module.TeamsPage
+  }))
+);
+
+const TeamDetailPage = lazy(() =>
+  import('../../modules/teams/ui/TeamDetailPage').then((module) => ({
+    default: module.TeamDetailPage
+  }))
+);
+
 function withSuspense(element: ReactNode) {
   return <Suspense fallback={<RouteFallback />}>{element}</Suspense>;
 }
@@ -104,6 +116,8 @@ export const appRouter = createBrowserRouter([
     element: <AppShellLayout />,
     children: [
       { path: routes.home, element: withSuspense(<HomePage />) },
+      { path: routes.teams, element: withSuspense(<TeamsPage />) },
+      { path: routes.teamDetail(), element: withSuspense(<TeamDetailPage />) },
       {
         element: <RequireEnabledParticipant />,
         children: [{ path: routes.leaderboard, element: withSuspense(<LeaderboardPage />) }]

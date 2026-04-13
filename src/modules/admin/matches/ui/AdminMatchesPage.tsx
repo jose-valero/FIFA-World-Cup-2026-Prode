@@ -33,7 +33,7 @@ import {
 import { getStatusLabel } from '../../../../shared/utils/getStatusLabel';
 import { getStatusColor } from '../../../../shared/utils/getStatusColor';
 import { MatchVs } from '../../../../shared/components/MatchVs';
-import { useTeams } from '../../../teams/hooks/useTeams';
+import { useTeamsCatalog } from '../../../teams/hooks/useTeamsCatalog';
 import { useCreateAdminMatch, useDeleteAdminMatch, useUpdateAdminMatch } from '../hooks/useAdminMatchMutations';
 import { useAdminMatches } from '../hooks/useAdminMatches';
 import type { AdminMatchesFormStateSchema, AdminMatchRow } from '../types/admin.match.types';
@@ -205,7 +205,7 @@ export function AdminMatchesPage() {
     error: matchesError
   } = useAdminMatches();
 
-  const { data: teams = [], isLoading: isTeamsLoading, isError: isTeamsError, error: teamsError } = useTeams();
+  const { data: teams = [], isLoading: isTeamsLoading, isError: isTeamsError, error: teamsError } = useTeamsCatalog();
 
   const createMatchMutation = useCreateAdminMatch();
   const updateMatchMutation = useUpdateAdminMatch();

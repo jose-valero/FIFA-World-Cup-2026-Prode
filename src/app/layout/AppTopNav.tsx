@@ -67,6 +67,7 @@ export default function AppTopNav() {
     { label: 'Ranking', to: routes.leaderboard },
     { label: 'Carga tu pronóstico', to: routes.predictionMatches },
     { label: 'Fixture', to: routes.fixture },
+    { label: 'Equipos', to: routes.teams },
     { label: 'Dashboard', to: routes.dashboard }
   ];
 
