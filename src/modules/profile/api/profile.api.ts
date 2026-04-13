@@ -1,4 +1,5 @@
 import { supabase } from '../../../lib/supabase/client';
+import type { Profile } from '../types/profile.types';
 
 export const AVATAR_BUCKET = 'avatars';
 export const MAX_AVATAR_FILE_SIZE_BYTES = 1_000_000;
@@ -10,6 +11,20 @@ const MIME_EXTENSION_MAP: Record<(typeof ALLOWED_AVATAR_MIME_TYPES)[number], str
   'image/webp': 'webp',
   'image/jpg': 'jpeg'
 };
+
+export async function getMyProfile(userId: string): Promise<Profile | null> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, display_name, is_admin, is_disabled, avatar_url, avatar_path, created_at, updated_at')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data ?? null;
+}
 
 export function validateAvatarFile(file: File) {
   if (!ALLOWED_AVATAR_MIME_TYPES.includes(file.type as (typeof ALLOWED_AVATAR_MIME_TYPES)[number])) {
