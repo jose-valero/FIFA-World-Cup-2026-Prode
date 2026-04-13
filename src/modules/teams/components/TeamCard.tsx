@@ -24,13 +24,7 @@ export function TeamCard({ team }: TeamCardProps) {
             <Typography variant='h6' fontWeight={800}>
               {team.name}
             </Typography>
-
-            <Stack direction='row' spacing={1} flexWrap='wrap' useFlexGap>
-              {team.code ? <Chip size='small' label={team.code} variant='outlined' /> : null}
-              {team.short_name ? <Chip size='small' label={team.short_name} variant='outlined' /> : null}
-            </Stack>
           </Stack>
-
           <Stack direction='row' justifyContent='flex-end'>
             <Button component={RouterLink} to={routes.teamDetail(team.id)} variant='outlined'>
               Ver detalle
