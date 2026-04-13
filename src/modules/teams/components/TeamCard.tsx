@@ -1,4 +1,4 @@
-import { Button, Card, CardContent, Chip, Stack, Typography } from '@mui/material';
+import { Button, Card, CardContent, Stack, Typography } from '@mui/material';
 import { Link as RouterLink } from 'react-router';
 import { routes } from '../../../app/router/routes';
 import type { TeamCatalogItem } from '../types/teams.types';
