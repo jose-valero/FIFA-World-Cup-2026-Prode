@@ -1,0 +1,11 @@
+.env.local
+.env.production
+.git
+.gitignore
+.idea
+.vscode
+tmp
+dist
+bin
+coverage
+*.log
