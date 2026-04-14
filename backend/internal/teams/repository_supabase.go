@@ -27,10 +27,11 @@ func NewSupabaseRepository(baseURL, apiKey string) *SupabaseRepository {
 }
 
 type teamCatalogRow struct {
-	ID        string  `json:"id"`
-	Code      *string `json:"code"`
-	Name      string  `json:"name"`
-	ShortName *string `json:"short_name"`
+	ID         string  `json:"id"`
+	Code       *string `json:"code"`
+	Name       string  `json:"name"`
+	ShortName  *string `json:"short_name"`
+	EspnTeamID *string `json:"espn_team_id"`
 }
 
 type matchGroupRow struct {
@@ -39,7 +40,7 @@ type matchGroupRow struct {
 
 func (r *SupabaseRepository) GetTeamCatalogByID(ctx context.Context, teamID string) (*TeamCatalogItem, error) {
 	params := url.Values{}
-	params.Set("select", "id,code,name,short_name")
+	params.Set("select", "id,code,name,short_name,espn_team_id")
 	params.Set("id", "eq."+teamID)
 	params.Set("limit", "1")
 
@@ -59,10 +60,11 @@ func (r *SupabaseRepository) GetTeamCatalogByID(ctx context.Context, teamID stri
 	fmt.Println("SUPABASE baseURL:", r.baseURL)
 
 	return &TeamCatalogItem{
-		ID:        row.ID,
-		Code:      row.Code,
-		Name:      row.Name,
-		ShortName: row.ShortName,
+		ID:         row.ID,
+		Code:       row.Code,
+		Name:       row.Name,
+		ShortName:  row.ShortName,
+		EspnTeamID: row.EspnTeamID,
 	}, nil
 
 }
@@ -112,6 +114,35 @@ func (r *SupabaseRepository) getJSON(ctx context.Context, endpoint string, targe
 
 	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (r *SupabaseRepository) SaveEspnTeamID(ctx context.Context, teamID string, espnTeamID string) error {
+	endpoint := fmt.Sprintf("%s/rest/v1/teams?id=eq.%s", r.baseURL, url.QueryEscape(teamID))
+
+	body := strings.NewReader(fmt.Sprintf(`{"espn_team_id":"%s"}`, espnTeamID))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, endpoint, body)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("apikey", r.apiKey)
+	req.Header.Set("Authorization", "Bearer "+r.apiKey)
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Prefer", "return=minimal")
+
+	res, err := r.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode >= 400 {
+		return fmt.Errorf("supabase patch request failed with status %d", res.StatusCode)
 	}
 
 	return nil

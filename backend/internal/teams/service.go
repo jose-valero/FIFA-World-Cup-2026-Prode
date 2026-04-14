@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -67,9 +68,17 @@ func (s *Service) GetTeamDetail(ctx context.Context, teamID string) (*TeamDetail
 		TeamCode:       catalog.Code,
 		TeamName:       catalog.Name,
 		TeamShortName:  catalog.ShortName,
+		ProviderTeamID: catalog.EspnTeamID,
 	})
 	if err != nil {
-		log.Printf("provider snapshot failed: teamID=%s name=%s code=%v provider=%s err=%v", catalog.ID, catalog.Name, catalog.Code, s.provider.Name(), err)
+		log.Printf(
+			"provider snapshot failed: teamID=%s name=%s code=%v provider=%s err=%v",
+			catalog.ID,
+			catalog.Name,
+			catalog.Code,
+			s.provider.Name(),
+			err,
+		)
 
 		detail := MapTeamDetailFromSnapshot(catalog, group, confederation, s.provider.Name(), nil)
 		return detail, nil
@@ -84,10 +93,35 @@ func (s *Service) GetTeamDetail(ctx context.Context, teamID string) (*TeamDetail
 		playerCount,
 	)
 
+	s.tryPersistProviderMapping(ctx, catalog, snapshot)
+
 	detail := MapTeamDetailFromSnapshot(catalog, group, confederation, s.provider.Name(), snapshot)
 	s.storeCachedDetail(teamID, detail)
 
 	return detail, nil
+}
+
+func (s *Service) tryPersistProviderMapping(ctx context.Context, catalog *TeamCatalogItem, snapshot *providers.TeamSnapshot) {
+	if s.provider.Name() != "espn" {
+		return
+	}
+
+	if snapshot == nil || snapshot.ProviderTeamID == nil || strings.TrimSpace(*snapshot.ProviderTeamID) == "" {
+		return
+	}
+
+	if catalog.EspnTeamID != nil && strings.TrimSpace(*catalog.EspnTeamID) != "" {
+		return
+	}
+
+	espnTeamID := strings.TrimSpace(*snapshot.ProviderTeamID)
+
+	if err := s.repo.SaveEspnTeamID(ctx, catalog.ID, espnTeamID); err != nil {
+		log.Printf("failed to persist espn_team_id: teamID=%s espnTeamID=%s err=%v", catalog.ID, espnTeamID, err)
+		return
+	}
+
+	log.Printf("persisted espn_team_id: teamID=%s espnTeamID=%s", catalog.ID, espnTeamID)
 }
 
 func (s *Service) getCachedDetail(teamID string) (*TeamDetail, bool) {

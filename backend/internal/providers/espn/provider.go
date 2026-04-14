@@ -49,41 +49,51 @@ func (p *TeamProvider) GetTeamSnapshot(ctx context.Context, input providers.Team
 
 	sport, league := resolveLeague(input.CompetitionKey, input.EditionKey)
 
-	teams, err := p.client.GetLeagueTeams(ctx, sport, league)
-	if err != nil {
-		if cached, ok := p.getCachedSnapshot(cacheKey); ok {
-			log.Printf("espn teams list failed, returning cached snapshot: key=%s err=%v", cacheKey, err)
-			return cached, nil
+	var teamID string
+
+	if input.ProviderTeamID != nil && strings.TrimSpace(*input.ProviderTeamID) != "" {
+		teamID = strings.TrimSpace(*input.ProviderTeamID)
+		log.Printf("espn provider using persisted team id: internalTeamID=%s espnTeamID=%s", input.InternalTeamID, teamID)
+	} else {
+		teams, err := p.client.GetLeagueTeams(ctx, sport, league)
+		if err != nil {
+			if cached, ok := p.getCachedSnapshot(cacheKey); ok {
+				log.Printf("espn teams list failed, returning cached snapshot: key=%s err=%v", cacheKey, err)
+				return cached, nil
+			}
+			return nil, err
 		}
-		return nil, err
+
+		externalTeam, ok := selectBestEspnTeam(teams, input)
+		if !ok {
+			if cached, ok := p.getCachedSnapshot(cacheKey); ok {
+				log.Printf("espn external team not resolved, returning cached snapshot: key=%s", cacheKey)
+				return cached, nil
+			}
+			return nil, ErrExternalTeamNotResolved
+		}
+
+		teamID = externalTeam.ID
+		log.Printf("espn provider resolved team id by search: internalTeamID=%s espnTeamID=%s", input.InternalTeamID, teamID)
 	}
 
-	externalTeam, ok := selectBestEspnTeam(teams, input)
-	if !ok {
-		if cached, ok := p.getCachedSnapshot(cacheKey); ok {
-			log.Printf("espn external team not resolved, returning cached snapshot: key=%s", cacheKey)
-			return cached, nil
-		}
-		return nil, ErrExternalTeamNotResolved
-	}
-
-	teamDetail, err := p.client.GetTeamDetail(ctx, sport, league, externalTeam.ID)
+	teamDetail, err := p.client.GetTeamDetail(ctx, sport, league, teamID)
 	if err != nil {
 		if cached, ok := p.getCachedSnapshot(cacheKey); ok {
-			log.Printf("espn team detail failed, returning cached snapshot: key=%s teamID=%s err=%v", cacheKey, externalTeam.ID, err)
+			log.Printf("espn team detail failed, returning cached snapshot: key=%s teamID=%s err=%v", cacheKey, teamID, err)
 			return cached, nil
 		}
 		return nil, err
 	}
 
 	if teamDetail == nil {
-		teamDetail = &externalTeam
+		return nil, ErrExternalTeamNotResolved
 	}
 
-	roster, err := p.client.GetTeamRoster(ctx, sport, league, externalTeam.ID)
+	roster, err := p.client.GetTeamRoster(ctx, sport, league, teamID)
 	if err != nil {
 		if cached, ok := p.getCachedSnapshot(cacheKey); ok {
-			log.Printf("espn roster failed, returning cached snapshot: key=%s teamID=%s err=%v", cacheKey, externalTeam.ID, err)
+			log.Printf("espn roster failed, returning cached snapshot: key=%s teamID=%s err=%v", cacheKey, teamID, err)
 			return cached, nil
 		}
 

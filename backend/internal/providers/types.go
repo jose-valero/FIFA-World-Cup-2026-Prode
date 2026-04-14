@@ -10,6 +10,7 @@ type TeamLookupInput struct {
 	TeamCode       *string
 	TeamName       string
 	TeamShortName  *string
+	ProviderTeamID *string
 }
 
 type Player struct {

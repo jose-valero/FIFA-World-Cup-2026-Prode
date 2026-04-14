@@ -3,10 +3,11 @@ package teams
 import "time"
 
 type TeamCatalogItem struct {
-	ID        string
-	Code      *string
-	Name      string
-	ShortName *string
+	ID         string
+	Code       *string
+	Name       string
+	ShortName  *string
+	EspnTeamID *string
 }
 
 type TeamConfederation struct {
