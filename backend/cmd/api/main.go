@@ -4,18 +4,19 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/joho/godotenv"
 
-	"quiniela-backend/internal/apisports"
+	apisportsclient "quiniela-backend/internal/apisports"
+	"quiniela-backend/internal/providers"
+	providerapisports "quiniela-backend/internal/providers/apisports"
+	providerespn "quiniela-backend/internal/providers/espn"
 	"quiniela-backend/internal/teams"
 )
 
 func main() {
 	loadEnv()
-
-	apiSportsBaseURL := mustGetEnv("API_SPORTS_BASE_URL")
-	apiSportsKey := mustGetEnv("API_SPORTS_KEY")
 
 	supabaseURL := mustGetEnv("SUPABASE_URL")
 	supabaseServiceRoleKey := mustGetEnv("SUPABASE_SERVICE_ROLE_KEY")
@@ -25,10 +26,10 @@ func main() {
 		port = "8080"
 	}
 
-	apiSportsClient := apisports.NewClient(apiSportsBaseURL, apiSportsKey)
 	repo := teams.NewSupabaseRepository(supabaseURL, supabaseServiceRoleKey)
+	teamProvider := buildTeamProvider()
 
-	service := teams.NewService(repo, apiSportsClient)
+	service := teams.NewService(repo, teamProvider)
 	handler := teams.NewHandler(service)
 
 	mux := http.NewServeMux()
@@ -41,11 +42,33 @@ func main() {
 	mux.HandleFunc("GET /api/v1/teams/", handler.GetTeamDetail)
 
 	log.Printf("backend escuchando en http://localhost:%s", port)
+	log.Printf("team provider activo: %s", teamProvider.Name())
 
 	if err := http.ListenAndServe(":"+port, withCORS(mux)); err != nil {
 		log.Fatal(err)
 	}
+}
 
+func buildTeamProvider() providers.TeamProvider {
+	providerName := strings.TrimSpace(strings.ToLower(os.Getenv("TEAM_PROVIDER")))
+	if providerName == "" {
+		log.Fatal("missing required env: TEAM_PROVIDER")
+	}
+
+	switch providerName {
+	case "espn":
+		espnBaseURL := mustGetEnv("ESPN_SITE_API_BASE")
+		espnClient := providerespn.NewClient(espnBaseURL)
+		return providerespn.NewTeamProvider(espnClient)
+
+	case "apisports":
+		fallthrough
+	default:
+		apiSportsBaseURL := mustGetEnv("API_SPORTS_BASE_URL")
+		apiSportsKey := mustGetEnv("API_SPORTS_KEY")
+		apiSportsClient := apisportsclient.NewClient(apiSportsBaseURL, apiSportsKey)
+		return providerapisports.NewTeamProvider(apiSportsClient)
+	}
 }
 
 func loadEnv() {

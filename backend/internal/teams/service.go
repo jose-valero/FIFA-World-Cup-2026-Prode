@@ -4,15 +4,13 @@ import (
 	"context"
 	"errors"
 	"log"
-	"strings"
 	"sync"
 	"time"
 
-	"quiniela-backend/internal/apisports"
+	"quiniela-backend/internal/providers"
 )
 
 var ErrTeamNotFound = errors.New("team not found")
-var ErrExternalTeamNotResolved = errors.New("external team not resolved")
 
 type cachedTeamDetail struct {
 	detail    *TeamDetail
@@ -20,18 +18,18 @@ type cachedTeamDetail struct {
 }
 
 type Service struct {
-	repo      Repository
-	apiClient *apisports.Client
+	repo     Repository
+	provider providers.TeamProvider
 
 	cacheMu     sync.RWMutex
 	detailCache map[string]cachedTeamDetail
 	cacheTTL    time.Duration
 }
 
-func NewService(repo Repository, apiClient *apisports.Client) *Service {
+func NewService(repo Repository, provider providers.TeamProvider) *Service {
 	return &Service{
 		repo:        repo,
-		apiClient:   apiClient,
+		provider:    provider,
 		detailCache: make(map[string]cachedTeamDetail),
 		cacheTTL:    10 * time.Minute,
 	}
@@ -39,7 +37,7 @@ func NewService(repo Repository, apiClient *apisports.Client) *Service {
 
 func (s *Service) GetTeamDetail(ctx context.Context, teamID string) (*TeamDetail, error) {
 	if cached, ok := s.getCachedDetail(teamID); ok {
-		log.Printf("teams detail cache hit: teamID=%s", teamID)
+		log.Printf("teams detail cache hit: teamID=%s provider=%s", teamID, s.provider.Name())
 		return cached, nil
 	}
 
@@ -53,7 +51,7 @@ func (s *Service) GetTeamDetail(ctx context.Context, teamID string) (*TeamDetail
 		return nil, ErrTeamNotFound
 	}
 
-	log.Printf("team detail request: teamID=%s name=%s code=%v", catalog.ID, catalog.Name, catalog.Code)
+	log.Printf("team detail request: teamID=%s name=%s code=%v provider=%s", catalog.ID, catalog.Name, catalog.Code, s.provider.Name())
 
 	var group *string
 	if catalog.Code != nil {
@@ -62,122 +60,34 @@ func (s *Service) GetTeamDetail(ctx context.Context, teamID string) (*TeamDetail
 
 	confederation := ResolveConfederation(catalog.Code)
 
-	externalTeam, err := s.resolveExternalTeam(ctx, catalog)
+	snapshot, err := s.provider.GetTeamSnapshot(ctx, providers.TeamLookupInput{
+		CompetitionKey: "world_cup",
+		EditionKey:     "2026",
+		InternalTeamID: catalog.ID,
+		TeamCode:       catalog.Code,
+		TeamName:       catalog.Name,
+		TeamShortName:  catalog.ShortName,
+	})
 	if err != nil {
-		log.Printf("resolveExternalTeam failed: teamID=%s name=%s code=%v err=%v", catalog.ID, catalog.Name, catalog.Code, err)
-		return MapTeamDetail(catalog, group, confederation, nil, nil), nil
-	}
+		log.Printf("provider snapshot failed: teamID=%s name=%s code=%v provider=%s err=%v", catalog.ID, catalog.Name, catalog.Code, s.provider.Name(), err)
 
-	log.Printf(
-		"resolved external team: teamID=%s externalTeamID=%d externalName=%s externalCode=%v national=%v",
-		catalog.ID,
-		externalTeam.Team.ID,
-		externalTeam.Team.Name,
-		externalTeam.Team.Code,
-		externalTeam.Team.National,
-	)
-
-	squad, err := s.apiClient.GetSquadByTeamID(ctx, externalTeam.Team.ID)
-	if err != nil {
-		log.Printf("get squad failed: teamID=%s externalTeamID=%d err=%v", catalog.ID, externalTeam.Team.ID, err)
-
-		detail := MapTeamDetail(catalog, group, confederation, externalTeam, nil)
-		s.storeCachedDetail(teamID, detail)
+		detail := MapTeamDetailFromSnapshot(catalog, group, confederation, s.provider.Name(), nil)
 		return detail, nil
 	}
 
-	playerCount := 0
-	if squad != nil && len(squad.Response) > 0 {
-		playerCount = len(squad.Response[0].Players)
-	}
+	playerCount := len(snapshot.Players)
+	log.Printf(
+		"provider snapshot loaded: teamID=%s provider=%s providerTeamID=%v players=%d",
+		catalog.ID,
+		s.provider.Name(),
+		snapshot.ProviderTeamID,
+		playerCount,
+	)
 
-	log.Printf("squad loaded: teamID=%s externalTeamID=%d players=%d", catalog.ID, externalTeam.Team.ID, playerCount)
-
-	detail := MapTeamDetail(catalog, group, confederation, externalTeam, squad)
+	detail := MapTeamDetailFromSnapshot(catalog, group, confederation, s.provider.Name(), snapshot)
 	s.storeCachedDetail(teamID, detail)
 
 	return detail, nil
-}
-
-func (s *Service) resolveExternalTeam(ctx context.Context, catalog *TeamCatalogItem) (*apisports.TeamSearchResult, error) {
-	resp, err := s.apiClient.GetTeamsBySearch(ctx, catalog.Name)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(resp.Response) == 0 {
-		return nil, ErrExternalTeamNotResolved
-	}
-
-	best, ok := selectBestExternalTeam(resp.Response, catalog)
-	if !ok {
-		return nil, ErrExternalTeamNotResolved
-	}
-
-	return best, nil
-}
-
-func selectBestExternalTeam(candidates []apisports.TeamSearchResult, catalog *TeamCatalogItem) (*apisports.TeamSearchResult, bool) {
-	if len(candidates) == 0 {
-		return nil, false
-	}
-
-	bestIndex := -1
-	bestScore := -1
-
-	for i, candidate := range candidates {
-		score := scoreExternalTeamCandidate(candidate, catalog)
-
-		if score > bestScore {
-			bestScore = score
-			bestIndex = i
-		}
-	}
-
-	if bestIndex < 0 || bestScore < 50 {
-		return nil, false
-	}
-
-	return &candidates[bestIndex], true
-}
-
-func scoreExternalTeamCandidate(candidate apisports.TeamSearchResult, catalog *TeamCatalogItem) int {
-	score := 0
-
-	if catalog.Code != nil && candidate.Team.Code != nil && strings.EqualFold(*catalog.Code, *candidate.Team.Code) {
-		score += 100
-	}
-
-	if candidate.Team.National != nil && *candidate.Team.National {
-		score += 40
-	}
-
-	if normalize(candidate.Team.Name) == normalize(catalog.Name) {
-		score += 60
-	}
-
-	if candidate.Team.Country != nil && normalize(*candidate.Team.Country) == normalize(catalog.Name) {
-		score += 20
-	}
-
-	if catalog.ShortName != nil && normalize(candidate.Team.Name) == normalize(*catalog.ShortName) {
-		score += 20
-	}
-
-	return score
-}
-
-func normalize(value string) string {
-	value = strings.TrimSpace(strings.ToLower(value))
-	replacer := strings.NewReplacer(
-		"á", "a",
-		"é", "e",
-		"í", "i",
-		"ó", "o",
-		"ú", "u",
-		"ü", "u",
-	)
-	return replacer.Replace(value)
 }
 
 func (s *Service) getCachedDetail(teamID string) (*TeamDetail, bool) {

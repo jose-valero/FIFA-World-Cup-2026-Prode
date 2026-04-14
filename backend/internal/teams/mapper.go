@@ -1,17 +1,18 @@
 package teams
 
 import (
-	"quiniela-backend/internal/apisports"
 	"strconv"
 	"time"
+
+	"quiniela-backend/internal/providers"
 )
 
-func MapTeamDetail(
+func MapTeamDetailFromSnapshot(
 	catalog *TeamCatalogItem,
 	group *string,
 	confederation TeamConfederation,
-	teamResult *apisports.TeamSearchResult,
-	squad *apisports.SquadResponse,
+	providerName string,
+	snapshot *providers.TeamSnapshot,
 ) *TeamDetail {
 	detail := &TeamDetail{
 		ID:        catalog.ID,
@@ -25,36 +26,45 @@ func MapTeamDetail(
 		},
 		Players: []TeamPlayer{},
 		Source: TeamDetailSource{
-			Provider:  "api-sports",
+			Provider:  providerName,
 			FetchedAt: time.Now().UTC(),
 		},
 	}
 
-	if teamResult != nil {
-		detail.Source.ExternalTeamID = &teamResult.Team.ID
-		detail.Country = teamResult.Team.Country
-		detail.LogoURL = teamResult.Team.Logo
-		detail.Founded = teamResult.Team.Founded
-		detail.National = teamResult.Team.National
-		detail.Venue = TeamVenue{
-			Name: teamResult.Venue.Name,
-			City: teamResult.Venue.City,
+	if snapshot == nil {
+		return detail
+	}
+
+	if snapshot.Provider != "" {
+		detail.Source.Provider = snapshot.Provider
+	}
+
+	if snapshot.ProviderTeamID != nil {
+		if parsedID, err := strconv.Atoi(*snapshot.ProviderTeamID); err == nil {
+			detail.Source.ExternalTeamID = &parsedID
 		}
 	}
 
-	if squad != nil && len(squad.Response) > 0 {
-		for _, p := range squad.Response[0].Players {
-			playerID := strconv.Itoa(p.ID)
+	detail.Country = snapshot.Country
+	detail.LogoURL = snapshot.LogoURL
+	detail.Founded = snapshot.Founded
+	detail.National = snapshot.National
+	detail.Venue = TeamVenue{
+		Name: snapshot.VenueName,
+		City: snapshot.VenueCity,
+	}
 
-			detail.Players = append(detail.Players, TeamPlayer{
-				ID:       playerID,
-				Name:     p.Name,
-				Age:      p.Age,
-				Number:   p.Number,
-				Position: p.Position,
-				PhotoURL: p.Photo,
-			})
-		}
+	for _, player := range snapshot.Players {
+		detail.Players = append(detail.Players, TeamPlayer{
+			ID:        player.ProviderPlayerID,
+			Name:      player.Name,
+			FirstName: player.FirstName,
+			LastName:  player.LastName,
+			Age:       player.Age,
+			Number:    player.Number,
+			Position:  player.Position,
+			PhotoURL:  player.PhotoURL,
+		})
 	}
 
 	return detail
