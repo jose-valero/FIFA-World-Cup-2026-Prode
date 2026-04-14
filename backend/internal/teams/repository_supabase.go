@@ -147,3 +147,31 @@ func (r *SupabaseRepository) SaveEspnTeamID(ctx context.Context, teamID string, 
 
 	return nil
 }
+
+func (r *SupabaseRepository) ListTeamsWithoutEspnMapping(ctx context.Context) ([]TeamCatalogItem, error) {
+	params := url.Values{}
+	params.Set("select", "id,code,name,short_name,espn_team_id")
+	params.Set("or", "(espn_team_id.is.null,espn_team_id.eq.)")
+	params.Set("order", "name.asc")
+
+	endpoint := fmt.Sprintf("%s/rest/v1/teams?%s", r.baseURL, params.Encode())
+
+	var rows []teamCatalogRow
+	if err := r.getJSON(ctx, endpoint, &rows); err != nil {
+		return nil, err
+	}
+
+	result := make([]TeamCatalogItem, 0, len(rows))
+
+	for _, row := range rows {
+		result = append(result, TeamCatalogItem{
+			ID:         row.ID,
+			Code:       row.Code,
+			Name:       row.Name,
+			ShortName:  row.ShortName,
+			EspnTeamID: row.EspnTeamID,
+		})
+	}
+
+	return result, nil
+}
