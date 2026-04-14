@@ -3,21 +3,35 @@ package espn
 import (
 	"context"
 	"errors"
+	"log"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"quiniela-backend/internal/providers"
 )
 
 var ErrExternalTeamNotResolved = errors.New("espn external team not resolved")
 
+type cachedSnapshot struct {
+	value     *providers.TeamSnapshot
+	expiresAt time.Time
+}
+
 type TeamProvider struct {
 	client *Client
+
+	cacheMu sync.RWMutex
+	cache   map[string]cachedSnapshot
+	ttl     time.Duration
 }
 
 func NewTeamProvider(client *Client) *TeamProvider {
 	return &TeamProvider{
 		client: client,
+		cache:  make(map[string]cachedSnapshot),
+		ttl:    10 * time.Minute,
 	}
 }
 
@@ -26,20 +40,39 @@ func (p *TeamProvider) Name() string {
 }
 
 func (p *TeamProvider) GetTeamSnapshot(ctx context.Context, input providers.TeamLookupInput) (*providers.TeamSnapshot, error) {
+	cacheKey := buildCacheKey(input)
+
+	if cached, ok := p.getCachedSnapshot(cacheKey); ok {
+		log.Printf("espn provider cache hit: key=%s", cacheKey)
+		return cached, nil
+	}
+
 	sport, league := resolveLeague(input.CompetitionKey, input.EditionKey)
 
 	teams, err := p.client.GetLeagueTeams(ctx, sport, league)
 	if err != nil {
+		if cached, ok := p.getCachedSnapshot(cacheKey); ok {
+			log.Printf("espn teams list failed, returning cached snapshot: key=%s err=%v", cacheKey, err)
+			return cached, nil
+		}
 		return nil, err
 	}
 
 	externalTeam, ok := selectBestEspnTeam(teams, input)
 	if !ok {
+		if cached, ok := p.getCachedSnapshot(cacheKey); ok {
+			log.Printf("espn external team not resolved, returning cached snapshot: key=%s", cacheKey)
+			return cached, nil
+		}
 		return nil, ErrExternalTeamNotResolved
 	}
 
 	teamDetail, err := p.client.GetTeamDetail(ctx, sport, league, externalTeam.ID)
 	if err != nil {
+		if cached, ok := p.getCachedSnapshot(cacheKey); ok {
+			log.Printf("espn team detail failed, returning cached snapshot: key=%s teamID=%s err=%v", cacheKey, externalTeam.ID, err)
+			return cached, nil
+		}
 		return nil, err
 	}
 
@@ -49,15 +82,23 @@ func (p *TeamProvider) GetTeamSnapshot(ctx context.Context, input providers.Team
 
 	roster, err := p.client.GetTeamRoster(ctx, sport, league, externalTeam.ID)
 	if err != nil {
-		return mapTeamSnapshot(teamDetail, nil), nil
+		if cached, ok := p.getCachedSnapshot(cacheKey); ok {
+			log.Printf("espn roster failed, returning cached snapshot: key=%s teamID=%s err=%v", cacheKey, externalTeam.ID, err)
+			return cached, nil
+		}
+
+		snapshot := mapTeamSnapshot(teamDetail, nil)
+		p.storeSnapshot(cacheKey, snapshot)
+		return snapshot, nil
 	}
 
-	return mapTeamSnapshot(teamDetail, roster), nil
+	snapshot := mapTeamSnapshot(teamDetail, roster)
+	p.storeSnapshot(cacheKey, snapshot)
+
+	return snapshot, nil
 }
 
 func resolveLeague(competitionKey, editionKey string) (string, string) {
-	// Por ahora solo World Cup 2026.
-	// Ya está preparado para crecer luego.
 	switch competitionKey {
 	case "world_cup":
 		return "soccer", "fifa.world"
@@ -152,6 +193,46 @@ func mapTeamSnapshot(team *espnTeam, athletes []espnAthlete) *providers.TeamSnap
 	}
 
 	return snapshot
+}
+
+func buildCacheKey(input providers.TeamLookupInput) string {
+	parts := []string{
+		strings.TrimSpace(strings.ToLower(input.CompetitionKey)),
+		strings.TrimSpace(strings.ToLower(input.EditionKey)),
+		strings.TrimSpace(strings.ToLower(input.InternalTeamID)),
+	}
+
+	return strings.Join(parts, "::")
+}
+
+func (p *TeamProvider) getCachedSnapshot(key string) (*providers.TeamSnapshot, bool) {
+	p.cacheMu.RLock()
+	defer p.cacheMu.RUnlock()
+
+	entry, ok := p.cache[key]
+	if !ok {
+		return nil, false
+	}
+
+	if time.Now().After(entry.expiresAt) {
+		return nil, false
+	}
+
+	return entry.value, true
+}
+
+func (p *TeamProvider) storeSnapshot(key string, snapshot *providers.TeamSnapshot) {
+	if snapshot == nil || snapshot.ProviderTeamID == nil || strings.TrimSpace(*snapshot.ProviderTeamID) == "" {
+		return
+	}
+
+	p.cacheMu.Lock()
+	defer p.cacheMu.Unlock()
+
+	p.cache[key] = cachedSnapshot{
+		value:     snapshot,
+		expiresAt: time.Now().Add(p.ttl),
+	}
 }
 
 func parseOptionalInt(value *string) *int {
