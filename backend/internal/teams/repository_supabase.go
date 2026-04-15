@@ -27,11 +27,15 @@ func NewSupabaseRepository(baseURL, apiKey string) *SupabaseRepository {
 }
 
 type teamCatalogRow struct {
-	ID         string  `json:"id"`
-	Code       *string `json:"code"`
-	Name       string  `json:"name"`
-	ShortName  *string `json:"short_name"`
-	EspnTeamID *string `json:"espn_team_id"`
+	ID          string  `json:"id"`
+	Code        *string `json:"code"`
+	Name        string  `json:"name"`
+	ShortName   *string `json:"short_name"`
+	EspnTeamID  *string `json:"espn_team_id"`
+	CountryName *string `json:"country_name"`
+	FlagCode    *string `json:"flag_code"`
+	IsNational  *bool   `json:"is_national"`
+	TeamLogoURL *string `json:"team_logo_url"`
 }
 
 type matchGroupRow struct {
@@ -40,7 +44,7 @@ type matchGroupRow struct {
 
 func (r *SupabaseRepository) GetTeamCatalogByID(ctx context.Context, teamID string) (*TeamCatalogItem, error) {
 	params := url.Values{}
-	params.Set("select", "id,code,name,short_name,espn_team_id")
+	params.Set("select", "id,code,name,short_name,espn_team_id,country_name,flag_code,is_national,team_logo_url")
 	params.Set("id", "eq."+teamID)
 	params.Set("limit", "1")
 
@@ -60,11 +64,15 @@ func (r *SupabaseRepository) GetTeamCatalogByID(ctx context.Context, teamID stri
 	fmt.Println("SUPABASE baseURL:", r.baseURL)
 
 	return &TeamCatalogItem{
-		ID:         row.ID,
-		Code:       row.Code,
-		Name:       row.Name,
-		ShortName:  row.ShortName,
-		EspnTeamID: row.EspnTeamID,
+		ID:          row.ID,
+		Code:        row.Code,
+		Name:        row.Name,
+		ShortName:   row.ShortName,
+		EspnTeamID:  row.EspnTeamID,
+		CountryName: row.CountryName,
+		FlagCode:    row.FlagCode,
+		IsNational:  row.IsNational,
+		TeamLogoURL: row.TeamLogoURL,
 	}, nil
 
 }
@@ -150,7 +158,7 @@ func (r *SupabaseRepository) SaveEspnTeamID(ctx context.Context, teamID string, 
 
 func (r *SupabaseRepository) ListTeamsWithoutEspnMapping(ctx context.Context) ([]TeamCatalogItem, error) {
 	params := url.Values{}
-	params.Set("select", "id,code,name,short_name,espn_team_id")
+	params.Set("select", "id,code,name,short_name,espn_team_id,country_name,flag_code,is_national,team_logo_url")
 	params.Set("or", "(espn_team_id.is.null,espn_team_id.eq.)")
 	params.Set("order", "name.asc")
 
@@ -165,11 +173,15 @@ func (r *SupabaseRepository) ListTeamsWithoutEspnMapping(ctx context.Context) ([
 
 	for _, row := range rows {
 		result = append(result, TeamCatalogItem{
-			ID:         row.ID,
-			Code:       row.Code,
-			Name:       row.Name,
-			ShortName:  row.ShortName,
-			EspnTeamID: row.EspnTeamID,
+			ID:          row.ID,
+			Code:        row.Code,
+			Name:        row.Name,
+			ShortName:   row.ShortName,
+			EspnTeamID:  row.EspnTeamID,
+			CountryName: row.CountryName,
+			FlagCode:    row.FlagCode,
+			IsNational:  row.IsNational,
+			TeamLogoURL: row.TeamLogoURL,
 		})
 	}
 

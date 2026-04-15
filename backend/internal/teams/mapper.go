@@ -20,6 +20,7 @@ func MapTeamDetailFromSnapshot(
 		Name:      catalog.Name,
 		ShortName: catalog.ShortName,
 		Group:     group,
+		FlagCode:  catalog.FlagCode,
 		Confederation: TeamConfederation{
 			Code:  confederation.Code,
 			Label: confederation.Label,
@@ -32,6 +33,9 @@ func MapTeamDetailFromSnapshot(
 	}
 
 	if snapshot == nil {
+		detail.Country = catalog.CountryName
+		detail.LogoURL = catalog.TeamLogoURL
+		detail.National = catalog.IsNational
 		return detail
 	}
 
@@ -45,10 +49,11 @@ func MapTeamDetailFromSnapshot(
 		}
 	}
 
-	detail.Country = snapshot.Country
-	detail.LogoURL = snapshot.LogoURL
+	detail.Country = firstString(catalog.CountryName, snapshot.Country)
+	detail.LogoURL = firstString(catalog.TeamLogoURL, snapshot.LogoURL)
+	detail.National = firstBool(catalog.IsNational, snapshot.National)
+
 	detail.Founded = snapshot.Founded
-	detail.National = snapshot.National
 	detail.Venue = TeamVenue{
 		Name: snapshot.VenueName,
 		City: snapshot.VenueCity,
@@ -68,4 +73,22 @@ func MapTeamDetailFromSnapshot(
 	}
 
 	return detail
+}
+
+func firstString(values ...*string) *string {
+	for _, value := range values {
+		if value != nil && *value != "" {
+			return value
+		}
+	}
+	return nil
+}
+
+func firstBool(values ...*bool) *bool {
+	for _, value := range values {
+		if value != nil {
+			return value
+		}
+	}
+	return nil
 }

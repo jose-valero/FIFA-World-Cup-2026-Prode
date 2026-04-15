@@ -3,11 +3,15 @@ package teams
 import "time"
 
 type TeamCatalogItem struct {
-	ID         string
-	Code       *string
-	Name       string
-	ShortName  *string
-	EspnTeamID *string
+	ID          string
+	Code        *string
+	Name        string
+	ShortName   *string
+	EspnTeamID  *string
+	CountryName *string
+	FlagCode    *string
+	IsNational  *bool
+	TeamLogoURL *string
 }
 
 type TeamConfederation struct {
@@ -37,6 +41,7 @@ type TeamDetail struct {
 	Name          string            `json:"name"`
 	ShortName     *string           `json:"shortName"`
 	Group         *string           `json:"group"`
+	FlagCode      *string           `json:"flagCode"`
 	Confederation TeamConfederation `json:"confederation"`
 	Country       *string           `json:"country"`
 	LogoURL       *string           `json:"logoUrl"`

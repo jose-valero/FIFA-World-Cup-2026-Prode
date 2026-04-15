@@ -10,6 +10,32 @@ import (
 	"time"
 )
 
+type athleteResponse struct {
+	Athlete espnAthleteDetail `json:"athlete"`
+}
+
+type espnAthleteDetail struct {
+	ID          string  `json:"id"`
+	DisplayName *string `json:"displayName"`
+	FirstName   *string `json:"firstName"`
+	LastName    *string `json:"lastName"`
+	Age         *int    `json:"age"`
+	Jersey      *string `json:"jersey"`
+	Position    *struct {
+		DisplayName *string `json:"displayName"`
+	} `json:"position"`
+	Headshot *struct {
+		Href *string `json:"href"`
+	} `json:"headshot"`
+	BirthPlace *struct {
+		City    *string `json:"city"`
+		Country *string `json:"country"`
+	} `json:"birthPlace"`
+	DateOfBirth   *string `json:"dateOfBirth"`
+	DisplayHeight *string `json:"displayHeight"`
+	DisplayWeight *string `json:"displayWeight"`
+}
+
 type StatusError struct {
 	Endpoint string
 	Status   int
@@ -170,4 +196,19 @@ func (c *Client) getJSON(ctx context.Context, endpoint string, target any) error
 	}
 
 	return nil
+}
+
+func (c *Client) GetAthleteDetail(ctx context.Context, sport, league, athleteID string) (*espnAthleteDetail, error) {
+	endpoint := fmt.Sprintf("%s/sports/%s/%s/athletes/%s", c.baseURL, sport, league, athleteID)
+
+	var payload athleteResponse
+	if err := c.getJSON(ctx, endpoint, &payload); err != nil {
+		return nil, err
+	}
+
+	if payload.Athlete.ID == "" {
+		return nil, nil
+	}
+
+	return &payload.Athlete, nil
 }

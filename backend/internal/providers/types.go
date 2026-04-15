@@ -41,7 +41,34 @@ type TeamSnapshot struct {
 	Players []Player
 }
 
+type PlayerLookupInput struct {
+	CompetitionKey   string
+	EditionKey       string
+	InternalTeamID   string
+	ProviderTeamID   *string
+	ProviderPlayerID string
+}
+
+type PlayerSnapshot struct {
+	Provider         string
+	ProviderPlayerID string
+
+	Name        string
+	DisplayName *string
+	FirstName   *string
+	LastName    *string
+	Age         *int
+	Number      *int
+	Position    *string
+	PhotoURL    *string
+	BirthPlace  *string
+	BirthDate   *string
+	Height      *string
+	Weight      *string
+}
+
 type TeamProvider interface {
 	Name() string
 	GetTeamSnapshot(ctx context.Context, input TeamLookupInput) (*TeamSnapshot, error)
+	GetPlayerSnapshot(ctx context.Context, input PlayerLookupInput) (*PlayerSnapshot, error)
 }

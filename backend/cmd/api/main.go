@@ -8,9 +8,7 @@ import (
 
 	"github.com/joho/godotenv"
 
-	apisportsclient "quiniela-backend/internal/apisports"
 	"quiniela-backend/internal/providers"
-	providerapisports "quiniela-backend/internal/providers/apisports"
 	providerespn "quiniela-backend/internal/providers/espn"
 	"quiniela-backend/internal/teams"
 )
@@ -39,7 +37,16 @@ func main() {
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	mux.HandleFunc("GET /api/v1/teams/", handler.GetTeamDetail)
+	mux.HandleFunc("GET /api/v1/teams/", func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+
+		if strings.Contains(path, "/players/") && strings.HasSuffix(path, "/detail") {
+			handler.GetPlayerDetail(w, r)
+			return
+		}
+
+		handler.GetTeamDetail(w, r)
+	})
 
 	log.Printf("backend escuchando en http://localhost:%s", port)
 	log.Printf("team provider activo: %s", teamProvider.Name())
@@ -50,10 +57,7 @@ func main() {
 }
 
 func buildTeamProvider() providers.TeamProvider {
-	providerName := strings.TrimSpace(strings.ToLower(os.Getenv("TEAM_PROVIDER")))
-	if providerName == "" {
-		log.Fatal("missing required env: TEAM_PROVIDER")
-	}
+	providerName := strings.TrimSpace(strings.ToLower(mustGetEnv("TEAM_PROVIDER")))
 
 	switch providerName {
 	case "espn":
@@ -61,13 +65,9 @@ func buildTeamProvider() providers.TeamProvider {
 		espnClient := providerespn.NewClient(espnBaseURL)
 		return providerespn.NewTeamProvider(espnClient)
 
-	case "apisports":
-		fallthrough
 	default:
-		apiSportsBaseURL := mustGetEnv("API_SPORTS_BASE_URL")
-		apiSportsKey := mustGetEnv("API_SPORTS_KEY")
-		apiSportsClient := apisportsclient.NewClient(apiSportsBaseURL, apiSportsKey)
-		return providerapisports.NewTeamProvider(apiSportsClient)
+		log.Fatalf("unsupported TEAM_PROVIDER: %s", providerName)
+		return nil
 	}
 }
 
@@ -77,11 +77,13 @@ func loadEnv() {
 		envFile = ".env.local"
 	}
 
-	_ = godotenv.Load(envFile)
+	if err := godotenv.Load(envFile); err != nil {
+		log.Printf("warning: could not load env file %s: %v", envFile, err)
+	}
 }
 
 func mustGetEnv(key string) string {
-	value := os.Getenv(key)
+	value := strings.TrimSpace(os.Getenv(key))
 	if value == "" {
 		log.Fatalf("missing required env: %s", key)
 	}

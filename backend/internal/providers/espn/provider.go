@@ -302,3 +302,74 @@ func normalize(value string) string {
 	)
 	return replacer.Replace(value)
 }
+
+func (p *TeamProvider) GetPlayerSnapshot(ctx context.Context, input providers.PlayerLookupInput) (*providers.PlayerSnapshot, error) {
+	sport, league := resolveLeague(input.CompetitionKey, input.EditionKey)
+
+	athlete, err := p.client.GetAthleteDetail(ctx, sport, league, input.ProviderPlayerID)
+	if err != nil {
+		var statusErr *StatusError
+		if errors.As(err, &statusErr) && statusErr.Status == 404 {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	if athlete == nil {
+		return nil, nil
+	}
+
+	var number *int
+	if athlete.Jersey != nil && strings.TrimSpace(*athlete.Jersey) != "" {
+		if parsed, err := strconv.Atoi(strings.TrimSpace(*athlete.Jersey)); err == nil {
+			number = &parsed
+		}
+	}
+
+	var position *string
+	if athlete.Position != nil {
+		position = athlete.Position.DisplayName
+	}
+
+	var photoURL *string
+	if athlete.Headshot != nil {
+		photoURL = athlete.Headshot.Href
+	}
+
+	var birthPlace *string
+	if athlete.BirthPlace != nil {
+		parts := []string{}
+		if athlete.BirthPlace.City != nil && strings.TrimSpace(*athlete.BirthPlace.City) != "" {
+			parts = append(parts, strings.TrimSpace(*athlete.BirthPlace.City))
+		}
+		if athlete.BirthPlace.Country != nil && strings.TrimSpace(*athlete.BirthPlace.Country) != "" {
+			parts = append(parts, strings.TrimSpace(*athlete.BirthPlace.Country))
+		}
+		if len(parts) > 0 {
+			value := strings.Join(parts, ", ")
+			birthPlace = &value
+		}
+	}
+
+	name := ""
+	if athlete.DisplayName != nil {
+		name = *athlete.DisplayName
+	}
+
+	return &providers.PlayerSnapshot{
+		Provider:         "espn",
+		ProviderPlayerID: athlete.ID,
+		Name:             name,
+		DisplayName:      athlete.DisplayName,
+		FirstName:        athlete.FirstName,
+		LastName:         athlete.LastName,
+		Age:              athlete.Age,
+		Number:           number,
+		Position:         position,
+		PhotoURL:         photoURL,
+		BirthPlace:       birthPlace,
+		BirthDate:        athlete.DateOfBirth,
+		Height:           athlete.DisplayHeight,
+		Weight:           athlete.DisplayWeight,
+	}, nil
+}
