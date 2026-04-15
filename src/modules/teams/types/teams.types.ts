@@ -36,16 +36,40 @@ export type TeamDetail = {
   name: string;
   shortName: string | null;
   group: string | null;
-  confederation: TeamConfederation;
+  flagCode: string | null;
+  confederation: {
+    code: string | null;
+    label: string | null;
+  };
   country: string | null;
   logoUrl: string | null;
   founded: number | null;
   national: boolean | null;
-  venue: TeamVenue;
+  venue: {
+    name: string | null;
+    city: string | null;
+  };
   players: TeamPlayer[];
   source: {
     provider: string;
     externalTeamId: number | null;
     fetchedAt: string;
   };
+};
+
+export type TeamPlayerDetail = {
+  id: string;
+  name: string;
+  displayName: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  age: number | null;
+  number: number | null;
+  position: string | null;
+  photoUrl: string | null;
+  birthPlace: string | null;
+  birthDate: string | null;
+  height: string | null;
+  weight: string | null;
+  provider: string;
 };

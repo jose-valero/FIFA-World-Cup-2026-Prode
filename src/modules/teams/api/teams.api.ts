@@ -1,5 +1,5 @@
 import { supabase } from '../../../lib/supabase/client';
-import type { TeamCatalogItem, TeamDetail } from '../types/teams.types';
+import type { TeamCatalogItem, TeamDetail, TeamPlayerDetail } from '../types/teams.types';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL?.replace(/\/$/, '');
 
@@ -52,4 +52,27 @@ export async function getTeamDetail(teamId: string): Promise<TeamDetail | null> 
 
   const data = (await response.json()) as TeamDetail;
   return data;
+}
+
+export async function getTeamPlayerDetail(teamId: string, playerId: string): Promise<TeamPlayerDetail | null> {
+  if (!BACKEND_URL) {
+    throw new Error('Falta configurar VITE_BACKEND_URL');
+  }
+
+  const response = await fetch(`${BACKEND_URL}/api/v1/teams/${teamId}/players/${playerId}/detail`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json'
+    }
+  });
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error('No se pudo cargar el detalle del jugador');
+  }
+
+  return (await response.json()) as TeamPlayerDetail;
 }

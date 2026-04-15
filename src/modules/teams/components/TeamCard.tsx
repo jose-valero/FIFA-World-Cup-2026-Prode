@@ -2,6 +2,7 @@ import { Button, Card, CardContent, Stack, Typography } from '@mui/material';
 import { Link as RouterLink } from 'react-router';
 import { routes } from '../../../app/router/routes';
 import type { TeamCatalogItem } from '../types/teams.types';
+import { TeamFlag } from '../../../shared/components/TeamFlag';
 
 type TeamCardProps = {
   team: TeamCatalogItem;
@@ -19,8 +20,9 @@ export function TeamCard({ team }: TeamCardProps) {
       }}
     >
       <CardContent sx={{ p: 3 }}>
-        <Stack spacing={2}>
-          <Stack spacing={0.75}>
+        <Stack spacing={2} direction={'row'} justifyContent={'space-between'}>
+          <Stack spacing={1.25} direction={'row'} alignItems={'center'}>
+            <TeamFlag teamCode={team.code} teamName={team.name} />
             <Typography variant='h6' fontWeight={800}>
               {team.name}
             </Typography>
