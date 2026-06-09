@@ -62,6 +62,8 @@ function createTemplateMatch(params: {
     groupCode: null,
     homeTeam: '',
     awayTeam: '',
+    homeTeamId: null,
+    awayTeamId: null,
     homeTeamCode: null,
     awayTeamCode: null,
     kickoff: 'Por definir',
