@@ -5,6 +5,9 @@ import { queryKeys } from '../../../lib/react-query/queryKeys';
 export function useMatches() {
   return useQuery({
     queryKey: queryKeys.matches,
-    queryFn: getMatches
+    queryFn: getMatches,
+    refetchOnWindowFocus: true,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false
   });
 }

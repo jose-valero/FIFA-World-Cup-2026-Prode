@@ -33,6 +33,7 @@ import type { Match } from '../../matches/types/types';
 import type { PredictionRow } from '../types/predictions.types';
 import { deletePrediction } from '../api/predictions.api';
 import { isMatchLocked } from '../utils/isMatchLocked';
+import { isKnockoutMatchDefined } from '../utils/isKnockoutMatchDefined';
 import { isPredictionsClosed } from '../../../shared/utils/isPredictionsClosed';
 import { queryKeys } from '../../../lib/react-query/queryKeys';
 import { getStatusLabel } from '../../../shared/utils/getStatusLabel';
@@ -215,6 +216,7 @@ export function PredictionsPage() {
   const filteredPredictionItems = React.useMemo(() => {
     return predictionItems.filter((item) => {
       if (!item.match) return false;
+      if (!isKnockoutMatchDefined(item.match)) return false;
       return filterMatches([item.match], filters).length > 0;
     });
   }, [predictionItems, filters]);

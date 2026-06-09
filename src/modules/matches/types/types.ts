@@ -10,6 +10,8 @@ export interface Match {
   groupCode: string | null;
   homeTeam: string;
   awayTeam: string;
+  homeTeamId: string | null;
+  awayTeamId: string | null;
   homeTeamCode: string | null;
   awayTeamCode: string | null;
   kickoff: string;

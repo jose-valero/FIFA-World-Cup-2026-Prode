@@ -13,5 +13,9 @@ export function getMatchLockMessage(match: Match, predictionsClosed: boolean) {
     return 'Este partido ya está finalizado y no admite cambios.';
   }
 
+  if (match.stage !== 'group_stage' && (!match.homeTeamId || !match.awayTeamId)) {
+    return 'Este cruce todavía no tiene equipos definidos.';
+  }
+
   return '';
 }

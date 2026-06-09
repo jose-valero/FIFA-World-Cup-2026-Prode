@@ -9,6 +9,8 @@ interface MatchRow {
   group_code: string | null;
   home_team: string;
   away_team: string;
+  home_team_id: string | null;
+  away_team_id: string | null;
   home_team_code: string | null;
   away_team_code: string | null;
   kickoff_at: string;
@@ -47,6 +49,8 @@ function mapMatchRow(row: MatchRow): Match {
     groupCode: row.group_code,
     homeTeam: row.home_team,
     awayTeam: row.away_team,
+    homeTeamId: row.home_team_id,
+    awayTeamId: row.away_team_id,
     homeTeamCode: row.home_team_code,
     awayTeamCode: row.away_team_code,
     kickoff: formatKickoff(row.kickoff_at),
@@ -83,6 +87,8 @@ export async function getMatches(): Promise<Match[]> {
       group_code,
       home_team,
       away_team,
+      home_team_id,
+      away_team_id,
       home_team_code,
       away_team_code,
       kickoff_at,

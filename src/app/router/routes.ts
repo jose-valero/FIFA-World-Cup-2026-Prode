@@ -7,8 +7,7 @@ export const slugs = {
   predictions: 'predictions',
   profile: 'profile',
   results: 'results',
-  settings: 'settings',
-  teams: 'teams'
+  settings: 'settings'
 } as const;
 
 export const routes = {
@@ -25,8 +24,6 @@ export const routes = {
   myPredictions: `/app/${slugs.predictions}/${slugs.my_predictions}`,
   profile: `/app/${slugs.profile}`,
   fixture: `/app/${slugs.fixture}`,
-  teams: `/app/${slugs.teams}`,
-  teamDetail: (teamId: string = ':teamId') => `/app/${slugs.teams}/${teamId}`,
 
   adminMatches: `/admin/${slugs.matches}`,
   adminResults: `/admin/${slugs.results}`,

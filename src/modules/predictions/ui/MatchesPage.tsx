@@ -23,6 +23,7 @@ import { getMatchLockMessage } from '../utils/getMatchLockMessage';
 import { isMatchLocked } from '../utils/isMatchLocked';
 import { isPredictionsClosed } from '../../../shared/utils/isPredictionsClosed';
 import { buildPredictionSummary } from '../utils/buildPredictionSummary';
+import { isKnockoutMatchDefined } from '../utils/isKnockoutMatchDefined';
 import type { Match } from '../../matches/types/types';
 import { sortMatchesByStatusPriority } from '../../../shared/utils/sortMatchesByStatusPriority';
 
@@ -104,7 +105,7 @@ export function MatchesPage() {
   const groupOptions = React.useMemo(() => getUniqueGroupOptions(matches), [matches]);
 
   const filteredMatches = React.useMemo(() => {
-    return sortMatchesByStatusPriority(filterMatches(matches, filters));
+    return sortMatchesByStatusPriority(filterMatches(matches, filters).filter(isKnockoutMatchDefined));
   }, [matches, filters]);
 
   React.useEffect(() => {
