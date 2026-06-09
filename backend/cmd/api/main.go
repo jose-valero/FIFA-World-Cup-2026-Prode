@@ -7,28 +7,15 @@ import (
 	"strings"
 
 	"github.com/joho/godotenv"
-
-	"quiniela-backend/internal/providers"
-	providerespn "quiniela-backend/internal/providers/espn"
-	"quiniela-backend/internal/teams"
 )
 
 func main() {
 	loadEnv()
 
-	supabaseURL := mustGetEnv("SUPABASE_URL")
-	supabaseServiceRoleKey := mustGetEnv("SUPABASE_SERVICE_ROLE_KEY")
-
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
-
-	repo := teams.NewSupabaseRepository(supabaseURL, supabaseServiceRoleKey)
-	teamProvider := buildTeamProvider()
-
-	service := teams.NewService(repo, teamProvider)
-	handler := teams.NewHandler(service)
 
 	mux := http.NewServeMux()
 
@@ -37,37 +24,10 @@ func main() {
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	mux.HandleFunc("GET /api/v1/teams/", func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path
-
-		if strings.Contains(path, "/players/") && strings.HasSuffix(path, "/detail") {
-			handler.GetPlayerDetail(w, r)
-			return
-		}
-
-		handler.GetTeamDetail(w, r)
-	})
-
 	log.Printf("backend escuchando en http://localhost:%s", port)
-	log.Printf("team provider activo: %s", teamProvider.Name())
 
 	if err := http.ListenAndServe(":"+port, withCORS(mux)); err != nil {
 		log.Fatal(err)
-	}
-}
-
-func buildTeamProvider() providers.TeamProvider {
-	providerName := strings.TrimSpace(strings.ToLower(mustGetEnv("TEAM_PROVIDER")))
-
-	switch providerName {
-	case "espn":
-		espnBaseURL := mustGetEnv("ESPN_SITE_API_BASE")
-		espnClient := providerespn.NewClient(espnBaseURL)
-		return providerespn.NewTeamProvider(espnClient)
-
-	default:
-		log.Fatalf("unsupported TEAM_PROVIDER: %s", providerName)
-		return nil
 	}
 }
 
@@ -99,7 +59,7 @@ func withCORS(next http.Handler) http.Handler {
 
 		w.Header().Set("Access-Control-Allow-Origin", origin)
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
