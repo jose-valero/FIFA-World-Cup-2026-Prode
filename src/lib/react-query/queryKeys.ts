@@ -16,5 +16,6 @@ export const queryKeys = {
   predictions: (userId: string) => ['predictions', userId] as const,
   adminParticipantsOverview: ['admin-participants-overview'] as const,
   topThreeAvatars: (userIds: string[]) => ['top-three-avatars', ...userIds.sort()] as const,
-  participantAvatars: (userIds: string[]) => ['participant-avatars', ...userIds.sort()] as const
+  participantAvatars: (userIds: string[]) => ['participant-avatars', ...userIds.sort()] as const,
+  matchDetail: (matchId: string) => ['match-detail', matchId] as const
 };

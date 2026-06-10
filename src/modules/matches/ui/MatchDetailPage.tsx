@@ -13,10 +13,14 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { Link as RouterLink, useNavigate, useParams } from 'react-router';
 import { useMatches } from '../hooks/useMatches';
+import { useMatchDetail } from '../hooks/useMatchDetail';
 import { TeamFlag } from '../../../shared/components/TeamFlag';
 import { getStageLabel } from '../../tournament/utils/stages';
 import { routes } from '../../../app/router/routes';
 import type { Match } from '../types/types';
+import type { MatchDetailPayload, MatchDetailEvent } from '../types/matchDetail.types';
+
+// ── Formatters ────────────────────────────────────────────────────────────────
 
 function formatKickoffLong(kickoffAt: string): string {
   return new Date(kickoffAt).toLocaleString('es-AR', {
@@ -39,7 +43,139 @@ function formatKickoffShort(kickoffAt: string): string {
   });
 }
 
-function MatchHero({ match }: { match: Match }) {
+// ── Status chip ───────────────────────────────────────────────────────────────
+
+function StatusChip({ status, minuteLabel }: { status: string; minuteLabel: string | null }) {
+  const isLive = status === 'live';
+  const isFinished = status === 'finished';
+
+  let label: string;
+  if (isLive) {
+    label = minuteLabel ? `EN VIVO ${minuteLabel}` : 'EN VIVO';
+  } else if (isFinished) {
+    label = 'Finalizado';
+  } else {
+    label = 'Pendiente';
+  }
+
+  return (
+    <Chip
+      label={label}
+      color={isLive ? 'error' : isFinished ? 'success' : 'warning'}
+      variant={isLive ? 'filled' : 'outlined'}
+      size='small'
+    />
+  );
+}
+
+// ── Events list ───────────────────────────────────────────────────────────────
+
+function eventIcon(type: MatchDetailEvent['type']): string {
+  switch (type) {
+    case 'penalty_goal': return '⚽ (P)';
+    case 'own_goal':     return '⚽ (OG)';
+    default:             return '⚽';
+  }
+}
+
+function EventsRow({ events, homeCode, awayCode }: {
+  events: MatchDetailEvent[];
+  homeCode: string;
+  awayCode: string;
+}) {
+  if (events.length === 0) return null;
+
+  const homeEvents = events.filter((e) => e.side === 'home');
+  const awayEvents = events.filter((e) => e.side === 'away');
+
+  function renderList(evts: MatchDetailEvent[], align: 'left' | 'right') {
+    return (
+      <Stack spacing={0.25} alignItems={align === 'right' ? 'flex-end' : 'flex-start'}>
+        {evts.map((e, i) => (
+          <Typography key={i} variant='caption' color='text.secondary' sx={{ lineHeight: 1.4 }}>
+            {align === 'right'
+              ? `${e.minute} ${e.player || homeCode} ${eventIcon(e.type)}`
+              : `${eventIcon(e.type)} ${e.player || awayCode} ${e.minute}`}
+          </Typography>
+        ))}
+      </Stack>
+    );
+  }
+
+  return (
+    <Stack direction='row' justifyContent='center' spacing={4} sx={{ pt: 0.5 }}>
+      <Box sx={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
+        {renderList(homeEvents, 'right')}
+      </Box>
+      <Box sx={{ width: 48 }} />
+      <Box sx={{ flex: 1, display: 'flex', justifyContent: 'flex-start' }}>
+        {renderList(awayEvents, 'left')}
+      </Box>
+    </Stack>
+  );
+}
+
+// ── Match hero ────────────────────────────────────────────────────────────────
+
+type HeroData = {
+  status: string;
+  minuteLabel: string | null;
+  homeCode: string;
+  awayCode: string;
+  homeName: string;
+  awayName: string;
+  scoreHome: number | null;
+  scoreAway: number | null;
+  events: MatchDetailEvent[];
+  kickoffAt: string;
+  venueName: string;
+  venueCity: string;
+  stage: string;
+  groupCode: string | null;
+  espnEnriched: boolean;
+};
+
+function heroFromDetail(d: MatchDetailPayload): HeroData {
+  return {
+    status:       d.status,
+    minuteLabel:  d.minuteLabel,
+    homeCode:     d.homeTeam.code,
+    awayCode:     d.awayTeam.code,
+    homeName:     d.homeTeam.name,
+    awayName:     d.awayTeam.name,
+    scoreHome:    d.score?.home ?? null,
+    scoreAway:    d.score?.away ?? null,
+    events:       d.events,
+    kickoffAt:    d.kickoffAt,
+    venueName:    d.venueName,
+    venueCity:    d.venueCity,
+    stage:        d.stage,
+    groupCode:    d.groupCode,
+    espnEnriched: d.espnEnriched,
+  };
+}
+
+function heroFromMatch(m: Match): HeroData {
+  return {
+    status:       m.status,
+    minuteLabel:  null,
+    homeCode:     m.homeTeamCode ?? '',
+    awayCode:     m.awayTeamCode ?? '',
+    homeName:     m.homeTeam,
+    awayName:     m.awayTeam,
+    scoreHome:    m.officialHomeScore,
+    scoreAway:    m.officialAwayScore,
+    events:       [],
+    kickoffAt:    m.kickoffAt,
+    venueName:    m.stadium,
+    venueCity:    m.city,
+    stage:        m.stage,
+    groupCode:    m.groupCode,
+    espnEnriched: false,
+  };
+}
+
+function MatchHero({ match, detail }: { match: Match; detail: MatchDetailPayload | null }) {
   const navigate = useNavigate();
 
   function handleBack() {
@@ -51,9 +187,9 @@ function MatchHero({ match }: { match: Match }) {
     }
   }
 
-  const hasScore = match.status !== 'scheduled' && match.officialHomeScore != null && match.officialAwayScore != null;
-
-  const isLive = match.status === 'live';
+  const h = detail ? heroFromDetail(detail) : heroFromMatch(match);
+  const isLive = h.status === 'live';
+  const hasScore = h.scoreHome != null && h.scoreAway != null;
 
   return (
     <Card
@@ -69,38 +205,28 @@ function MatchHero({ match }: { match: Match }) {
 
       <CardContent sx={{ p: { xs: 2, md: 3 } }}>
         <Stack spacing={2.5}>
-          {/* Top row: back + breadcrumb */}
+          {/* Back + breadcrumb */}
           <Stack direction='row' spacing={1.5} alignItems='center'>
             <IconButton onClick={handleBack} size='small' aria-label='Volver atrás'>
               <ArrowBackIcon fontSize='small' />
             </IconButton>
-            <Stack direction='row' spacing={1} alignItems='center' flexWrap='wrap' useFlexGap>
+            <Stack direction='row' spacing={0.75} alignItems='center' flexWrap='wrap' useFlexGap>
               <Typography variant='caption' color='text.secondary'>
-                {getStageLabel(match.stage)}
+                {getStageLabel(h.stage as Parameters<typeof getStageLabel>[0])}
               </Typography>
-              {match.groupCode ? (
-                <>
-                  <Typography variant='caption' color='text.secondary'>
-                    ·
-                  </Typography>
-                  <Typography variant='caption' color='text.secondary'>
-                    Grupo {match.groupCode}
-                  </Typography>
-                </>
+              {h.groupCode ? (
+                <Typography variant='caption' color='text.secondary'>
+                  · Grupo {h.groupCode}
+                </Typography>
               ) : null}
             </Stack>
           </Stack>
 
-          {/* Status + date row */}
+          {/* Status + date */}
           <Stack direction='row' spacing={1.5} alignItems='center' flexWrap='wrap' useFlexGap>
-            <Chip
-              label={match.status === 'live' ? 'EN VIVO' : match.status === 'finished' ? 'Finalizado' : 'Pendiente'}
-              color={match.status === 'live' ? 'error' : match.status === 'finished' ? 'success' : 'warning'}
-              variant={match.status === 'live' ? 'filled' : 'outlined'}
-              size='small'
-            />
+            <StatusChip status={h.status} minuteLabel={h.minuteLabel} />
             <Typography variant='body2' color='text.secondary'>
-              {formatKickoffLong(match.kickoffAt)}
+              {formatKickoffLong(h.kickoffAt)}
             </Typography>
           </Stack>
 
@@ -109,68 +235,61 @@ function MatchHero({ match }: { match: Match }) {
             container
             alignItems='center'
             justifyContent='center'
-            spacing={{ xs: 1.5, md: 3 }}
+            spacing={{ xs: 2, md: 4 }}
             sx={{ py: { xs: 1, md: 2 } }}
           >
-            {/* Home team */}
-            <Grid size={{ xs: 'auto', md: 'auto' }}>
+            <Grid size={{ xs: 'auto' }}>
               <Stack alignItems='center' spacing={1}>
-                <TeamFlag teamCode={match.homeTeamCode} teamName={match.homeTeam} size={36} />
-                <Typography variant='h6' fontWeight={800} textAlign='center' sx={{ maxWidth: 120 }}>
-                  {match.homeTeam}
+                <TeamFlag teamCode={h.homeCode} teamName={h.homeName} size={40} />
+                <Typography variant='h6' fontWeight={800} textAlign='center' sx={{ maxWidth: 130 }}>
+                  {h.homeName}
                 </Typography>
-                {match.homeTeamCode ? (
-                  <Typography variant='caption' color='text.secondary'>
-                    {match.homeTeamCode}
-                  </Typography>
+                {h.homeCode ? (
+                  <Typography variant='caption' color='text.secondary'>{h.homeCode}</Typography>
                 ) : null}
               </Stack>
             </Grid>
 
-            {/* Score or time */}
-            <Grid size={{ xs: 'auto', md: 'auto' }}>
+            <Grid size={{ xs: 'auto' }}>
               <Stack alignItems='center' spacing={0.5}>
                 {hasScore ? (
                   <Typography variant='h2' fontWeight={900} sx={{ letterSpacing: 4, lineHeight: 1 }}>
-                    {match.officialHomeScore} – {match.officialAwayScore}
+                    {h.scoreHome} – {h.scoreAway}
                   </Typography>
                 ) : (
                   <>
-                    <Typography variant='h3' fontWeight={300} color='text.secondary'>
-                      vs
-                    </Typography>
+                    <Typography variant='h3' fontWeight={300} color='text.secondary'>vs</Typography>
                     <Typography variant='body2' color='text.secondary'>
-                      {new Date(match.kickoffAt).toLocaleTimeString('es-AR', {
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
+                      {new Date(h.kickoffAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
                     </Typography>
                   </>
                 )}
               </Stack>
             </Grid>
 
-            {/* Away team */}
-            <Grid size={{ xs: 'auto', md: 'auto' }}>
+            <Grid size={{ xs: 'auto' }}>
               <Stack alignItems='center' spacing={1}>
-                <TeamFlag teamCode={match.awayTeamCode} teamName={match.awayTeam} size={36} />
-                <Typography variant='h6' fontWeight={800} textAlign='center' sx={{ maxWidth: 120 }}>
-                  {match.awayTeam}
+                <TeamFlag teamCode={h.awayCode} teamName={h.awayName} size={40} />
+                <Typography variant='h6' fontWeight={800} textAlign='center' sx={{ maxWidth: 130 }}>
+                  {h.awayName}
                 </Typography>
-                {match.awayTeamCode ? (
-                  <Typography variant='caption' color='text.secondary'>
-                    {match.awayTeamCode}
-                  </Typography>
+                {h.awayCode ? (
+                  <Typography variant='caption' color='text.secondary'>{h.awayCode}</Typography>
                 ) : null}
               </Stack>
             </Grid>
           </Grid>
 
+          {/* Scoring events under the score */}
+          {h.events.length > 0 ? (
+            <EventsRow events={h.events} homeCode={h.homeCode} awayCode={h.awayCode} />
+          ) : null}
+
           {/* Venue */}
-          {match.stadium || match.city ? (
+          {h.venueName || h.venueCity ? (
             <Stack alignItems='center'>
               <Typography variant='body2' color='text.secondary' textAlign='center'>
-                {[match.stadium, match.city].filter(Boolean).join(' · ')}
+                {[h.venueName, h.venueCity].filter(Boolean).join(' · ')}
               </Typography>
             </Stack>
           ) : null}
@@ -180,15 +299,13 @@ function MatchHero({ match }: { match: Match }) {
   );
 }
 
+// ── Info card ─────────────────────────────────────────────────────────────────
+
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <Stack direction='row' justifyContent='space-between' alignItems='baseline' spacing={1}>
-      <Typography variant='body2' color='text.secondary' sx={{ flexShrink: 0 }}>
-        {label}
-      </Typography>
-      <Typography variant='body2' fontWeight={600} textAlign='right'>
-        {value}
-      </Typography>
+      <Typography variant='body2' color='text.secondary' sx={{ flexShrink: 0 }}>{label}</Typography>
+      <Typography variant='body2' fontWeight={600} textAlign='right'>{value}</Typography>
     </Stack>
   );
 }
@@ -205,12 +322,10 @@ function MatchContextCard({ match }: { match: Match }) {
   ];
 
   return (
-    <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider', height: '100%' }}>
+    <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
       <CardContent sx={{ p: 2.5 }}>
         <Stack spacing={2}>
-          <Typography variant='subtitle1' fontWeight={800}>
-            Datos del partido
-          </Typography>
+          <Typography variant='subtitle1' fontWeight={800}>Datos del partido</Typography>
           <Stack spacing={1.25} divider={<Box sx={{ borderTop: '1px solid', borderColor: 'divider' }} />}>
             {rows.map((row) => (
               <InfoRow key={row.label} label={row.label} value={row.value} />
@@ -222,22 +337,14 @@ function MatchContextCard({ match }: { match: Match }) {
   );
 }
 
+// ── Coming soon ───────────────────────────────────────────────────────────────
+
 function ComingSoonCard() {
   return (
-    <Card
-      elevation={0}
-      sx={{
-        borderRadius: 2,
-        border: '1px dashed',
-        borderColor: 'divider',
-        bgcolor: 'transparent'
-      }}
-    >
+    <Card elevation={0} sx={{ borderRadius: 2, border: '1px dashed', borderColor: 'divider', bgcolor: 'transparent' }}>
       <CardContent sx={{ p: 2.5 }}>
         <Stack spacing={0.5}>
-          <Typography variant='subtitle2' color='text.secondary' fontWeight={700}>
-            Próximamente
-          </Typography>
+          <Typography variant='subtitle2' color='text.secondary' fontWeight={700}>Próximamente</Typography>
           <Typography variant='body2' color='text.disabled'>
             Estadísticas, alineaciones, eventos del partido y más estarán disponibles durante el Mundial.
           </Typography>
@@ -247,9 +354,12 @@ function ComingSoonCard() {
   );
 }
 
+// ── Page ──────────────────────────────────────────────────────────────────────
+
 export function MatchDetailPage() {
   const { matchId } = useParams<{ matchId: string }>();
   const { data: matches = [], isLoading } = useMatches();
+  const { data: detail = null } = useMatchDetail(matchId);
 
   if (isLoading) {
     return (
@@ -273,16 +383,14 @@ export function MatchDetailPage() {
         >
           Volver al fixture
         </Button>
-        <Typography variant='h6' color='text.secondary'>
-          Partido no encontrado.
-        </Typography>
+        <Typography variant='h6' color='text.secondary'>Partido no encontrado.</Typography>
       </Stack>
     );
   }
 
   return (
     <Stack spacing={2.5}>
-      <MatchHero match={match} />
+      <MatchHero match={match} detail={detail} />
 
       <Grid container spacing={2}>
         <Grid size={{ xs: 12 }}>

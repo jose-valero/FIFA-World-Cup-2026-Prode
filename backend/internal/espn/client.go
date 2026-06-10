@@ -60,7 +60,58 @@ type Competitor struct {
 
 // Team holds the identifying info we use for matching.
 type Team struct {
+	ID           string `json:"id"`
 	Abbreviation string `json:"abbreviation"`
+}
+
+// ── Event summary types (used by GetEventSummary) ────────────────────────────
+
+// EventSummary is the response from ESPN's summary endpoint for a single event.
+type EventSummary struct {
+	Header struct {
+		Competitions []SummaryCompetition `json:"competitions"`
+	} `json:"header"`
+	ScoringPlays []ScoringPlay `json:"scoringPlays"`
+}
+
+// SummaryCompetition holds live status and competitors from the summary response.
+type SummaryCompetition struct {
+	Status struct {
+		DisplayClock string         `json:"displayClock"`
+		Type         CompStatusType `json:"type"`
+	} `json:"status"`
+	Competitors []SummaryCompetitor `json:"competitors"`
+}
+
+// SummaryCompetitor is a team entry in the summary response (includes team ID).
+type SummaryCompetitor struct {
+	HomeAway string `json:"homeAway"`
+	Score    string `json:"score"`
+	Team     struct {
+		ID string `json:"id"`
+	} `json:"team"`
+}
+
+// ScoringPlay represents a goal or scoring event in the summary.
+type ScoringPlay struct {
+	Clock struct {
+		DisplayValue string `json:"displayValue"`
+	} `json:"clock"`
+	Type struct {
+		Text string `json:"text"`
+	} `json:"type"`
+	Team struct {
+		ID string `json:"id"`
+	} `json:"team"`
+	Participants []ScoringParticipant `json:"participants"`
+}
+
+// ScoringParticipant is a player involved in a scoring play.
+type ScoringParticipant struct {
+	Athlete struct {
+		ShortName   string `json:"shortName"`
+		DisplayName string `json:"displayName"`
+	} `json:"athlete"`
 }
 
 // HomeAbbrev returns the home team's abbreviation for this event (empty if not found).
@@ -127,6 +178,34 @@ func parseESPNTime(s string) (time.Time, error) {
 		}
 	}
 	return time.Time{}, fmt.Errorf("cannot parse ESPN time %q", s)
+}
+
+// GetEventSummary fetches the detailed summary for a single ESPN event.
+// It returns enriched live data: live clock, scoring plays, etc.
+func (c *Client) GetEventSummary(ctx context.Context, eventID string) (*EventSummary, error) {
+	url := fmt.Sprintf("%s/sports/soccer/fifa.world/summary?event=%s", c.baseURL, eventID)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("ESPN summary request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("ESPN summary returned status %d for event %s", resp.StatusCode, eventID)
+	}
+
+	var summary EventSummary
+	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
+		return nil, fmt.Errorf("decoding ESPN summary: %w", err)
+	}
+
+	return &summary, nil
 }
 
 // GetScoreboard fetches the scoreboard for a given date (YYYYMMDD).

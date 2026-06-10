@@ -15,6 +15,7 @@ import (
 	"github.com/joho/godotenv"
 
 	"quiniela-backend/internal/espn"
+	"quiniela-backend/internal/matchdetail"
 	matchsync "quiniela-backend/internal/sync"
 )
 
@@ -45,6 +46,10 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
+
+	mux.HandleFunc("GET /api/v1/matches/{matchId}/detail",
+		matchDetailHandler(espnClient, supabaseURL, supabaseKey),
+	)
 
 	mux.HandleFunc("POST /api/v1/admin/sync-espn-matches",
 		requireAdminAuth(adminSyncToken, supabaseURL, supabaseKey, allowedEmail,
@@ -133,6 +138,32 @@ func syncESPNMatchesHandler(espnClient *espn.Client, supabaseURL, supabaseKey st
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(result); err != nil {
 			log.Printf("encoding sync result: %v", err)
+		}
+	}
+}
+
+func matchDetailHandler(espnClient *espn.Client, supabaseURL, supabaseKey string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		matchID := r.PathValue("matchId")
+		if matchID == "" {
+			writeJSON(w, http.StatusBadRequest, `{"error":"matchId required"}`)
+			return
+		}
+
+		detail, err := matchdetail.Fetch(r.Context(), supabaseURL, supabaseKey, espnClient, matchID)
+		if err != nil {
+			if err == matchdetail.ErrNotFound {
+				writeJSON(w, http.StatusNotFound, `{"error":"match not found"}`)
+				return
+			}
+			log.Printf("match detail error matchId=%s err=%v", matchID, err)
+			writeJSON(w, http.StatusInternalServerError, `{"error":"internal error"}`)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(detail); err != nil {
+			log.Printf("encoding match detail: %v", err)
 		}
 	}
 }
