@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/subtle"
 	"encoding/json"
@@ -16,6 +17,11 @@ import (
 	"quiniela-backend/internal/espn"
 	matchsync "quiniela-backend/internal/sync"
 )
+
+// ctxKey is a private type for context values set by this package.
+type ctxKey string
+
+const authSourceCtxKey ctxKey = "auth_source"
 
 func main() {
 	loadEnv()
@@ -56,9 +62,8 @@ func main() {
 // requireAdminAuth protects a handler with dual-path authorization:
 //  1. Static token: Authorization: Bearer <ADMIN_SYNC_TOKEN>  (for curl / Cloud Shell)
 //  2. Supabase session: Authorization: Bearer <access_token>  (for frontend admin UI)
-//     The Supabase token is verified against the auth API; the returned email must
-//     match ADMIN_SYNC_ALLOWED_EMAIL. Unrecognized tokens → 401. Valid token with
-//     wrong email → 403.
+//
+// It also records the auth source in the request context for downstream use.
 func requireAdminAuth(staticToken, supabaseURL, supabaseKey, allowedEmail string, next http.HandlerFunc) http.HandlerFunc {
 	expected := []byte(staticToken)
 
@@ -72,7 +77,8 @@ func requireAdminAuth(staticToken, supabaseURL, supabaseKey, allowedEmail string
 
 		// Fast path: constant-time compare against static admin token.
 		if subtle.ConstantTimeCompare([]byte(candidate), expected) == 1 {
-			next(w, r)
+			ctx := context.WithValue(r.Context(), authSourceCtxKey, "manual_token")
+			next(w, r.WithContext(ctx))
 			return
 		}
 
@@ -89,8 +95,115 @@ func requireAdminAuth(staticToken, supabaseURL, supabaseKey, allowedEmail string
 			return
 		}
 
-		next(w, r)
+		ctx := context.WithValue(r.Context(), authSourceCtxKey, "manual_ui")
+		next(w, r.WithContext(ctx))
 	}
+}
+
+func syncESPNMatchesHandler(espnClient *espn.Client, supabaseURL, supabaseKey string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Determine trigger source: query param takes precedence (used by Cloud Scheduler URL),
+		// then the auth method recorded by requireAdminAuth.
+		source := r.URL.Query().Get("source")
+		if source == "" {
+			if s, ok := r.Context().Value(authSourceCtxKey).(string); ok {
+				source = s
+			} else {
+				source = "unknown"
+			}
+		}
+
+		opts := matchsync.Options{Source: source}
+		result, err := matchsync.ESPNMatches(r.Context(), espnClient, supabaseURL, supabaseKey, opts)
+
+		if err != nil {
+			log.Printf("sync error source=%s err=%v", source, err)
+			insertSyncLogError(context.Background(), supabaseURL, supabaseKey, source, err.Error())
+			writeJSON(w, http.StatusInternalServerError, `{"error":"sync failed"}`)
+			return
+		}
+
+		log.Printf("sync ok source=%s reviewed=%d updated=%d unchanged=%d omitted=%d duration_ms=%d",
+			result.Source, result.TotalReviewed, result.TotalUpdated,
+			result.TotalUnchanged, result.TotalOmitted, result.DurationMs,
+		)
+
+		insertSyncLogSuccess(context.Background(), supabaseURL, supabaseKey, result)
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(result); err != nil {
+			log.Printf("encoding sync result: %v", err)
+		}
+	}
+}
+
+// syncLogPayload is the row we insert into public.sync_logs.
+type syncLogPayload struct {
+	TriggerSource  string  `json:"trigger_source"`
+	TotalReviewed  int     `json:"total_reviewed"`
+	TotalUpdated   int     `json:"total_updated"`
+	TotalUnchanged int     `json:"total_unchanged"`
+	TotalOmitted   int     `json:"total_omitted"`
+	DurationMs     int64   `json:"duration_ms"`
+	Status         string  `json:"status"`
+	ErrorMessage   *string `json:"error_message"`
+}
+
+func insertSyncLogSuccess(ctx context.Context, supabaseURL, key string, r *matchsync.Result) {
+	p := syncLogPayload{
+		TriggerSource:  r.Source,
+		TotalReviewed:  r.TotalReviewed,
+		TotalUpdated:   r.TotalUpdated,
+		TotalUnchanged: r.TotalUnchanged,
+		TotalOmitted:   r.TotalOmitted,
+		DurationMs:     r.DurationMs,
+		Status:         "success",
+	}
+	if err := insertSyncLog(ctx, supabaseURL, key, p); err != nil {
+		log.Printf("sync_logs insert failed: %v", err)
+	}
+}
+
+func insertSyncLogError(ctx context.Context, supabaseURL, key, source, errMsg string) {
+	msg := errMsg
+	p := syncLogPayload{
+		TriggerSource: source,
+		Status:        "error",
+		ErrorMessage:  &msg,
+	}
+	if err := insertSyncLog(ctx, supabaseURL, key, p); err != nil {
+		log.Printf("sync_logs insert failed: %v", err)
+	}
+}
+
+func insertSyncLog(ctx context.Context, supabaseURL, key string, p syncLogPayload) error {
+	url := supabaseURL + "/rest/v1/sync_logs"
+
+	body, err := json.Marshal(p)
+	if err != nil {
+		return fmt.Errorf("marshaling sync log: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("building request: %w", err)
+	}
+	req.Header.Set("apikey", key)
+	req.Header.Set("Authorization", "Bearer "+key)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Prefer", "return=minimal")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("POST sync_logs: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("sync_logs returned HTTP %d: %s", resp.StatusCode, b)
+	}
+	return nil
 }
 
 // verifySupabaseToken calls the Supabase Auth API to validate a user access token
@@ -137,22 +250,6 @@ func extractToken(r *http.Request) string {
 		}
 	}
 	return strings.TrimSpace(r.Header.Get("X-Admin-Token"))
-}
-
-func syncESPNMatchesHandler(espnClient *espn.Client, supabaseURL, supabaseKey string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		result, err := matchsync.ESPNMatches(r.Context(), espnClient, supabaseURL, supabaseKey)
-		if err != nil {
-			log.Printf("sync-espn-matches error: %v", err)
-			writeJSON(w, http.StatusInternalServerError, `{"error":"sync failed"}`)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(result); err != nil {
-			log.Printf("encoding sync result: %v", err)
-		}
-	}
 }
 
 func writeJSON(w http.ResponseWriter, status int, body string) {

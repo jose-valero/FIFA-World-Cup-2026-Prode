@@ -14,14 +14,22 @@ import (
 	"quiniela-backend/internal/espn"
 )
 
+// Options carries per-request parameters for a sync run.
+type Options struct {
+	// Source identifies what triggered the sync ("scheduler", "manual_ui", "manual_token", "unknown").
+	Source string
+}
+
 // Result summarizes the outcome of a sync run.
 type Result struct {
-	TotalReviewed int           `json:"total_reviewed"`
-	TotalUpdated  int           `json:"total_updated"`
-	TotalUnchanged int          `json:"total_unchanged"`
-	TotalOmitted  int           `json:"total_omitted"`
-	Changes       []Change      `json:"changes"`
-	Omissions     []Omission    `json:"omissions,omitempty"`
+	Source         string    `json:"source"`
+	TotalReviewed  int       `json:"total_reviewed"`
+	TotalUpdated   int       `json:"total_updated"`
+	TotalUnchanged int       `json:"total_unchanged"`
+	TotalOmitted   int       `json:"total_omitted"`
+	DurationMs     int64     `json:"duration_ms"`
+	Changes        []Change  `json:"changes"`
+	Omissions      []Omission `json:"omissions,omitempty"`
 }
 
 // Change describes a single match that was updated (or would be in dry-run).
@@ -69,7 +77,9 @@ type patchPayload struct {
 // Matches without espn_event_id are silently ignored.
 // Already-finished matches in the DB are never reverted.
 // A finished transition is only written if ESPN supplies both valid scores.
-func ESPNMatches(ctx context.Context, espnClient *espn.Client, supabaseURL, supabaseKey string) (*Result, error) {
+func ESPNMatches(ctx context.Context, espnClient *espn.Client, supabaseURL, supabaseKey string, opts Options) (*Result, error) {
+	start := time.Now()
+
 	rows, err := fetchSyncableMatches(ctx, supabaseURL, supabaseKey)
 	if err != nil {
 		return nil, fmt.Errorf("fetching matches from Supabase: %w", err)
@@ -156,6 +166,9 @@ func ESPNMatches(ctx context.Context, espnClient *espn.Client, supabaseURL, supa
 			After:       after,
 		})
 	}
+
+	result.Source = opts.Source
+	result.DurationMs = time.Since(start).Milliseconds()
 
 	return result, nil
 }

@@ -21,6 +21,7 @@ import { PageFiltersBar } from '../../../../shared/components/PageFiltersBar';
 import type { MatchStatus } from '../../../matches/types/types';
 import { formatKickoff } from '../../../../shared/utils/formatKickoff';
 import { useSyncESPNMatches } from '../../sync/hooks/useSyncESPNMatches';
+import { useLastSyncLog } from '../../sync/hooks/useLastSyncLog';
 
 type DraftMap = Record<
   string,
@@ -127,6 +128,43 @@ function hasDraftChanged(match: AdminMatchRow, draft: DraftMap[string] | undefin
   );
 }
 
+function formatAge(isoString: string): string {
+  const diff = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000);
+  if (diff < 60) return `hace ${diff}s`;
+  if (diff < 3600) return `hace ${Math.floor(diff / 60)}m`;
+  if (diff < 86400) return `hace ${Math.floor(diff / 3600)}h`;
+  return `hace ${Math.floor(diff / 86400)}d`;
+}
+
+function sourceLabel(source: string): string {
+  if (source === 'scheduler') return 'scheduler';
+  if (source === 'manual_ui') return 'UI admin';
+  if (source === 'manual_token') return 'token manual';
+  return source;
+}
+
+type LastSyncRowProps = { log: import('../../sync/hooks/useLastSyncLog').SyncLog | null };
+
+function LastSyncRow({ log }: LastSyncRowProps) {
+  if (!log) return null;
+
+  const isError = log.status === 'error';
+
+  return (
+    <Typography variant='caption' color={isError ? 'error' : 'text.secondary'} sx={{ mt: 1.5, display: 'block' }}>
+      {isError ? (
+        <>Último sync ({sourceLabel(log.trigger_source)}, {formatAge(log.created_at)}): error — {log.error_message}</>
+      ) : (
+        <>
+          Último sync ({sourceLabel(log.trigger_source)}, {formatAge(log.created_at)}):&nbsp;
+          {log.total_updated} actualizado(s) · {log.total_unchanged} sin cambios · {log.total_omitted} omitido(s) de {log.total_reviewed} revisados
+          &nbsp;·&nbsp;{log.duration_ms}ms
+        </>
+      )}
+    </Typography>
+  );
+}
+
 export function AdminResultsPage() {
   const adminResultsQuery = useAdminResults();
   const matchesData = adminResultsQuery.data;
@@ -136,6 +174,7 @@ export function AdminResultsPage() {
 
   const updateOfficialResultMutation = useUpdateOfficialResultMutation();
   const { state: syncState, run: runSync } = useSyncESPNMatches();
+  const lastSyncLogQuery = useLastSyncLog();
 
   const [drafts, setDrafts] = React.useState<DraftMap>({});
   const [errorMessage, setErrorMessage] = React.useState('');
@@ -291,6 +330,8 @@ export function AdminResultsPage() {
               Error al sincronizar: {syncState.message}
             </Alert>
           ) : null}
+
+          <LastSyncRow log={lastSyncLogQuery.data ?? null} />
         </CardContent>
       </Card>
 
