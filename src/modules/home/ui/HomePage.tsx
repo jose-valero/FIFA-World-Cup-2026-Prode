@@ -1,9 +1,7 @@
 import { Alert, Box, CircularProgress, Grid, Stack } from '@mui/material';
-import { Navigate } from 'react-router';
 import { useAppSettings } from '../../admin/settings/hooks/useAppSettings';
 import { useLeaderboard } from '../../leaderboard/hooks/useLeaderboard';
 import { useMatches } from '../../matches/hooks/useMatches';
-import { useAuth } from '../../auth/hooks/useAuth';
 import { HowItWorks } from '../components/HowItWorks';
 import { ProductHighlights } from '../components/ProductHighlights';
 import { ScoringRules } from '../components/ScoringRules';
@@ -12,14 +10,8 @@ import { HomeHero } from '../components/HomeHero';
 import { HomeFooter } from '../components/HomeFooter';
 import { StrongProdeMessage } from '../components/StrongProdeMessage';
 import { LeaderboardPreview } from '../components/LeaderboardPreview';
-import { routes } from '../../../app/router/routes';
 
 export function HomePage() {
-  const { user, isLoading: isAuthLoading } = useAuth();
-
-  if (!isAuthLoading && user) {
-    return <Navigate to={routes.dashboard} replace />;
-  }
   const {
     data: leaderboard = [],
     isLoading: isLeaderboardLoading,

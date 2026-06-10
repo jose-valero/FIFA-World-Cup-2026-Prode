@@ -53,21 +53,20 @@ export default function AppTopNav() {
   const avatarUrl = profile?.avatar_url ?? undefined;
 
   const publicNavItems: NavItem[] = [
-    { label: 'Inicio', to: routes.home },
+    { label: 'Cómo funciona', to: routes.howItWorks },
     { label: 'Ranking', to: routes.leaderboard }
   ];
 
   const disabledNavItems: NavItem[] = [
-    { label: 'Inicio', to: routes.home },
+    { label: 'Cómo funciona', to: routes.howItWorks },
     { label: 'Fixture', to: routes.fixture }
   ];
 
   const privateNavItems: NavItem[] = [
-    { label: 'Inicio', to: routes.home },
+    { label: 'Dashboard', to: routes.dashboard },
     { label: 'Ranking', to: routes.leaderboard },
     { label: 'Carga tu pronóstico', to: routes.predictionMatches },
-    { label: 'Fixture', to: routes.fixture },
-    { label: 'Dashboard', to: routes.dashboard }
+    { label: 'Fixture', to: routes.fixture }
   ];
 
   const navItems = !isAuthenticated ? publicNavItems : isDisabled ? disabledNavItems : privateNavItems;

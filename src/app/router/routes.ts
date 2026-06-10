@@ -13,6 +13,7 @@ export const slugs = {
 
 export const routes = {
   home: '/',
+  howItWorks: '/how-it-works',
   leaderboard: '/leaderboard',
   login: '/login',
   register: '/register',

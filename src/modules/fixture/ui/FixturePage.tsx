@@ -5,6 +5,7 @@ import {
   AccordionSummary,
   Alert,
   Box,
+  Button,
   Card,
   CardContent,
   Chip,
@@ -24,8 +25,10 @@ import {
   ToggleButtonGroup,
   Typography
 } from '@mui/material';
+import { Link as RouterLink } from 'react-router';
 import { MatchVs } from '../../../shared/components/MatchVs';
 import { useMatches } from '../../matches/hooks/useMatches';
+import { matchDetailPath } from '../../../app/router/routes';
 import { buildProjectedKnockoutMatches } from '../../tournament/utils/buildProjectedKnockoutMatches';
 import { getUniqueGroupOptions, matchTeamQuery } from '../../matches/utils/listFilters';
 import { PageHeader, type PageHeaderBadge } from '../../../shared/components/PageHeader';
@@ -86,6 +89,18 @@ function GroupMatchCard({ match }: { match: Match }) {
         <Typography variant='caption' color='text.secondary'>
           {match.stadium} · {match.city}
         </Typography>
+
+        <Box>
+          <Button
+            component={RouterLink}
+            to={matchDetailPath(match.id)}
+            size='small'
+            variant='text'
+            sx={{ px: 0, minWidth: 0 }}
+          >
+            Ver detalle →
+          </Button>
+        </Box>
       </Stack>
     </Box>
   );

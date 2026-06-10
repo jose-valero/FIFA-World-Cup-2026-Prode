@@ -106,22 +106,6 @@ export const HomeHero = ({ leaderboard, matches, settings }: HomeHeroProps) => {
               >
                 Crear cuenta
               </Button>
-
-              <Button
-                component={RouterLink}
-                to='/leaderboard'
-                variant='outlined'
-                size='large'
-                fullWidth
-                sx={{
-                  minHeight: 50,
-                  borderRadius: 3,
-                  textTransform: 'none',
-                  fontWeight: 800
-                }}
-              >
-                Ver ranking
-              </Button>
             </Stack>
           </Stack>
         </Grid>

@@ -14,27 +14,19 @@ export function AppFooter() {
               <SportsSoccerIcon />
             </Typography>
 
-            <Typography variant='body2' color='text.secondary'>
-              Quiniela privada del Mundial FIFA 2026 para competir entre amigos y seguir el torneo partido a partido.
-            </Typography>
-
             {/* <Typography variant='body2' color='text.secondary'>
+              Quiniela privada del Mundial FIFA 2026 para competir entre amigos y seguir el torneo partido a partido.
+            </Typography> */}
+
+            <Typography variant='body2' color='text.secondary'>
               Proyecto personal para mis amigos, homosexuales, lesbianas, gente depravada, cegada por satanás seducidas
               por la concupiscencia de sus corazones
-            </Typography> */}
+            </Typography>
           </Box>
 
           <Stack direction='row' spacing={2} flexWrap='wrap' useFlexGap>
             <MuiLink component={RouterLink} to='/' underline='hover' color='inherit'>
               Inicio
-            </MuiLink>
-
-            <MuiLink component={RouterLink} to='/login' underline='hover' color='inherit'>
-              Login
-            </MuiLink>
-
-            <MuiLink component={RouterLink} to='/register' underline='hover' color='inherit'>
-              Registro
             </MuiLink>
           </Stack>
         </Stack>

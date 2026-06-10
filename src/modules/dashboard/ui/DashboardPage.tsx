@@ -76,7 +76,7 @@ export function DashboardPage() {
 
   const todayMatches = React.useMemo(() => {
     const todayStr = new Date().toDateString();
-    return sortedMatches.filter((m) => true || new Date(m.kickoffAt).toDateString() === todayStr);
+    return sortedMatches.filter((m) => new Date(m.kickoffAt).toDateString() === todayStr);
   }, [sortedMatches]);
 
   const pendingPredictionMatches = React.useMemo(() => {
@@ -196,7 +196,7 @@ export function DashboardPage() {
         badges={badges}
         actions={
           <Button component={RouterLink} to={routes.leaderboard} size='small' variant='outlined'>
-            Ir a tabla
+            Ir al Ranking
           </Button>
         }
       />

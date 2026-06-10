@@ -10,6 +10,7 @@ import { NotFoundPage } from '../../shared/components/NotFoundPage';
 import { RouteFallback } from '../../shared/components/RouteFallback';
 import { AppShellLayout } from '../layout/AppShellLayout';
 import { PublicOnlyRoute } from '../../modules/auth/guard/PublicOnlyRoute';
+import { useAuthContext } from '../providers/AuthProvider';
 
 const ProfilePage = lazy(() =>
   import('../../modules/profile/ui/ProfilePage').then((module) => ({
@@ -105,11 +106,19 @@ function withSuspense(element: ReactNode) {
   return <Suspense fallback={<RouteFallback />}>{element}</Suspense>;
 }
 
+function HomeRoute() {
+  const { user, isLoading } = useAuthContext();
+  if (isLoading) return <RouteFallback />;
+  if (user) return <Navigate to={routes.dashboard} replace />;
+  return <Navigate to={routes.howItWorks} replace />;
+}
+
 export const appRouter = createBrowserRouter([
   {
     element: <AppShellLayout />,
     children: [
-      { path: routes.home, element: withSuspense(<HomePage />) },
+      { path: routes.home, element: <HomeRoute /> },
+      { path: routes.howItWorks, element: withSuspense(<HomePage />) },
       {
         element: <RequireEnabledParticipant />,
         children: [{ path: routes.leaderboard, element: withSuspense(<LeaderboardPage />) }]
