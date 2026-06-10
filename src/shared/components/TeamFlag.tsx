@@ -8,19 +8,20 @@ type TeamFlagProps = {
   rounded?: boolean;
 };
 
-export function TeamFlag({ teamCode, teamName, size = 13, rounded = false }: TeamFlagProps) {
+export function TeamFlag({ teamCode, teamName, size = 16, rounded = false }: TeamFlagProps) {
   const flagSrc = getFlagSrcByTeamCode(teamCode);
+  const effectiveSize = Math.max(16, Math.round(size));
 
   if (!flagSrc) {
     return (
       <Avatar
         variant={rounded ? 'circular' : 'rounded'}
         sx={{
-          width: size,
-          height: size,
-          fontSize: Math.max(10, size * 0.42),
+          width: effectiveSize,
+          height: effectiveSize,
+          fontSize: Math.max(10, effectiveSize * 0.42),
           fontWeight: 800,
-          borderRadius: rounded ? size / 2 : '4px'
+          borderRadius: rounded ? effectiveSize / 2 : '4px'
         }}
       >
         {teamCode?.slice(0, 2).toUpperCase() ?? '?'}
@@ -28,8 +29,8 @@ export function TeamFlag({ teamCode, teamName, size = 13, rounded = false }: Tea
     );
   }
 
-  const flagWidth = Math.round(size * 1.4);
-  const flagHeight = Math.round(size);
+  const flagWidth = Math.round(effectiveSize * 1.4);
+  const flagHeight = effectiveSize;
 
   return (
     <Box
@@ -40,7 +41,8 @@ export function TeamFlag({ teamCode, teamName, size = 13, rounded = false }: Tea
         width: flagWidth,
         height: flagHeight,
         objectFit: 'contain',
-        borderRadius: rounded ? '999px' : '4px',
+        borderRadius: rounded ? '999px' : '3px',
+        boxShadow: '0 0 0 1px rgba(255,255,255,0.1)',
         display: 'block',
         flexShrink: 0
       }}
