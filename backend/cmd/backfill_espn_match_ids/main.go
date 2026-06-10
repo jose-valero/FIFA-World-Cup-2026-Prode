@@ -10,8 +10,9 @@
 //
 // Usage (from the backend/ directory):
 //
-//	go run ./cmd/backfill_espn_match_ids             # dry run
-//	go run ./cmd/backfill_espn_match_ids --apply     # write to Supabase
+//	go run ./cmd/backfill_espn_match_ids               # dry run
+//	go run ./cmd/backfill_espn_match_ids --apply       # write to Supabase
+//	go run ./cmd/backfill_espn_match_ids --inspect     # detailed diagnostics for unresolved matches
 //
 // Override individual values:
 //
@@ -27,9 +28,11 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -46,6 +49,7 @@ type cfg struct {
 	supabaseKey string
 	espnBase    string
 	apply       bool
+	inspect     bool
 }
 
 // dbMatch represents a group_stage match row from Supabase.
@@ -71,9 +75,12 @@ func main() {
 
 	log.Printf("Supabase URL : %s", c.supabaseURL)
 	log.Printf("ESPN base    : %s", c.espnBase)
-	if c.apply {
+	switch {
+	case c.inspect:
+		log.Printf("Mode         : INSPECT — detailed diagnostics for unresolved matches (read-only)")
+	case c.apply:
 		log.Printf("Mode         : APPLY — will write to Supabase")
-	} else {
+	default:
 		log.Printf("Mode         : DRY RUN — no writes (pass --apply to commit)")
 	}
 
@@ -101,6 +108,11 @@ func main() {
 		}
 		dateEvents[t.UTC().Format("20060102")] = nil
 		dateEvents[t.UTC().AddDate(0, 0, -1).Format("20060102")] = nil
+		if c.inspect {
+			// In inspect mode also fetch the next day: covers matches near 22:00-23:59 UTC
+			// that ESPN may index under the following calendar day in some timezones.
+			dateEvents[t.UTC().AddDate(0, 0, 1).Format("20060102")] = nil
+		}
 	}
 
 	log.Printf("fetching ESPN scoreboards for %d unique date(s)...", len(dateEvents))
@@ -191,15 +203,22 @@ func main() {
 	}
 
 	if len(unresolved) > 0 {
-		fmt.Printf("\nUNRESOLVED (%d) — no ESPN event matched:\n", len(unresolved))
-		for _, r := range unresolved {
-			fmt.Printf("  ?  %-36s  [%s vs %s  %s]\n",
-				r.dbMatch.ID,
-				strVal(r.dbMatch.HomeTeamCode), strVal(r.dbMatch.AwayTeamCode),
-				r.dbMatch.KickoffAt,
-			)
+		if c.inspect {
+			fmt.Printf("\nINSPECT — %d unresolved match(es) with ESPN event candidates:\n", len(unresolved))
+			for _, r := range unresolved {
+				printInspectDetail(r, dateEvents)
+			}
+		} else {
+			fmt.Printf("\nUNRESOLVED (%d) — no ESPN event matched:\n", len(unresolved))
+			for _, r := range unresolved {
+				fmt.Printf("  ?  %-36s  [%s vs %s  %s]\n",
+					r.dbMatch.ID,
+					strVal(r.dbMatch.HomeTeamCode), strVal(r.dbMatch.AwayTeamCode),
+					r.dbMatch.KickoffAt,
+				)
+			}
+			fmt.Println("  → check that ESPN abbreviations match DB team codes, or widen the time window")
 		}
-		fmt.Println("  → check that ESPN abbreviations match DB team codes, or widen the time window")
 	}
 
 	if len(conflicts) > 0 {
@@ -261,6 +280,7 @@ func parseConfig() cfg {
 	fESPNBase := flag.String("espn-base", "", "ESPN site API base URL  (env: ESPN_SITE_API_BASE)")
 	fEnvFile := flag.String("env-file", "", "Path to env file  (default: .env.local, or ENV_FILE env var)")
 	fApply := flag.Bool("apply", false, "Write changes to Supabase (default: dry run)")
+	fInspect := flag.Bool("inspect", false, "Print detailed ESPN diagnostics for each unresolved match (read-only)")
 	flag.Parse()
 
 	// Load env file so env vars are available; godotenv never overwrites existing env vars.
@@ -269,6 +289,7 @@ func parseConfig() cfg {
 	// Resolve: explicit flag → env var.
 	c := cfg{
 		apply:       *fApply,
+		inspect:     *fInspect,
 		supabaseURL: coalesce(*fSupabaseURL, os.Getenv("SUPABASE_URL")),
 		supabaseKey: coalesce(*fSupabaseKey, os.Getenv("SUPABASE_SERVICE_ROLE_KEY")),
 		espnBase:    coalesce(*fESPNBase, os.Getenv("ESPN_SITE_API_BASE")),
@@ -428,4 +449,107 @@ func modeLabel(apply bool) string {
 		return "WRITTEN"
 	}
 	return "written on --apply"
+}
+
+// inspectCandidate is an ESPN event annotated with how closely it matches a DB match.
+type inspectCandidate struct {
+	event      espn.Event
+	kickoff    time.Time
+	timeDiff   time.Duration
+	homeMatch  bool
+	awayMatch  bool
+	inWindow   bool
+}
+
+// printInspectDetail prints a diagnostic table for one unresolved match,
+// showing all ESPN events from the fetched date range with time diffs and code comparisons.
+func printInspectDetail(r matchResult, dateEvents map[string][]espn.Event) {
+	m := r.dbMatch
+	dbKickoff, err := parseTime(m.KickoffAt)
+	if err != nil {
+		fmt.Printf("\n  DB match  %s  [%s vs %s  %s]\n  ✗ cannot parse kickoff_at\n",
+			m.ID, strVal(m.HomeTeamCode), strVal(m.AwayTeamCode), m.KickoffAt)
+		return
+	}
+
+	homeCode := strings.ToUpper(strVal(m.HomeTeamCode))
+	awayCode := strings.ToUpper(strVal(m.AwayTeamCode))
+
+	fmt.Println()
+	fmt.Printf("  ┌─ DB match  %s\n", m.ID)
+	fmt.Printf("  │  Kickoff   %s UTC\n", dbKickoff.Format("2006-01-02 15:04"))
+	fmt.Printf("  │  Teams     %s  vs  %s\n", homeCode, awayCode)
+	fmt.Println("  │")
+
+	// Collect all events across all fetched dates.
+	var candidates []inspectCandidate
+	for _, events := range dateEvents {
+		for _, ev := range events {
+			evKickoff, err := ev.KickoffTime()
+			if err != nil {
+				continue
+			}
+			diff := evKickoff.Sub(dbKickoff)
+			absDiff := time.Duration(math.Abs(float64(diff)))
+			candidates = append(candidates, inspectCandidate{
+				event:     ev,
+				kickoff:   evKickoff,
+				timeDiff:  absDiff,
+				homeMatch: strings.ToUpper(ev.HomeAbbrev()) == homeCode,
+				awayMatch: strings.ToUpper(ev.AwayAbbrev()) == awayCode,
+				inWindow:  absDiff <= matchWindow,
+			})
+		}
+	}
+
+	// Sort by absolute time diff so nearest events appear first.
+	sort.Slice(candidates, func(i, j int) bool {
+		return candidates[i].timeDiff < candidates[j].timeDiff
+	})
+
+	if len(candidates) == 0 {
+		fmt.Println("  │  (no ESPN events in fetched date range)")
+		fmt.Println("  └─────────────────────────────────────────────────────────")
+		return
+	}
+
+	// Show up to 10 nearest candidates; always show any that pass codes or time.
+	shown := 0
+	for _, c := range candidates {
+		notable := c.homeMatch || c.awayMatch || c.inWindow
+		if !notable && shown >= 5 {
+			continue
+		}
+		shown++
+
+		timeTag := "  TIME"
+		if c.inWindow {
+			timeTag = "✓ TIME"
+		}
+
+		homeTag := "✗ HOME"
+		if c.homeMatch {
+			homeTag = "✓ HOME"
+		}
+
+		awayTag := "✗ AWAY"
+		if c.awayMatch {
+			awayTag = "✓ AWAY"
+		}
+
+		diffStr := fmt.Sprintf("%+.0fm", c.timeDiff.Minutes())
+		if c.timeDiff == 0 {
+			diffStr = "exact"
+		}
+
+		fmt.Printf("  │  [%s][%s][%s]  espn_id=%-10s  %s vs %-4s  %s UTC  (diff %s)\n",
+			timeTag, homeTag, awayTag,
+			c.event.ID,
+			c.event.HomeAbbrev(), c.event.AwayAbbrev(),
+			c.kickoff.Format("2006-01-02 15:04"),
+			diffStr,
+		)
+	}
+
+	fmt.Println("  └─────────────────────────────────────────────────────────")
 }

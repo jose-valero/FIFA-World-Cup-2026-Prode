@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
 	"crypto/subtle"
 	"encoding/json"
+	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -20,7 +23,8 @@ func main() {
 	supabaseURL := mustGetEnv("SUPABASE_URL")
 	supabaseKey := mustGetEnv("SUPABASE_SERVICE_ROLE_KEY")
 	espnBase := mustGetEnv("ESPN_SITE_API_BASE")
-	adminToken := mustGetEnv("ADMIN_SYNC_TOKEN")
+	adminSyncToken := mustGetEnv("ADMIN_SYNC_TOKEN")
+	allowedEmail := mustGetEnv("ADMIN_SYNC_ALLOWED_EMAIL")
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -37,7 +41,9 @@ func main() {
 	})
 
 	mux.HandleFunc("POST /api/v1/admin/sync-espn-matches",
-		requireToken(adminToken, syncESPNMatchesHandler(espnClient, supabaseURL, supabaseKey)),
+		requireAdminAuth(adminSyncToken, supabaseURL, supabaseKey, allowedEmail,
+			syncESPNMatchesHandler(espnClient, supabaseURL, supabaseKey),
+		),
 	)
 
 	log.Printf("backend escuchando en http://localhost:%s", port)
@@ -47,22 +53,80 @@ func main() {
 	}
 }
 
-// requireToken returns a handler that checks Authorization: Bearer <token>
-// or X-Admin-Token: <token> before calling next.
-// Uses constant-time comparison to prevent timing attacks.
-func requireToken(token string, next http.HandlerFunc) http.HandlerFunc {
-	expected := []byte(token)
+// requireAdminAuth protects a handler with dual-path authorization:
+//  1. Static token: Authorization: Bearer <ADMIN_SYNC_TOKEN>  (for curl / Cloud Shell)
+//  2. Supabase session: Authorization: Bearer <access_token>  (for frontend admin UI)
+//     The Supabase token is verified against the auth API; the returned email must
+//     match ADMIN_SYNC_ALLOWED_EMAIL. Unrecognized tokens → 401. Valid token with
+//     wrong email → 403.
+func requireAdminAuth(staticToken, supabaseURL, supabaseKey, allowedEmail string, next http.HandlerFunc) http.HandlerFunc {
+	expected := []byte(staticToken)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		candidate := extractToken(r)
-		if subtle.ConstantTimeCompare([]byte(candidate), expected) != 1 {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusUnauthorized)
-			_, _ = w.Write([]byte(`{"error":"unauthorized"}`))
+
+		if candidate == "" {
+			writeJSON(w, http.StatusUnauthorized, `{"error":"unauthorized"}`)
 			return
 		}
+
+		// Fast path: constant-time compare against static admin token.
+		if subtle.ConstantTimeCompare([]byte(candidate), expected) == 1 {
+			next(w, r)
+			return
+		}
+
+		// Slow path: treat as a Supabase session token.
+		email, err := verifySupabaseToken(r.Context(), supabaseURL, supabaseKey, candidate)
+		if err != nil {
+			log.Printf("auth: supabase token verification failed: %v", err)
+			writeJSON(w, http.StatusUnauthorized, `{"error":"unauthorized"}`)
+			return
+		}
+		if email != allowedEmail {
+			log.Printf("auth: forbidden — email %q is not in the allowed list", email)
+			writeJSON(w, http.StatusForbidden, `{"error":"forbidden"}`)
+			return
+		}
+
 		next(w, r)
 	}
+}
+
+// verifySupabaseToken calls the Supabase Auth API to validate a user access token
+// and returns the authenticated user's email.
+func verifySupabaseToken(ctx context.Context, supabaseURL, supabaseKey, token string) (string, error) {
+	url := supabaseURL + "/auth/v1/user"
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return "", fmt.Errorf("building request: %w", err)
+	}
+	req.Header.Set("apikey", supabaseKey)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("supabase auth returned %d", resp.StatusCode)
+	}
+
+	var user struct {
+		Email string `json:"email"`
+	}
+	if err := json.Unmarshal(body, &user); err != nil {
+		return "", fmt.Errorf("decoding user: %w", err)
+	}
+	if user.Email == "" {
+		return "", fmt.Errorf("supabase returned empty email")
+	}
+	return user.Email, nil
 }
 
 // extractToken reads the bearer token from Authorization or X-Admin-Token headers.
@@ -80,7 +144,7 @@ func syncESPNMatchesHandler(espnClient *espn.Client, supabaseURL, supabaseKey st
 		result, err := matchsync.ESPNMatches(r.Context(), espnClient, supabaseURL, supabaseKey)
 		if err != nil {
 			log.Printf("sync-espn-matches error: %v", err)
-			http.Error(w, `{"error":"sync failed"}`, http.StatusInternalServerError)
+			writeJSON(w, http.StatusInternalServerError, `{"error":"sync failed"}`)
 			return
 		}
 
@@ -89,6 +153,12 @@ func syncESPNMatchesHandler(espnClient *espn.Client, supabaseURL, supabaseKey st
 			log.Printf("encoding sync result: %v", err)
 		}
 	}
+}
+
+func writeJSON(w http.ResponseWriter, status int, body string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_, _ = w.Write([]byte(body))
 }
 
 func loadEnv() {

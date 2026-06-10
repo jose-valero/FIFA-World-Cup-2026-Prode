@@ -12,6 +12,7 @@ import {
   Typography,
   Chip
 } from '@mui/material';
+import SyncIcon from '@mui/icons-material/Sync';
 import { useAdminResults } from '../hooks/useAdminResults';
 import { MatchVs } from '../../../../shared/components/MatchVs';
 import { useUpdateOfficialResultMutation } from '../hooks/useAdminResultMutations';
@@ -19,6 +20,7 @@ import type { AdminMatchRow } from '../types/admin.results.types';
 import { PageFiltersBar } from '../../../../shared/components/PageFiltersBar';
 import type { MatchStatus } from '../../../matches/types/types';
 import { formatKickoff } from '../../../../shared/utils/formatKickoff';
+import { useSyncESPNMatches } from '../../sync/hooks/useSyncESPNMatches';
 
 type DraftMap = Record<
   string,
@@ -133,6 +135,7 @@ export function AdminResultsPage() {
   const { isLoading, isError, error } = adminResultsQuery;
 
   const updateOfficialResultMutation = useUpdateOfficialResultMutation();
+  const { state: syncState, run: runSync } = useSyncESPNMatches();
 
   const [drafts, setDrafts] = React.useState<DraftMap>({});
   const [errorMessage, setErrorMessage] = React.useState('');
@@ -256,14 +259,38 @@ export function AdminResultsPage() {
     <Stack spacing={3}>
       <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
         <CardContent sx={{ p: { xs: 3, md: 4 } }}>
-          <Stack spacing={1}>
-            <Typography variant='h4' fontWeight={800}>
-              Admin · Resultados oficiales
-            </Typography>
-            <Typography color='text.secondary'>
-              Aquí puedes editar los marcadores oficiales y filtrar rápidamente los partidos.
-            </Typography>
+          <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent='space-between' alignItems={{ sm: 'center' }} spacing={2}>
+            <Stack spacing={1}>
+              <Typography variant='h4' fontWeight={800}>
+                Admin · Resultados oficiales
+              </Typography>
+              <Typography color='text.secondary'>
+                Aquí puedes editar los marcadores oficiales y filtrar rápidamente los partidos.
+              </Typography>
+            </Stack>
+
+            <Button
+              variant='outlined'
+              startIcon={syncState.status === 'loading' ? <CircularProgress size={16} /> : <SyncIcon />}
+              onClick={() => void runSync()}
+              disabled={syncState.status === 'loading'}
+              sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+            >
+              {syncState.status === 'loading' ? 'Sincronizando...' : 'Sincronizar ESPN'}
+            </Button>
           </Stack>
+
+          {syncState.status === 'success' ? (
+            <Alert severity='success' sx={{ mt: 2 }}>
+              Sync completado — {syncState.result.total_updated} actualizado(s), {syncState.result.total_unchanged} sin cambios, {syncState.result.total_omitted} omitido(s) de {syncState.result.total_reviewed} revisados.
+            </Alert>
+          ) : null}
+
+          {syncState.status === 'error' ? (
+            <Alert severity='error' sx={{ mt: 2 }}>
+              Error al sincronizar: {syncState.message}
+            </Alert>
+          ) : null}
         </CardContent>
       </Card>
 
