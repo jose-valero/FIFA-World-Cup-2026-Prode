@@ -13,7 +13,6 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { Link as RouterLink, useNavigate, useParams } from 'react-router';
 import { useMatches } from '../hooks/useMatches';
-import { useAuth } from '../../auth/hooks/useAuth';
 import { TeamFlag } from '../../../shared/components/TeamFlag';
 import { getStageLabel } from '../../tournament/utils/stages';
 import { routes } from '../../../app/router/routes';
@@ -52,10 +51,7 @@ function MatchHero({ match }: { match: Match }) {
     }
   }
 
-  const hasScore =
-    match.status !== 'scheduled' &&
-    match.officialHomeScore != null &&
-    match.officialAwayScore != null;
+  const hasScore = match.status !== 'scheduled' && match.officialHomeScore != null && match.officialAwayScore != null;
 
   const isLive = match.status === 'live';
 
@@ -69,9 +65,7 @@ function MatchHero({ match }: { match: Match }) {
         overflow: 'hidden'
       }}
     >
-      {isLive && (
-        <Box sx={{ height: 3, bgcolor: 'error.main' }} />
-      )}
+      {isLive && <Box sx={{ height: 3, bgcolor: 'error.main' }} />}
 
       <CardContent sx={{ p: { xs: 2, md: 3 } }}>
         <Stack spacing={2.5}>
@@ -86,7 +80,9 @@ function MatchHero({ match }: { match: Match }) {
               </Typography>
               {match.groupCode ? (
                 <>
-                  <Typography variant='caption' color='text.secondary'>·</Typography>
+                  <Typography variant='caption' color='text.secondary'>
+                    ·
+                  </Typography>
                   <Typography variant='caption' color='text.secondary'>
                     Grupo {match.groupCode}
                   </Typography>
@@ -135,11 +131,7 @@ function MatchHero({ match }: { match: Match }) {
             <Grid size={{ xs: 'auto', md: 'auto' }}>
               <Stack alignItems='center' spacing={0.5}>
                 {hasScore ? (
-                  <Typography
-                    variant='h2'
-                    fontWeight={900}
-                    sx={{ letterSpacing: 4, lineHeight: 1 }}
-                  >
+                  <Typography variant='h2' fontWeight={900} sx={{ letterSpacing: 4, lineHeight: 1 }}>
                     {match.officialHomeScore} – {match.officialAwayScore}
                   </Typography>
                 ) : (
@@ -213,10 +205,7 @@ function MatchContextCard({ match }: { match: Match }) {
   ];
 
   return (
-    <Card
-      elevation={0}
-      sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider', height: '100%' }}
-    >
+    <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider', height: '100%' }}>
       <CardContent sx={{ p: 2.5 }}>
         <Stack spacing={2}>
           <Typography variant='subtitle1' fontWeight={800}>
