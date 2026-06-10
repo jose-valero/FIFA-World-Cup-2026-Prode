@@ -19,6 +19,7 @@ import { formatDateTime } from '../utils/formatDateTime';
 import { isPredictionsClosed } from '../../../shared/utils/isPredictionsClosed';
 import { routes } from '../../../app/router/routes';
 import { PerformanceChartSection } from '../components/PerformanceChartSection';
+import { TodayMatchesScroller } from '../components/TodayMatchesScroller';
 
 export function DashboardPage() {
   const { user, profile } = useAuth();
@@ -72,6 +73,11 @@ export function DashboardPage() {
   const liveMatches = React.useMemo(() => {
     return matches.filter((match) => match.status === 'live');
   }, [matches]);
+
+  const todayMatches = React.useMemo(() => {
+    const todayStr = new Date().toDateString();
+    return sortedMatches.filter((m) => true || new Date(m.kickoffAt).toDateString() === todayStr);
+  }, [sortedMatches]);
 
   const pendingPredictionMatches = React.useMemo(() => {
     return scheduledMatches.filter((match) => !predictedMatchIds.has(match.id));
@@ -175,10 +181,24 @@ export function DashboardPage() {
 
   return (
     <Stack spacing={2.5}>
+      {todayMatches.length > 0 ? (
+        <Box>
+          <Typography variant='subtitle2' color='text.secondary' sx={{ mb: 1 }}>
+            Partidos de hoy
+          </Typography>
+          <TodayMatchesScroller matches={todayMatches} />
+        </Box>
+      ) : null}
+
       <PageHeader
         title='Panel de control'
         description='Sigue el estado del torneo y tu rendimiento dentro de la quiniela desde un solo lugar.'
         badges={badges}
+        actions={
+          <Button component={RouterLink} to={routes.leaderboard} size='small' variant='outlined'>
+            Ir a tabla
+          </Button>
+        }
       />
 
       <Grid container spacing={1.5}>

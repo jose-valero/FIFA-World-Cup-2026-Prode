@@ -77,6 +77,12 @@ const FixturePage = lazy(() =>
   }))
 );
 
+const MatchDetailPage = lazy(() =>
+  import('../../modules/matches/ui/MatchDetailPage').then((module) => ({
+    default: module.MatchDetailPage
+  }))
+);
+
 const AdminMatchesPage = lazy(() =>
   import('../../modules/admin/matches/ui/AdminMatchesPage').then((module) => ({
     default: module.AdminMatchesPage
@@ -159,7 +165,8 @@ export const appRouter = createBrowserRouter([
             ]
           },
 
-          { path: routes.fixture, element: withSuspense(<FixturePage />) }
+          { path: routes.fixture, element: withSuspense(<FixturePage />) },
+          { path: routes.matchDetail, element: withSuspense(<MatchDetailPage />) }
         ]
       },
 

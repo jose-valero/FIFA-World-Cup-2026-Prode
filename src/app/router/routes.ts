@@ -4,6 +4,7 @@ export const slugs = {
   fixture: 'fixture',
   matches: 'matches',
   my_predictions: 'my-predictions',
+  partido: 'partido',
   predictions: 'predictions',
   profile: 'profile',
   results: 'results',
@@ -24,8 +25,13 @@ export const routes = {
   myPredictions: `/app/${slugs.predictions}/${slugs.my_predictions}`,
   profile: `/app/${slugs.profile}`,
   fixture: `/app/${slugs.fixture}`,
+  matchDetail: `/app/${slugs.partido}/:matchId`,
 
   adminMatches: `/admin/${slugs.matches}`,
   adminResults: `/admin/${slugs.results}`,
   adminSettings: `/admin/${slugs.settings}`
 } as const;
+
+export function matchDetailPath(matchId: string): string {
+  return `/app/${slugs.partido}/${matchId}`;
+}
