@@ -57,6 +57,15 @@ export function LeaderboardPage() {
     staleTime: 60_000
   });
 
+  const allUserIds = React.useMemo(() => displayRows.map((r) => r.user_id), [displayRows]);
+
+  const { data: participantAvatars = new Map() } = useQuery({
+    queryKey: queryKeys.participantAvatars(allUserIds),
+    queryFn: () => getTopThreeAvatars(allUserIds),
+    enabled: allUserIds.length > 0,
+    staleTime: 60_000
+  });
+
   const adminMap = React.useMemo(() => {
     return new Map(adminOverview.map((row) => [row.user_id, row]));
   }, [adminOverview]);
@@ -173,6 +182,7 @@ export function LeaderboardPage() {
                 displayRows={displayRows}
                 adminMap={adminMap}
                 activePositionMap={activePositionMap}
+                avatarMap={participantAvatars}
                 user={user}
                 isAdmin={isAdmin}
                 canInspectPredictions={canInspectPredictions}

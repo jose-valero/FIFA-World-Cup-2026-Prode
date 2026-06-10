@@ -21,6 +21,7 @@ export interface LeaderboardTableProps {
   displayRows: LeaderboardRow[];
   adminMap: Map<string, AdminParticipantOverviewRow>;
   activePositionMap: Map<string, number>;
+  avatarMap: Map<string, string | null>;
   user: User | null;
   isAdmin: boolean;
   canInspectPredictions: boolean;

@@ -8,6 +8,7 @@ export const LeaderboardTableBody = ({
   displayRows,
   adminMap,
   activePositionMap,
+  avatarMap,
   user,
   isAdmin,
   canInspectPredictions,
@@ -76,6 +77,7 @@ export const LeaderboardTableBody = ({
               <TableCell>
                 <Stack direction='row' spacing={1.5} alignItems='center'>
                   <Avatar
+                    src={avatarMap.get(row.user_id) ?? undefined}
                     sx={{
                       width: 32,
                       height: 32,

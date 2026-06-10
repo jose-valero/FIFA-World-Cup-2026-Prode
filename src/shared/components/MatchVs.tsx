@@ -11,7 +11,7 @@ export const MatchVs = ({ match }: MatchVsProps) => {
     <Stack direction='row' spacing={1.25} alignItems='center'>
       <Stack direction='row' spacing={0.5} alignItems='center'>
         <TeamFlag teamCode={match?.homeTeamCode} teamName={match?.homeTeam} />
-        <Typography variant='h6' fontWeight={700}>
+        <Typography variant='body1' fontWeight={700}>
           {match?.homeTeam}
         </Typography>
       </Stack>
@@ -22,7 +22,7 @@ export const MatchVs = ({ match }: MatchVsProps) => {
 
       <Stack direction='row' spacing={0.5} alignItems='center'>
         <TeamFlag teamCode={match?.awayTeamCode} teamName={match?.awayTeam} />
-        <Typography variant='h6' fontWeight={700}>
+        <Typography variant='body1' fontWeight={700}>
           {match?.awayTeam}
         </Typography>
       </Stack>

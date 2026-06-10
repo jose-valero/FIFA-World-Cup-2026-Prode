@@ -28,18 +28,19 @@ export function TeamFlag({ teamCode, teamName, size = 13, rounded = false }: Tea
     );
   }
 
+  const flagWidth = Math.round(size * 1.4);
+  const flagHeight = Math.round(size);
+
   return (
     <Box
       component='img'
       src={flagSrc}
       alt={teamName ? `Bandera de ${teamName}` : `Bandera ${teamCode ?? ''}`}
       sx={{
-        width: size * 1.4,
-        height: size,
-        objectFit: 'cover',
+        width: flagWidth,
+        height: flagHeight,
+        objectFit: 'contain',
         borderRadius: rounded ? '999px' : '4px',
-        // border: '1px solid',
-        // borderColor: 'divider',
         display: 'block',
         flexShrink: 0
       }}

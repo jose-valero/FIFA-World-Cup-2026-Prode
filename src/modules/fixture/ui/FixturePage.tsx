@@ -373,7 +373,7 @@ export function FixturePage() {
                                         <Stack direction='row' spacing={1} alignItems='center'>
                                           <Stack direction='row' spacing={1} alignItems='center'>
                                             <TeamFlag teamCode={row.team_code} teamName={row.team_name} />
-                                            <Typography variant='h6' fontWeight={700}>
+                                            <Typography variant='body1' fontWeight={700}>
                                               {row.team_name}
                                             </Typography>
                                           </Stack>

@@ -7,6 +7,7 @@ export const LeaderboardTable = ({
   displayRows,
   adminMap,
   activePositionMap,
+  avatarMap,
   user,
   isAdmin,
   canInspectPredictions,
@@ -24,6 +25,7 @@ export const LeaderboardTable = ({
           displayRows={displayRows}
           adminMap={adminMap}
           activePositionMap={activePositionMap}
+          avatarMap={avatarMap}
           user={user}
           isAdmin={isAdmin}
           canInspectPredictions={canInspectPredictions}
