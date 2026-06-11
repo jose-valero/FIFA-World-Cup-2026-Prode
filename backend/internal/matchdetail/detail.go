@@ -308,8 +308,13 @@ func corePlayEventType(p espn.CorePlay) (string, bool) {
 }
 
 // teamIDFromRef extracts the numeric ID from an ESPN Core API $ref URL.
-// e.g. ".../teams/12345" → "12345"
+// Core API refs include query params (e.g. "?lang=en&region=us") that must be
+// stripped before path extraction, otherwise the lookup in teamSides fails.
+// e.g. ".../teams/12345?lang=en" → "12345"
 func teamIDFromRef(ref string) string {
+	if q := strings.Index(ref, "?"); q >= 0 {
+		ref = ref[:q]
+	}
 	ref = strings.TrimRight(ref, "/")
 	i := strings.LastIndex(ref, "/")
 	if i < 0 || i == len(ref)-1 {
@@ -347,7 +352,7 @@ func eventsFromCorePlays(plays []espn.CorePlay, teamSides map[string]string) []E
 		}
 		side := teamSides[teamIDFromRef(p.Team.Ref)]
 		if side == "" {
-			side = "home"
+			continue // skip: cannot resolve team side reliably
 		}
 		player := corePlayerName(p)
 		minute := p.Clock.DisplayValue
@@ -375,7 +380,7 @@ func eventsFromPlays(plays []espn.Play, teamSides map[string]string) []Event {
 		minute := p.Clock.DisplayValue
 		side := teamSides[p.Team.ID]
 		if side == "" {
-			side = "home"
+			continue // skip: cannot resolve team side reliably
 		}
 		events = append(events, Event{
 			Minute: minute,
@@ -397,7 +402,7 @@ func eventsFromScoringPlays(plays []espn.ScoringPlay, teamSides map[string]strin
 		minute := sp.Clock.DisplayValue
 		side := teamSides[sp.Team.ID]
 		if side == "" {
-			// fallback: linear search through comps
+			// secondary lookup: linear search through summary competitors
 			for _, c := range comps {
 				if c.Team.ID == sp.Team.ID {
 					side = c.HomeAway
@@ -406,7 +411,7 @@ func eventsFromScoringPlays(plays []espn.ScoringPlay, teamSides map[string]strin
 			}
 		}
 		if side == "" {
-			side = "home"
+			continue // skip: cannot resolve team side reliably
 		}
 		eventType, _ := mapPlayTypeFromText(sp.Type.Text)
 		if eventType == "" {

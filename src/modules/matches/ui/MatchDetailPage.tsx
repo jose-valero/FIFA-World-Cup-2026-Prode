@@ -534,9 +534,8 @@ const LEGEND_ITEMS: { type: MatchDetailEventType; label: string }[] = [
   { type: 'substitution', label: 'Cambio' },
 ];
 
-// For each event, compute a "stack level" (0, 1, 2…) within its side.
-// Events of the same side closer than CLUSTER_THRESHOLD % get stacked.
 const CLUSTER_THRESHOLD = 7;
+// Returns per-event stack levels within its own side (0, 1, 2…).
 function computeMarkerLevels(events: MatchDetailEvent[]): number[] {
   const positions = events.map((e) => minuteToPercent(e.minute));
   const levels = new Array(events.length).fill(0) as number[];
@@ -553,7 +552,10 @@ function computeMarkerLevels(events: MatchDetailEvent[]): number[] {
   return levels;
 }
 
-// ── Event detail popover content ──────────────────────────────────────────────
+const LANE_BASE = 44; // px — minimum height of each team lane
+const LEVEL_STEP = 22; // px — extra height per stacking level
+
+// ── Event detail popover ──────────────────────────────────────────────────────
 
 function EventDetailContent({
   event,
@@ -565,117 +567,104 @@ function EventDetailContent({
   awayCode: string;
 }) {
   const { label } = useEventVisual(event.type);
-  const teamLabel = event.side === 'home' ? homeCode || 'Local' : awayCode || 'Visitante';
-
+  const teamCode = event.side === 'home' ? homeCode || 'Local' : awayCode || 'Visit.';
   return (
-    <Stack spacing={0.75} sx={{ p: 1.5, minWidth: 150, maxWidth: 210 }}>
-      <Stack direction='row' alignItems='center' spacing={1}>
-        <EventTypeIcon type={event.type} size={17} />
-        <Typography variant='body2' fontWeight={700}>
-          {label}
-        </Typography>
+    <Stack spacing={0.5} sx={{ p: 1.5, minWidth: 140, maxWidth: 200 }}>
+      <Stack direction='row' alignItems='center' spacing={0.75}>
+        <EventTypeIcon type={event.type} size={16} />
+        <Typography variant='body2' fontWeight={700}>{label}</Typography>
       </Stack>
       <Typography variant='body2' sx={{ color: 'text.primary', fontWeight: 500, lineHeight: 1.3 }}>
         {formatPlayerName(event.player)}
-        {event.type === 'penalty_goal' && (
-          <Typography component='span' variant='caption' sx={{ color: 'text.secondary', ml: 0.5 }}>
-            (P)
-          </Typography>
-        )}
-        {event.type === 'own_goal' && (
-          <Typography component='span' variant='caption' sx={{ color: 'error.main', ml: 0.5 }}>
-            (OG)
-          </Typography>
-        )}
+        {event.type === 'penalty_goal' && <Typography component='span' variant='caption' sx={{ color: 'text.secondary', ml: 0.5 }}>(P)</Typography>}
+        {event.type === 'own_goal' && <Typography component='span' variant='caption' sx={{ color: 'error.main', ml: 0.5 }}>(OG)</Typography>}
       </Typography>
-      <Stack direction='row' spacing={1} alignItems='center'>
-        <Typography variant='caption' sx={{ color: 'text.disabled', fontVariantNumeric: 'tabular-nums' }}>
-          {event.minute}
-        </Typography>
-        <Typography variant='caption' sx={{ color: 'text.disabled' }}>·</Typography>
-        <Typography variant='caption' sx={{ color: 'text.disabled', fontWeight: 600 }}>
-          {teamLabel}
-        </Typography>
-      </Stack>
+      <Typography variant='caption' sx={{ color: 'text.disabled', fontVariantNumeric: 'tabular-nums' }}>
+        {event.minute} · {teamCode}
+      </Typography>
     </Stack>
   );
 }
 
-// ── Timeline marker ───────────────────────────────────────────────────────────
+// ── Lane marker (home or away) ────────────────────────────────────────────────
 
-function TimelineMarker({
+function LaneMarker({
   event,
   position,
   level,
+  side,
   onSelect,
 }: {
   event: MatchDetailEvent;
-  position: number;
+  position: number;  // 0–100 %
   level: number;
+  side: 'home' | 'away';
   onSelect: (anchor: HTMLElement, ev: MatchDetailEvent) => void;
 }) {
   const { color } = useEventVisual(event.type);
-  const isHome = event.side === 'home';
-  const levelOffset = level * 22;
-
-  // Home: box grows upward from line (column-reverse, translate up)
-  // Away: box grows downward from line (column, translate down)
-  const transform = isHome
-    ? `translate(-50%, calc(-100% - ${levelOffset}px))`
-    : `translate(-50%, ${levelOffset}px)`;
+  // home → anchor at bottom of lane, grow upward; away → anchor at top, grow downward
+  const anchorProp = side === 'home' ? 'bottom' : 'top';
+  const anchorValue = level * LEVEL_STEP;
 
   return (
     <Box
       component='button'
       onClick={(e: React.MouseEvent<HTMLButtonElement>) => onSelect(e.currentTarget, event)}
+      aria-label={`${event.minute} ${formatPlayerName(event.player)}`}
       sx={{
         position: 'absolute',
         left: `${position}%`,
-        top: '50%',
-        transform,
+        [anchorProp]: anchorValue,
+        transform: 'translateX(-50%)',
         display: 'flex',
-        flexDirection: isHome ? 'column-reverse' : 'column',
+        flexDirection: side === 'home' ? 'column' : 'column-reverse',
         alignItems: 'center',
-        gap: '3px',
+        gap: '2px',
         cursor: 'pointer',
         background: 'none',
         border: 'none',
         p: 0,
         zIndex: 2,
-        '&:hover .marker-dot, &:focus-visible .marker-dot': {
-          transform: 'scale(1.35)',
-          boxShadow: `0 0 10px ${color}`,
+        '&:hover .dot, &:focus-visible .dot': {
+          transform: 'scale(1.4)',
+          boxShadow: `0 0 8px ${color}`,
         },
         '&:focus-visible': { outline: 'none' },
       }}
     >
-      <Box
-        className='marker-dot'
-        sx={{
-          width: 10,
-          height: 10,
-          borderRadius: '50%',
-          bgcolor: color,
-          border: '2px solid',
-          borderColor: 'background.paper',
-          boxShadow: `0 0 5px ${color}80`,
-          transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-          flexShrink: 0,
-        }}
-      />
+      {/* minute label — always furthest from the line */}
       <Typography
         sx={{
-          fontSize: '0.58rem',
+          fontSize: '0.56rem',
           fontWeight: 700,
           color,
           lineHeight: 1,
           whiteSpace: 'nowrap',
-          textShadow: '0 1px 4px rgba(0,0,0,0.7)',
+          textShadow: '0 1px 3px rgba(0,0,0,0.8)',
           pointerEvents: 'none',
         }}
       >
         {event.minute}
       </Typography>
+      {/* icon */}
+      <Box sx={{ display: 'flex', pointerEvents: 'none' }}>
+        <EventTypeIcon type={event.type} size={12} />
+      </Box>
+      {/* dot — always closest to the line */}
+      <Box
+        className='dot'
+        sx={{
+          width: 9,
+          height: 9,
+          borderRadius: '50%',
+          bgcolor: color,
+          border: '2px solid',
+          borderColor: 'background.paper',
+          boxShadow: `0 0 4px ${color}80`,
+          transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+          flexShrink: 0,
+        }}
+      />
     </Box>
   );
 }
@@ -684,30 +673,14 @@ function TimelineMarker({
 
 function TimelineEventListRow({ event }: { event: MatchDetailEvent }) {
   const { color } = useEventVisual(event.type);
-
   return (
     <Stack
       direction='row'
       alignItems='center'
       spacing={1.5}
-      sx={{
-        py: 0.75,
-        px: 0.5,
-        borderRadius: 1,
-        '&:hover': { bgcolor: alpha('#ffffff', 0.03) },
-      }}
+      sx={{ py: 0.75, px: 0.5, borderRadius: 1, '&:hover': { bgcolor: alpha('#ffffff', 0.03) } }}
     >
-      <Typography
-        variant='caption'
-        sx={{
-          color: 'text.disabled',
-          fontVariantNumeric: 'tabular-nums',
-          fontWeight: 600,
-          minWidth: 28,
-          textAlign: 'right',
-          flexShrink: 0,
-        }}
-      >
+      <Typography variant='caption' sx={{ color: 'text.disabled', fontVariantNumeric: 'tabular-nums', fontWeight: 600, minWidth: 28, textAlign: 'right', flexShrink: 0 }}>
         {event.minute}
       </Typography>
       <Box sx={{ display: 'flex', flexShrink: 0 }}>
@@ -715,18 +688,10 @@ function TimelineEventListRow({ event }: { event: MatchDetailEvent }) {
       </Box>
       <Typography variant='body2' sx={{ flex: 1, fontWeight: 500, color: 'text.primary' }}>
         {formatPlayerName(event.player)}
-        {event.type === 'penalty_goal' && (
-          <Typography component='span' variant='caption' sx={{ color: 'text.secondary', ml: 0.5 }}>
-            (P)
-          </Typography>
-        )}
-        {event.type === 'own_goal' && (
-          <Typography component='span' variant='caption' sx={{ color: 'error.main', ml: 0.5 }}>
-            (OG)
-          </Typography>
-        )}
+        {event.type === 'penalty_goal' && <Typography component='span' variant='caption' sx={{ color: 'text.secondary', ml: 0.5 }}>(P)</Typography>}
+        {event.type === 'own_goal' && <Typography component='span' variant='caption' sx={{ color: 'error.main', ml: 0.5 }}>(OG)</Typography>}
       </Typography>
-      <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: color, flexShrink: 0, opacity: 0.8 }} />
+      <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: color, flexShrink: 0, opacity: 0.8 }} />
     </Stack>
   );
 }
@@ -748,164 +713,186 @@ function MatchTimeline({
 }) {
   const theme = useTheme();
   const [showList, setShowList] = React.useState(false);
-  const [popover, setPopover] = React.useState<{
-    anchor: HTMLElement;
-    event: MatchDetailEvent;
-  } | null>(null);
+  const [popover, setPopover] = React.useState<{ anchor: HTMLElement; event: MatchDetailEvent } | null>(null);
 
   const timelineEvents = getTimelineEvents(events);
+  const homeEvents = timelineEvents.filter((e) => e.side === 'home');
+  const awayEvents = timelineEvents.filter((e) => e.side === 'away');
   const levels = computeMarkerLevels(timelineEvents);
-  const maxLevel = levels.length > 0 ? Math.max(...levels) : 0;
+
+  const maxHomeLevel = homeEvents.length > 0
+    ? Math.max(...homeEvents.map((e) => levels[timelineEvents.indexOf(e)]))
+    : 0;
+  const maxAwayLevel = awayEvents.length > 0
+    ? Math.max(...awayEvents.map((e) => levels[timelineEvents.indexOf(e)]))
+    : 0;
+
+  // Lane heights grow with stacking depth
+  const homeLaneH = LANE_BASE + maxHomeLevel * LEVEL_STEP;
+  const awayLaneH = LANE_BASE + maxAwayLevel * LEVEL_STEP;
 
   const liveMinute = status === 'live' && minuteLabel ? parseMinute(minuteLabel) : null;
-  const progressPercent =
-    liveMinute != null
-      ? Math.min((liveMinute / TIMELINE_MAX) * 100, 100)
-      : status === 'finished'
-        ? 100
-        : 0;
-
-  // Vertical padding to accommodate stacked labels (base 44px + 22px per extra level)
-  const vertPad = Math.max(44, 36 + maxLevel * 24);
-
-  function handleMarkerSelect(anchor: HTMLElement, ev: MatchDetailEvent) {
-    setPopover((prev) =>
-      prev?.event === ev && prev.anchor === anchor ? null : { anchor, event: ev }
-    );
-  }
+  const progressPct = liveMinute != null
+    ? Math.min((liveMinute / TIMELINE_MAX) * 100, 100)
+    : status === 'finished' ? 100 : 0;
 
   const htPct = (45 / TIMELINE_MAX) * 100;
   const ftPct = (90 / TIMELINE_MAX) * 100;
 
+  function handleSelect(anchor: HTMLElement, ev: MatchDetailEvent) {
+    setPopover((prev) => (prev?.event === ev ? null : { anchor, event: ev }));
+  }
+
   return (
-    <Box sx={{ px: { xs: 0.5, sm: 1.5 }, py: 0.5 }}>
-      {/* Side labels */}
-      <Stack direction='row' justifyContent='space-between' sx={{ mb: 0.5, px: 0.5 }}>
-        <Typography variant='caption' sx={{ color: 'text.disabled', fontWeight: 700, letterSpacing: 0.5 }}>
-          {homeCode || 'LOCAL'}
-        </Typography>
-        <Typography variant='caption' sx={{ color: 'text.disabled', fontWeight: 700, letterSpacing: 0.5 }}>
-          {awayCode || 'VISIT'}
-        </Typography>
-      </Stack>
+    <Box sx={{ py: 0.5 }}>
+      {/* Main layout: team-code column + track column */}
+      <Stack direction='row' alignItems='stretch' spacing={0}>
 
-      {/* Track — scrollable on mobile */}
-      <Box sx={{ overflowX: 'auto' }}>
-        <Box
-          sx={{
-            minWidth: 300,
-            position: 'relative',
-            pt: `${vertPad}px`,
-            pb: `${vertPad}px`,
-          }}
+        {/* Left: team codes */}
+        <Stack
+          justifyContent='space-between'
+          sx={{ width: 28, flexShrink: 0, pr: 0.5, userSelect: 'none' }}
         >
-          {/* Track background */}
-          <Box
+          <Typography
+            variant='caption'
             sx={{
-              position: 'absolute',
-              left: 0,
-              right: 0,
-              top: '50%',
-              transform: 'translateY(-50%)',
-              height: 3,
-              bgcolor: alpha(theme.palette.common.white, 0.08),
-              borderRadius: 2,
-            }}
-          />
-
-          {/* Progress fill */}
-          {progressPercent > 0 && (
-            <Box
-              sx={{
-                position: 'absolute',
-                left: 0,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                width: `${progressPercent}%`,
-                height: 3,
-                bgcolor:
-                  status === 'live'
-                    ? theme.palette.success.main
-                    : alpha(theme.palette.common.white, 0.18),
-                borderRadius: 2,
-                transition: 'width 1s ease',
-              }}
-            />
-          )}
-
-          {/* HT marker */}
-          <Box
-            sx={{
-              position: 'absolute',
-              left: `${htPct}%`,
-              top: '50%',
-              transform: 'translate(-50%, -50%)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              zIndex: 1,
+              color: 'text.disabled',
+              fontWeight: 800,
+              fontSize: '0.6rem',
+              letterSpacing: 0.3,
+              lineHeight: 1,
+              pt: `${homeLaneH - 10}px`, // align to bottom of home lane
+              textAlign: 'right',
             }}
           >
-            <Box sx={{ width: 1, height: 14, bgcolor: alpha(theme.palette.common.white, 0.25) }} />
-            <Typography sx={{ fontSize: '0.52rem', color: 'text.disabled', mt: '2px' }}>HT</Typography>
-          </Box>
-
-          {/* FT marker */}
-          <Box
+            {homeCode || 'LOC'}
+          </Typography>
+          <Typography
+            variant='caption'
             sx={{
-              position: 'absolute',
-              left: `${ftPct}%`,
-              top: '50%',
-              transform: 'translate(-50%, -50%)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              zIndex: 1,
+              color: 'text.disabled',
+              fontWeight: 800,
+              fontSize: '0.6rem',
+              letterSpacing: 0.3,
+              lineHeight: 1,
+              pb: `${awayLaneH - 10}px`, // align to top of away lane
+              textAlign: 'right',
             }}
           >
-            <Box sx={{ width: 1, height: 14, bgcolor: alpha(theme.palette.common.white, 0.25) }} />
-            <Typography sx={{ fontSize: '0.52rem', color: 'text.disabled', mt: '2px' }}>FT</Typography>
+            {awayCode || 'VIS'}
+          </Typography>
+        </Stack>
+
+        {/* Right: track */}
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+
+          {/* Home lane */}
+          <Box sx={{ position: 'relative', height: homeLaneH }}>
+            {homeEvents.map((e) => {
+              const idx = timelineEvents.indexOf(e);
+              return (
+                <LaneMarker
+                  key={idx}
+                  event={e}
+                  position={minuteToPercent(e.minute)}
+                  level={levels[idx]}
+                  side='home'
+                  onSelect={handleSelect}
+                />
+              );
+            })}
           </Box>
 
-          {/* Live cursor */}
-          {status === 'live' && liveMinute != null && (
-            <Box
-              sx={{
+          {/* Center line */}
+          <Box sx={{ position: 'relative', height: 20 }}>
+            {/* Track bar */}
+            <Box sx={{
+              position: 'absolute', left: 0, right: 0,
+              top: '50%', transform: 'translateY(-50%)',
+              height: 2,
+              bgcolor: alpha(theme.palette.common.white, 0.10),
+              borderRadius: 1,
+            }} />
+
+            {/* Progress fill */}
+            {progressPct > 0 && (
+              <Box sx={{
+                position: 'absolute', left: 0,
+                top: '50%', transform: 'translateY(-50%)',
+                width: `${progressPct}%`, height: 2,
+                bgcolor: status === 'live' ? theme.palette.success.main : alpha(theme.palette.common.white, 0.22),
+                borderRadius: 1, transition: 'width 1s ease',
+              }} />
+            )}
+
+            {/* 0' label */}
+            <Typography sx={{
+              position: 'absolute', left: 0, top: '50%',
+              transform: 'translateY(4px)',
+              fontSize: '0.5rem', color: 'text.disabled', lineHeight: 1,
+            }}>0'</Typography>
+
+            {/* HT tick */}
+            <Box sx={{
+              position: 'absolute', left: `${htPct}%`, top: '50%',
+              transform: 'translate(-50%, -50%)',
+              display: 'flex', flexDirection: 'column', alignItems: 'center',
+            }}>
+              <Box sx={{ width: 1, height: 8, bgcolor: alpha(theme.palette.common.white, 0.25) }} />
+              <Typography sx={{ fontSize: '0.48rem', color: 'text.disabled', lineHeight: 1, mt: '1px' }}>HT</Typography>
+            </Box>
+
+            {/* FT tick */}
+            <Box sx={{
+              position: 'absolute', left: `${ftPct}%`, top: '50%',
+              transform: 'translate(-50%, -50%)',
+              display: 'flex', flexDirection: 'column', alignItems: 'center',
+            }}>
+              <Box sx={{ width: 1, height: 8, bgcolor: alpha(theme.palette.common.white, 0.25) }} />
+              <Typography sx={{ fontSize: '0.48rem', color: 'text.disabled', lineHeight: 1, mt: '1px' }}>FT</Typography>
+            </Box>
+
+            {/* Live cursor */}
+            {status === 'live' && liveMinute != null && (
+              <Box sx={{
                 position: 'absolute',
-                left: `${progressPercent}%`,
-                top: '50%',
+                left: `${progressPct}%`, top: '50%',
                 transform: 'translate(-50%, -50%)',
-                width: 12,
-                height: 12,
-                borderRadius: '50%',
+                width: 10, height: 10, borderRadius: '50%',
                 bgcolor: theme.palette.success.main,
-                border: '2px solid',
-                borderColor: 'background.paper',
-                boxShadow: `0 0 8px ${theme.palette.success.main}`,
-                animation: 'livePulse 1.4s ease-in-out infinite',
-                '@keyframes livePulse': {
-                  '0%, 100%': { opacity: 1, transform: 'translate(-50%, -50%) scale(1)' },
-                  '50%': { opacity: 0.7, transform: 'translate(-50%, -50%) scale(1.3)' },
+                border: '2px solid', borderColor: 'background.paper',
+                boxShadow: `0 0 6px ${theme.palette.success.main}`,
+                animation: 'lp 1.4s ease-in-out infinite',
+                '@keyframes lp': {
+                  '0%,100%': { opacity: 1, transform: 'translate(-50%,-50%) scale(1)' },
+                  '50%': { opacity: 0.6, transform: 'translate(-50%,-50%) scale(1.3)' },
                 },
                 zIndex: 3,
-              }}
-            />
-          )}
+              }} />
+            )}
+          </Box>
 
-          {/* Event markers — home above line, away below line */}
-          {timelineEvents.map((e, i) => (
-            <TimelineMarker
-              key={i}
-              event={e}
-              position={minuteToPercent(e.minute)}
-              level={levels[i]}
-              onSelect={handleMarkerSelect}
-            />
-          ))}
+          {/* Away lane */}
+          <Box sx={{ position: 'relative', height: awayLaneH }}>
+            {awayEvents.map((e) => {
+              const idx = timelineEvents.indexOf(e);
+              return (
+                <LaneMarker
+                  key={idx}
+                  event={e}
+                  position={minuteToPercent(e.minute)}
+                  level={levels[idx]}
+                  side='away'
+                  onSelect={handleSelect}
+                />
+              );
+            })}
+          </Box>
+
         </Box>
-      </Box>
+      </Stack>
 
-      {/* Popover for event detail */}
+      {/* Popover */}
       <Popover
         open={Boolean(popover)}
         anchorEl={popover?.anchor ?? null}
@@ -916,56 +903,30 @@ function MatchTimeline({
         slotProps={{
           paper: {
             elevation: 8,
-            sx: {
-              bgcolor: 'background.paper',
-              border: '1px solid',
-              borderColor: 'divider',
-              borderRadius: 2,
-              mt: 0.5,
-            },
+            sx: { bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 2, mt: 0.5 },
           },
         }}
       >
-        {popover && (
-          <EventDetailContent
-            event={popover.event}
-            homeCode={homeCode}
-            awayCode={awayCode}
-          />
-        )}
+        {popover && <EventDetailContent event={popover.event} homeCode={homeCode} awayCode={awayCode} />}
       </Popover>
 
-      {/* Collapsible event list */}
+      {/* Collapsible list */}
       {timelineEvents.length > 0 && (
-        <Box sx={{ mt: 1.5, borderTop: '1px solid', borderColor: 'divider', pt: 1 }}>
+        <Box sx={{ mt: 1, borderTop: '1px solid', borderColor: 'divider', pt: 0.75 }}>
           <Button
             size='small'
             variant='text'
             onClick={() => setShowList((v) => !v)}
             endIcon={
-              <ExpandMoreIcon
-                sx={{
-                  fontSize: 18,
-                  transition: 'transform 0.2s ease',
-                  transform: showList ? 'rotate(180deg)' : 'rotate(0deg)',
-                }}
-              />
+              <ExpandMoreIcon sx={{ fontSize: 17, transition: 'transform 0.2s', transform: showList ? 'rotate(180deg)' : 'none' }} />
             }
-            sx={{
-              color: 'text.secondary',
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              px: 0.5,
-              '&:hover': { color: 'text.primary', bgcolor: 'transparent' },
-            }}
+            sx={{ color: 'text.secondary', fontSize: '0.72rem', fontWeight: 600, px: 0.5, '&:hover': { color: 'text.primary', bgcolor: 'transparent' } }}
           >
             {showList ? 'Ocultar eventos' : `Ver eventos (${timelineEvents.length})`}
           </Button>
           <Collapse in={showList}>
-            <Stack spacing={0} sx={{ mt: 1 }}>
-              {timelineEvents.map((e, i) => (
-                <TimelineEventListRow key={i} event={e} />
-              ))}
+            <Stack spacing={0} sx={{ mt: 0.5 }}>
+              {timelineEvents.map((e, i) => <TimelineEventListRow key={i} event={e} />)}
             </Stack>
           </Collapse>
         </Box>
@@ -989,22 +950,17 @@ function MatchTimelineCard({ match, detail }: { match: Match; detail: MatchDetai
     <Card elevation={0} sx={{ borderRadius: 2 }}>
       <CardContent sx={{ p: 2.5 }}>
         <Stack spacing={2}>
-          {/* Header */}
           <Stack direction='row' alignItems='center' justifyContent='space-between' flexWrap='wrap' gap={1}>
             <Stack direction='row' alignItems='center' spacing={1}>
               <AccessTimeIcon sx={{ fontSize: 18, color: 'text.disabled' }} />
-              <Typography variant='subtitle1' fontWeight={800}>
-                Cronología del partido
-              </Typography>
+              <Typography variant='subtitle1' fontWeight={800}>Cronología del partido</Typography>
             </Stack>
             {!isScheduled && (
               <Stack direction='row' spacing={1.5} flexWrap='wrap'>
                 {LEGEND_ITEMS.map((item) => (
                   <Stack key={item.type} direction='row' alignItems='center' spacing={0.5}>
-                    <EventTypeIcon type={item.type} size={13} />
-                    <Typography variant='caption' sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>
-                      {item.label}
-                    </Typography>
+                    <EventTypeIcon type={item.type} size={12} />
+                    <Typography variant='caption' sx={{ color: 'text.secondary', fontSize: '0.68rem' }}>{item.label}</Typography>
                   </Stack>
                 ))}
               </Stack>
@@ -1019,13 +975,7 @@ function MatchTimelineCard({ match, detail }: { match: Match; detail: MatchDetai
               </Typography>
             </Stack>
           ) : hasEvents ? (
-            <MatchTimeline
-              events={events}
-              status={status}
-              minuteLabel={minuteLabel}
-              homeCode={homeCode}
-              awayCode={awayCode}
-            />
+            <MatchTimeline events={events} status={status} minuteLabel={minuteLabel} homeCode={homeCode} awayCode={awayCode} />
           ) : (
             <Stack alignItems='center' spacing={1} sx={{ py: 3 }}>
               <SportsSoccerIcon sx={{ fontSize: 32, color: 'text.disabled', opacity: 0.4 }} />
