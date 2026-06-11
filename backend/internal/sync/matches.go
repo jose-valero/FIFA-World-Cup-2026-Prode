@@ -223,10 +223,15 @@ func mapESPNStatus(name string) (string, bool) {
 	switch name {
 	case "STATUS_SCHEDULED":
 		return "scheduled", true
-	case "STATUS_IN_PROGRESS", "STATUS_HALFTIME", "STATUS_END_PERIOD",
-		"STATUS_EXTRA_TIME", "STATUS_SHOOTOUT":
+	case "STATUS_IN_PROGRESS",
+		"STATUS_FIRST_HALF",
+		"STATUS_SECOND_HALF",
+		"STATUS_HALFTIME",
+		"STATUS_END_PERIOD",
+		"STATUS_EXTRA_TIME",
+		"STATUS_SHOOTOUT":
 		return "live", true
-	case "STATUS_FINAL":
+	case "STATUS_FINAL", "STATUS_FULL_TIME":
 		return "finished", true
 	default:
 		return "", false
