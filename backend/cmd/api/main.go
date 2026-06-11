@@ -29,7 +29,8 @@ func main() {
 
 	supabaseURL := mustGetEnv("SUPABASE_URL")
 	supabaseKey := mustGetEnv("SUPABASE_SERVICE_ROLE_KEY")
-	espnBase := mustGetEnv("ESPN_SITE_API_BASE")
+	espnSiteBase := mustGetEnv("ESPN_SITE_API_BASE")
+	espnCoreBase := mustGetEnv("ESPN_CORE_API_BASE")
 	adminSyncToken := mustGetEnv("ADMIN_SYNC_TOKEN")
 	allowedEmail := mustGetEnv("ADMIN_SYNC_ALLOWED_EMAIL")
 
@@ -38,7 +39,7 @@ func main() {
 		port = "8080"
 	}
 
-	espnClient := espn.NewClient(espnBase)
+	espnClient := espn.NewClient(espnSiteBase, espnCoreBase)
 
 	mux := http.NewServeMux()
 

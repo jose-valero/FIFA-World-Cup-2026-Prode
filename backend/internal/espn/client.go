@@ -8,16 +8,18 @@ import (
 	"time"
 )
 
-// Client accesses ESPN's public site API.
+// Client accesses ESPN's site API (scoreboard/summary) and Core API (play-by-play).
 type Client struct {
-	baseURL    string
-	httpClient *http.Client
+	baseURL     string // site.api.espn.com — scoreboard, summary
+	coreBaseURL string // sports.core.api.espn.com — plays
+	httpClient  *http.Client
 }
 
-func NewClient(baseURL string) *Client {
+func NewClient(siteBaseURL, coreBaseURL string) *Client {
 	return &Client{
-		baseURL:    baseURL,
-		httpClient: &http.Client{Timeout: 15 * time.Second},
+		baseURL:     siteBaseURL,
+		coreBaseURL: coreBaseURL,
+		httpClient:  &http.Client{Timeout: 15 * time.Second},
 	}
 }
 
@@ -72,7 +74,53 @@ type EventSummary struct {
 		Competitions []SummaryCompetition `json:"competitions"`
 	} `json:"header"`
 	ScoringPlays []ScoringPlay `json:"scoringPlays"`
+	KeyMoments   []Play        `json:"keyMoments"` // ESPN soccer sometimes uses keyMoments instead of scoringPlays
 	Plays        []Play        `json:"plays"`
+}
+
+// ── Core API types ────────────────────────────────────────────────────────────
+
+// corePlayCollection is the paged response from ESPN Core API plays endpoint.
+type corePlayCollection struct {
+	Count     int        `json:"count"`
+	PageIndex int        `json:"pageIndex"`
+	PageSize  int        `json:"pageSize"`
+	PageCount int        `json:"pageCount"`
+	Items     []CorePlay `json:"items"`
+}
+
+// CorePlay is a single play from the ESPN Core API plays endpoint.
+// Boolean flags allow reliable event-type detection without text parsing.
+type CorePlay struct {
+	ID    string `json:"id"`
+	Clock struct {
+		DisplayValue string `json:"displayValue"`
+	} `json:"clock"`
+	Type struct {
+		Text string `json:"text"`
+	} `json:"type"`
+	Text      string `json:"text"`
+	ShortText string `json:"shortText"`
+	Team      struct {
+		Ref string `json:"$ref"`
+	} `json:"team"`
+	Participants []CoreParticipant `json:"participants"`
+	ScoringPlay  bool              `json:"scoringPlay"`
+	Substitution bool              `json:"substitution"`
+	YellowCard   bool              `json:"yellowCard"`
+	RedCard      bool              `json:"redCard"`
+	PenaltyKick  bool              `json:"penaltyKick"`
+	OwnGoal      bool              `json:"ownGoal"`
+}
+
+// CoreParticipant is an athlete entry in a Core API play.
+// ShortName/DisplayName are often embedded inline; Ref is provided as fallback link.
+type CoreParticipant struct {
+	Athlete struct {
+		Ref         string `json:"$ref"`
+		ShortName   string `json:"shortName"`
+		DisplayName string `json:"displayName"`
+	} `json:"athlete"`
 }
 
 // SummaryCompetition holds live status and competitors from the summary response.
@@ -194,6 +242,59 @@ func parseESPNTime(s string) (time.Time, error) {
 		}
 	}
 	return time.Time{}, fmt.Errorf("cannot parse ESPN time %q", s)
+}
+
+// GetEventPlays fetches the full play-by-play for a single ESPN event from the Core API.
+// It paginates automatically (limit=300, up to 5 pages). Only the first page failure
+// is fatal; subsequent page errors return what was already collected.
+func (c *Client) GetEventPlays(ctx context.Context, eventID string) ([]CorePlay, error) {
+	const (
+		limit    = 300
+		maxPages = 10
+		league   = "fifa.world"
+	)
+
+	var all []CorePlay
+
+	for page := 1; page <= maxPages; page++ {
+		url := fmt.Sprintf(
+			"%s/sports/soccer/leagues/%s/events/%s/competitions/%s/plays?limit=%d&page=%d",
+			c.coreBaseURL, league, eventID, eventID, limit, page,
+		)
+		col, err := c.fetchPlayPage(ctx, url)
+		if err != nil {
+			if page == 1 {
+				return nil, fmt.Errorf("ESPN core plays page 1: %w", err)
+			}
+			break
+		}
+		all = append(all, col.Items...)
+		if col.PageCount == 0 || page >= col.PageCount {
+			break
+		}
+	}
+
+	return all, nil
+}
+
+func (c *Client) fetchPlayPage(ctx context.Context, url string) (*corePlayCollection, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+	var col corePlayCollection
+	if err := json.NewDecoder(resp.Body).Decode(&col); err != nil {
+		return nil, fmt.Errorf("decoding: %w", err)
+	}
+	return &col, nil
 }
 
 // GetEventSummary fetches the detailed summary for a single ESPN event.

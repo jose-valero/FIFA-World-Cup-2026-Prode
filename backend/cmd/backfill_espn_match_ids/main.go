@@ -71,7 +71,7 @@ func main() {
 	c := parseConfig()
 
 	ctx := context.Background()
-	espnClient := espn.NewClient(c.espnBase)
+	espnClient := espn.NewClient(c.espnBase, "")
 
 	log.Printf("Supabase URL : %s", c.supabaseURL)
 	log.Printf("ESPN base    : %s", c.espnBase)

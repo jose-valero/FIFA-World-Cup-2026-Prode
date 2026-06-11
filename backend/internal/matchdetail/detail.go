@@ -92,11 +92,20 @@ func Fetch(ctx context.Context, supabaseURL, supabaseKey string, espnClient *esp
 	resp := buildBaseResponse(m)
 
 	if m.ESPNEventID != nil && *m.ESPNEventID != "" {
-		summary, espnErr := espnClient.GetEventSummary(ctx, *m.ESPNEventID)
-		if espnErr == nil {
+		espnID := *m.ESPNEventID
+
+		var teamSides map[string]string
+
+		summary, summaryErr := espnClient.GetEventSummary(ctx, espnID)
+		if summaryErr == nil {
 			enrichFromESPN(resp, summary)
 			resp.EspnEnriched = true
+			teamSides = buildTeamSides(summary)
 		}
+
+		// Fetch play-by-play events (primary source for goals/cards/subs).
+		// Falls back to keyMoments then scoringPlays from summary.
+		resp.Events = fetchEvents(ctx, espnClient, espnID, summary, teamSides)
 	}
 
 	return resp, nil
@@ -199,14 +208,6 @@ func enrichFromESPN(r *Response, s *espn.EventSummary) {
 		r.Score = &Score{Home: *home, Away: *away}
 	}
 
-	// Events: prefer full play-by-play (goals + cards + subs); fall back to scoring plays (goals only).
-	events := eventsFromPlays(s.Plays, comp.Competitors)
-	if len(events) == 0 {
-		events = eventsFromScoringPlays(s.ScoringPlays, comp.Competitors)
-	}
-	if len(events) > 0 {
-		r.Events = events
-	}
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -227,15 +228,6 @@ func scorePair(comps []espn.SummaryCompetitor) (home, away *int) {
 	return
 }
 
-func sideForTeam(teamID string, comps []espn.SummaryCompetitor) string {
-	for _, c := range comps {
-		if c.Team.ID == teamID {
-			return c.HomeAway
-		}
-	}
-	return "home"
-}
-
 func firstPlayerName(participants []espn.ScoringParticipant) string {
 	if len(participants) == 0 {
 		return ""
@@ -247,9 +239,132 @@ func firstPlayerName(participants []espn.ScoringParticipant) string {
 	return a.DisplayName
 }
 
-// eventsFromPlays extracts relevant events from ESPN's full play-by-play array.
+// buildTeamSides builds a teamID→"home"|"away" map from the summary competitors.
+func buildTeamSides(s *espn.EventSummary) map[string]string {
+	sides := make(map[string]string)
+	if len(s.Header.Competitions) == 0 {
+		return sides
+	}
+	for _, c := range s.Header.Competitions[0].Competitors {
+		if c.Team.ID != "" {
+			sides[c.Team.ID] = c.HomeAway
+		}
+	}
+	return sides
+}
+
+// fetchEvents returns match events, trying sources in order of reliability:
+//  1. Core API plays endpoint (primary: goals + cards + subs, boolean flags)
+//  2. keyMoments from summary (ESPN soccer rarely uses this, kept as fallback)
+//  3. scoringPlays from summary (goals only, last resort)
+func fetchEvents(ctx context.Context, client *espn.Client, espnID string, summary *espn.EventSummary, teamSides map[string]string) []Event {
+	// 1. Core API plays (primary)
+	corePlays, err := client.GetEventPlays(ctx, espnID)
+	if err == nil {
+		if events := eventsFromCorePlays(corePlays, teamSides); len(events) > 0 {
+			return events
+		}
+	}
+
+	if summary == nil || len(summary.Header.Competitions) == 0 {
+		return []Event{}
+	}
+	comp := summary.Header.Competitions[0]
+
+	// 2. keyMoments from summary (site API fallback)
+	if events := eventsFromPlays(summary.KeyMoments, teamSides); len(events) > 0 {
+		return events
+	}
+
+	// 3. scoringPlays from summary (goals only, last resort)
+	if events := eventsFromScoringPlays(summary.ScoringPlays, teamSides, comp.Competitors); len(events) > 0 {
+		return events
+	}
+
+	return []Event{}
+}
+
+// ── Core API event helpers ────────────────────────────────────────────────────
+
+// corePlayEventType maps Core API boolean flags to our event type enum.
+// Boolean flags are more reliable than type.text string matching.
+func corePlayEventType(p espn.CorePlay) (string, bool) {
+	switch {
+	case p.OwnGoal:
+		return "own_goal", true
+	case p.PenaltyKick && p.ScoringPlay:
+		return "penalty_goal", true
+	case p.ScoringPlay:
+		return "goal", true
+	case p.YellowCard:
+		return "yellow_card", true
+	case p.RedCard:
+		return "red_card", true
+	case p.Substitution:
+		return "substitution", true
+	default:
+		return "", false
+	}
+}
+
+// teamIDFromRef extracts the numeric ID from an ESPN Core API $ref URL.
+// e.g. ".../teams/12345" → "12345"
+func teamIDFromRef(ref string) string {
+	ref = strings.TrimRight(ref, "/")
+	i := strings.LastIndex(ref, "/")
+	if i < 0 || i == len(ref)-1 {
+		return ""
+	}
+	return ref[i+1:]
+}
+
+// corePlayerName resolves a player name from a Core API play.
+// Prefers inline athlete data (no extra HTTP call); falls back to ShortText then Text.
+func corePlayerName(p espn.CorePlay) string {
+	if len(p.Participants) > 0 {
+		a := p.Participants[0].Athlete
+		if a.ShortName != "" {
+			return a.ShortName
+		}
+		if a.DisplayName != "" {
+			return a.DisplayName
+		}
+	}
+	if p.ShortText != "" {
+		return p.ShortText
+	}
+	return p.Text
+}
+
+// eventsFromCorePlays converts Core API plays to our Event slice,
+// filtering to only the event types meaningful for the UI.
+func eventsFromCorePlays(plays []espn.CorePlay, teamSides map[string]string) []Event {
+	var events []Event
+	for _, p := range plays {
+		eventType, ok := corePlayEventType(p)
+		if !ok {
+			continue
+		}
+		side := teamSides[teamIDFromRef(p.Team.Ref)]
+		if side == "" {
+			side = "home"
+		}
+		player := corePlayerName(p)
+		minute := p.Clock.DisplayValue
+		events = append(events, Event{
+			Minute: minute,
+			Side:   side,
+			Type:   eventType,
+			Player: player,
+			Label:  buildEventLabel(minute, player),
+		})
+	}
+	return events
+}
+
+// eventsFromPlays extracts relevant events from an ESPN Play slice.
 // Only goal, card, and substitution types are included; all other plays are skipped.
-func eventsFromPlays(plays []espn.Play, comps []espn.SummaryCompetitor) []Event {
+func eventsFromPlays(plays []espn.Play, teamSides map[string]string) []Event {
 	var events []Event
 	for _, p := range plays {
 		eventType, ok := mapPlayTypeFromText(p.Type.Text)
@@ -258,7 +373,10 @@ func eventsFromPlays(plays []espn.Play, comps []espn.SummaryCompetitor) []Event 
 		}
 		player := firstPlayerName(p.Participants)
 		minute := p.Clock.DisplayValue
-		side := sideForTeam(p.Team.ID, comps)
+		side := teamSides[p.Team.ID]
+		if side == "" {
+			side = "home"
+		}
 		events = append(events, Event{
 			Minute: minute,
 			Side:   side,
@@ -271,12 +389,25 @@ func eventsFromPlays(plays []espn.Play, comps []espn.SummaryCompetitor) []Event 
 }
 
 // eventsFromScoringPlays extracts goal events from the scoring plays array (goals only).
-func eventsFromScoringPlays(plays []espn.ScoringPlay, comps []espn.SummaryCompetitor) []Event {
+// comps is passed to resolve the home/away side as a fallback for older ESPN responses.
+func eventsFromScoringPlays(plays []espn.ScoringPlay, teamSides map[string]string, comps []espn.SummaryCompetitor) []Event {
 	var events []Event
 	for _, sp := range plays {
 		player := firstPlayerName(sp.Participants)
 		minute := sp.Clock.DisplayValue
-		side := sideForTeam(sp.Team.ID, comps)
+		side := teamSides[sp.Team.ID]
+		if side == "" {
+			// fallback: linear search through comps
+			for _, c := range comps {
+				if c.Team.ID == sp.Team.ID {
+					side = c.HomeAway
+					break
+				}
+			}
+		}
+		if side == "" {
+			side = "home"
+		}
 		eventType, _ := mapPlayTypeFromText(sp.Type.Text)
 		if eventType == "" {
 			eventType = "goal"
