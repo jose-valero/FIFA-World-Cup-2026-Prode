@@ -268,9 +268,6 @@ function MatchHero({ match, detail }: { match: Match; detail: MatchDetailPayload
         overflow: 'hidden'
       }}
     >
-      {/* Live accent bar */}
-      {isLive && <Box sx={{ height: 3, bgcolor: 'success.main' }} />}
-
       <CardContent sx={{ p: { xs: 2, sm: 2.5, md: 3 } }}>
         <Stack spacing={0}>
           {/* ── Row 1: back + breadcrumb + status badge ── */}
@@ -455,7 +452,7 @@ function eventSuffix(type: MatchDetailEvent['type']): string {
 function TimelineEventRow({
   event,
   homeCode,
-  awayCode,
+  awayCode
 }: {
   event: MatchDetailEvent;
   homeCode: string;
@@ -473,7 +470,7 @@ function TimelineEventRow({
         py: 1,
         px: 0.5,
         borderRadius: 1,
-        '&:hover': { bgcolor: 'rgba(255,255,255,0.03)' },
+        '&:hover': { bgcolor: 'rgba(255,255,255,0.03)' }
       }}
     >
       <Typography
@@ -484,7 +481,7 @@ function TimelineEventRow({
           fontWeight: 600,
           minWidth: 28,
           textAlign: 'right',
-          flexShrink: 0,
+          flexShrink: 0
         }}
       >
         {event.minute}
@@ -494,17 +491,10 @@ function TimelineEventRow({
         <EventIcon type={event.type} />
       </Box>
 
-      <Typography
-        variant='body2'
-        sx={{ flex: 1, fontWeight: 500, color: 'text.primary' }}
-      >
+      <Typography variant='body2' sx={{ flex: 1, fontWeight: 500, color: 'text.primary' }}>
         {event.player}
         {suffix && (
-          <Typography
-            component='span'
-            variant='caption'
-            sx={{ color: 'text.secondary', ml: 0.5 }}
-          >
+          <Typography component='span' variant='caption' sx={{ color: 'text.secondary', ml: 0.5 }}>
             {suffix}
           </Typography>
         )}
@@ -517,7 +507,7 @@ function TimelineEventRow({
             color: 'text.disabled',
             fontWeight: 600,
             letterSpacing: 0.5,
-            flexShrink: 0,
+            flexShrink: 0
           }}
         >
           {teamCode}
@@ -527,13 +517,7 @@ function TimelineEventRow({
   );
 }
 
-function MatchTimelineCard({
-  match,
-  detail,
-}: {
-  match: Match;
-  detail: MatchDetailPayload | null;
-}) {
+function MatchTimelineCard({ match, detail }: { match: Match; detail: MatchDetailPayload | null }) {
   const status = detail?.status ?? match.status;
   const events = detail?.events ?? [];
   const homeCode = detail?.homeTeam.code ?? match.homeTeamCode ?? '';
@@ -560,18 +544,9 @@ function MatchTimelineCard({
               </Typography>
             </Stack>
           ) : hasEvents ? (
-            <Stack
-              divider={
-                <Box sx={{ borderTop: '1px solid', borderColor: 'divider', mx: 0.5 }} />
-              }
-            >
+            <Stack divider={<Box sx={{ borderTop: '1px solid', borderColor: 'divider', mx: 0.5 }} />}>
               {events.map((e, i) => (
-                <TimelineEventRow
-                  key={i}
-                  event={e}
-                  homeCode={homeCode}
-                  awayCode={awayCode}
-                />
+                <TimelineEventRow key={i} event={e} homeCode={homeCode} awayCode={awayCode} />
               ))}
             </Stack>
           ) : (
