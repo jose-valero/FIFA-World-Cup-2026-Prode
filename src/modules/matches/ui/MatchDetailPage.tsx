@@ -3,15 +3,17 @@ import {
   Button,
   Card,
   CardContent,
+  Collapse,
   CircularProgress,
   Divider,
   Grid,
   IconButton,
+  Popover,
   Stack,
-  Tooltip,
   Typography,
   useTheme
 } from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { alpha } from '@mui/material/styles';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
@@ -21,6 +23,7 @@ import SportsSoccerIcon from '@mui/icons-material/SportsSoccer';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import StyleIcon from '@mui/icons-material/Style';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import React from 'react';
 import { Link as RouterLink, useNavigate, useParams } from 'react-router';
 import { useMatches } from '../hooks/useMatches';
 import { useMatchDetail } from '../hooks/useMatchDetail';
@@ -522,7 +525,7 @@ function MatchHero({ match, detail }: { match: Match; detail: MatchDetailPayload
   );
 }
 
-// ── Timeline ──────────────────────────────────────────────────────────────────
+// ── Timeline helpers ──────────────────────────────────────────────────────────
 
 const LEGEND_ITEMS: { type: MatchDetailEventType; label: string }[] = [
   { type: 'goal', label: 'Gol' },
@@ -531,215 +534,153 @@ const LEGEND_ITEMS: { type: MatchDetailEventType; label: string }[] = [
   { type: 'substitution', label: 'Cambio' },
 ];
 
-function LegendItem({ type, label }: { type: MatchDetailEventType; label: string }) {
+// For each event, compute a "stack level" (0, 1, 2…) within its side.
+// Events of the same side closer than CLUSTER_THRESHOLD % get stacked.
+const CLUSTER_THRESHOLD = 7;
+function computeMarkerLevels(events: MatchDetailEvent[]): number[] {
+  const positions = events.map((e) => minuteToPercent(e.minute));
+  const levels = new Array(events.length).fill(0) as number[];
+  for (let i = 1; i < events.length; i++) {
+    for (let j = 0; j < i; j++) {
+      if (
+        events[i].side === events[j].side &&
+        Math.abs(positions[i] - positions[j]) < CLUSTER_THRESHOLD
+      ) {
+        levels[i] = Math.max(levels[i], levels[j] + 1);
+      }
+    }
+  }
+  return levels;
+}
+
+// ── Event detail popover content ──────────────────────────────────────────────
+
+function EventDetailContent({
+  event,
+  homeCode,
+  awayCode,
+}: {
+  event: MatchDetailEvent;
+  homeCode: string;
+  awayCode: string;
+}) {
+  const { label } = useEventVisual(event.type);
+  const teamLabel = event.side === 'home' ? homeCode || 'Local' : awayCode || 'Visitante';
+
   return (
-    <Stack direction='row' alignItems='center' spacing={0.5}>
-      <EventTypeIcon type={type} size={13} />
-      <Typography variant='caption' sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>
-        {label}
+    <Stack spacing={0.75} sx={{ p: 1.5, minWidth: 150, maxWidth: 210 }}>
+      <Stack direction='row' alignItems='center' spacing={1}>
+        <EventTypeIcon type={event.type} size={17} />
+        <Typography variant='body2' fontWeight={700}>
+          {label}
+        </Typography>
+      </Stack>
+      <Typography variant='body2' sx={{ color: 'text.primary', fontWeight: 500, lineHeight: 1.3 }}>
+        {formatPlayerName(event.player)}
+        {event.type === 'penalty_goal' && (
+          <Typography component='span' variant='caption' sx={{ color: 'text.secondary', ml: 0.5 }}>
+            (P)
+          </Typography>
+        )}
+        {event.type === 'own_goal' && (
+          <Typography component='span' variant='caption' sx={{ color: 'error.main', ml: 0.5 }}>
+            (OG)
+          </Typography>
+        )}
       </Typography>
+      <Stack direction='row' spacing={1} alignItems='center'>
+        <Typography variant='caption' sx={{ color: 'text.disabled', fontVariantNumeric: 'tabular-nums' }}>
+          {event.minute}
+        </Typography>
+        <Typography variant='caption' sx={{ color: 'text.disabled' }}>·</Typography>
+        <Typography variant='caption' sx={{ color: 'text.disabled', fontWeight: 600 }}>
+          {teamLabel}
+        </Typography>
+      </Stack>
     </Stack>
   );
 }
 
-type TimelineMarkerProps = {
-  event: MatchDetailEvent;
-  position: number; // 0–100%
-  above: boolean;   // alternate above/below to reduce overlap
-};
+// ── Timeline marker ───────────────────────────────────────────────────────────
 
-function TimelineMarker({ event, position, above }: TimelineMarkerProps) {
+function TimelineMarker({
+  event,
+  position,
+  level,
+  onSelect,
+}: {
+  event: MatchDetailEvent;
+  position: number;
+  level: number;
+  onSelect: (anchor: HTMLElement, ev: MatchDetailEvent) => void;
+}) {
   const { color } = useEventVisual(event.type);
-  const playerName = formatPlayerName(event.player);
+  const isHome = event.side === 'home';
+  const levelOffset = level * 22;
+
+  // Home: box grows upward from line (column-reverse, translate up)
+  // Away: box grows downward from line (column, translate down)
+  const transform = isHome
+    ? `translate(-50%, calc(-100% - ${levelOffset}px))`
+    : `translate(-50%, ${levelOffset}px)`;
 
   return (
-    <Tooltip
-      title={`${event.minute} · ${playerName}`}
-      placement={above ? 'top' : 'bottom'}
-      arrow
+    <Box
+      component='button'
+      onClick={(e: React.MouseEvent<HTMLButtonElement>) => onSelect(e.currentTarget, event)}
+      sx={{
+        position: 'absolute',
+        left: `${position}%`,
+        top: '50%',
+        transform,
+        display: 'flex',
+        flexDirection: isHome ? 'column-reverse' : 'column',
+        alignItems: 'center',
+        gap: '3px',
+        cursor: 'pointer',
+        background: 'none',
+        border: 'none',
+        p: 0,
+        zIndex: 2,
+        '&:hover .marker-dot, &:focus-visible .marker-dot': {
+          transform: 'scale(1.35)',
+          boxShadow: `0 0 10px ${color}`,
+        },
+        '&:focus-visible': { outline: 'none' },
+      }}
     >
       <Box
+        className='marker-dot'
         sx={{
-          position: 'absolute',
-          left: `${position}%`,
-          top: '50%',
-          transform: 'translate(-50%, -50%)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: above ? '2px' : 0,
-          cursor: 'default',
-          zIndex: 2,
+          width: 10,
+          height: 10,
+          borderRadius: '50%',
+          bgcolor: color,
+          border: '2px solid',
+          borderColor: 'background.paper',
+          boxShadow: `0 0 5px ${color}80`,
+          transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+          flexShrink: 0,
+        }}
+      />
+      <Typography
+        sx={{
+          fontSize: '0.58rem',
+          fontWeight: 700,
+          color,
+          lineHeight: 1,
+          whiteSpace: 'nowrap',
+          textShadow: '0 1px 4px rgba(0,0,0,0.7)',
+          pointerEvents: 'none',
         }}
       >
-        {/* Label above */}
-        {above && (
-          <Typography
-            sx={{
-              fontSize: '0.6rem',
-              fontWeight: 700,
-              color,
-              lineHeight: 1,
-              whiteSpace: 'nowrap',
-              mb: 0.25,
-              textShadow: '0 1px 4px rgba(0,0,0,0.6)',
-            }}
-          >
-            {event.minute}
-          </Typography>
-        )}
-
-        {/* Dot */}
-        <Box
-          sx={{
-            width: 10,
-            height: 10,
-            borderRadius: '50%',
-            bgcolor: color,
-            border: '2px solid',
-            borderColor: 'background.paper',
-            boxShadow: `0 0 6px ${color}80`,
-            flexShrink: 0,
-          }}
-        />
-
-        {/* Label below */}
-        {!above && (
-          <Typography
-            sx={{
-              fontSize: '0.6rem',
-              fontWeight: 700,
-              color,
-              lineHeight: 1,
-              whiteSpace: 'nowrap',
-              mt: 0.25,
-              textShadow: '0 1px 4px rgba(0,0,0,0.6)',
-            }}
-          >
-            {event.minute}
-          </Typography>
-        )}
-      </Box>
-    </Tooltip>
-  );
-}
-
-function MatchTimeline({
-  events,
-  status,
-  minuteLabel,
-}: {
-  events: MatchDetailEvent[];
-  status: string;
-  minuteLabel: string | null;
-}) {
-  const theme = useTheme();
-  const timelineEvents = getTimelineEvents(events);
-
-  // Current live minute for the progress indicator
-  const liveMinute = status === 'live' && minuteLabel ? parseMinute(minuteLabel) : null;
-  const progressPercent = liveMinute != null ? Math.min((liveMinute / TIMELINE_MAX) * 100, 100) : status === 'finished' ? 100 : 0;
-
-  return (
-    <Box sx={{ px: { xs: 1, sm: 2 }, py: 1 }}>
-      {/* Timeline track — scrollable on mobile */}
-      <Box sx={{ overflowX: 'auto', overflowY: 'visible', pb: 1 }}>
-        <Box sx={{ minWidth: 320, position: 'relative', py: 4 }}>
-          {/* Track background */}
-          <Box
-            sx={{
-              position: 'absolute',
-              left: 0,
-              right: 0,
-              top: '50%',
-              transform: 'translateY(-50%)',
-              height: 3,
-              bgcolor: alpha(theme.palette.common.white, 0.08),
-              borderRadius: 2,
-            }}
-          />
-
-          {/* Progress fill */}
-          {progressPercent > 0 && (
-            <Box
-              sx={{
-                position: 'absolute',
-                left: 0,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                width: `${progressPercent}%`,
-                height: 3,
-                bgcolor: status === 'live' ? theme.palette.success.main : alpha(theme.palette.common.white, 0.20),
-                borderRadius: 2,
-                transition: 'width 1s ease',
-              }}
-            />
-          )}
-
-          {/* HT marker */}
-          <Box sx={{ position: 'absolute', left: `${(45 / TIMELINE_MAX) * 100}%`, top: '50%', transform: 'translate(-50%, -50%)', zIndex: 1 }}>
-            <Box sx={{ width: 2, height: 14, bgcolor: alpha(theme.palette.common.white, 0.20), borderRadius: 1 }} />
-            <Typography sx={{ fontSize: '0.55rem', color: 'text.disabled', textAlign: 'center', mt: 0.5, whiteSpace: 'nowrap', ml: '-6px' }}>
-              HT
-            </Typography>
-          </Box>
-
-          {/* FT marker */}
-          <Box sx={{ position: 'absolute', left: `${(90 / TIMELINE_MAX) * 100}%`, top: '50%', transform: 'translate(-50%, -50%)', zIndex: 1 }}>
-            <Box sx={{ width: 2, height: 14, bgcolor: alpha(theme.palette.common.white, 0.20), borderRadius: 1 }} />
-            <Typography sx={{ fontSize: '0.55rem', color: 'text.disabled', textAlign: 'center', mt: 0.5, whiteSpace: 'nowrap', ml: '-5px' }}>
-              FT
-            </Typography>
-          </Box>
-
-          {/* Live cursor */}
-          {status === 'live' && liveMinute != null && (
-            <Box
-              sx={{
-                position: 'absolute',
-                left: `${progressPercent}%`,
-                top: '50%',
-                transform: 'translate(-50%, -50%)',
-                width: 12,
-                height: 12,
-                borderRadius: '50%',
-                bgcolor: theme.palette.success.main,
-                border: '2px solid',
-                borderColor: 'background.paper',
-                boxShadow: `0 0 8px ${theme.palette.success.main}`,
-                animation: 'pulse 1.4s ease-in-out infinite',
-                '@keyframes pulse': {
-                  '0%, 100%': { opacity: 1, transform: 'translate(-50%, -50%) scale(1)' },
-                  '50%': { opacity: 0.7, transform: 'translate(-50%, -50%) scale(1.3)' },
-                },
-                zIndex: 3,
-              }}
-            />
-          )}
-
-          {/* Event markers */}
-          {timelineEvents.map((e, i) => (
-            <TimelineMarker
-              key={i}
-              event={e}
-              position={minuteToPercent(e.minute)}
-              above={i % 2 === 0}
-            />
-          ))}
-        </Box>
-      </Box>
-
-      {/* Event list below the track (compact) */}
-      {timelineEvents.length > 0 && (
-        <Stack spacing={0} sx={{ mt: 1, borderTop: '1px solid', borderColor: 'divider', pt: 1.5 }}>
-          {timelineEvents.map((e, i) => (
-            <TimelineEventListRow key={i} event={e} />
-          ))}
-        </Stack>
-      )}
+        {event.minute}
+      </Typography>
     </Box>
   );
 }
+
+// ── Event list row ────────────────────────────────────────────────────────────
 
 function TimelineEventListRow({ event }: { event: MatchDetailEvent }) {
   const { color } = useEventVisual(event.type);
@@ -769,11 +710,9 @@ function TimelineEventListRow({ event }: { event: MatchDetailEvent }) {
       >
         {event.minute}
       </Typography>
-
       <Box sx={{ display: 'flex', flexShrink: 0 }}>
         <EventTypeIcon type={event.type} size={15} />
       </Box>
-
       <Typography variant='body2' sx={{ flex: 1, fontWeight: 500, color: 'text.primary' }}>
         {formatPlayerName(event.player)}
         {event.type === 'penalty_goal' && (
@@ -787,9 +726,251 @@ function TimelineEventListRow({ event }: { event: MatchDetailEvent }) {
           </Typography>
         )}
       </Typography>
-
       <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: color, flexShrink: 0, opacity: 0.8 }} />
     </Stack>
+  );
+}
+
+// ── MatchTimeline ─────────────────────────────────────────────────────────────
+
+function MatchTimeline({
+  events,
+  status,
+  minuteLabel,
+  homeCode,
+  awayCode,
+}: {
+  events: MatchDetailEvent[];
+  status: string;
+  minuteLabel: string | null;
+  homeCode: string;
+  awayCode: string;
+}) {
+  const theme = useTheme();
+  const [showList, setShowList] = React.useState(false);
+  const [popover, setPopover] = React.useState<{
+    anchor: HTMLElement;
+    event: MatchDetailEvent;
+  } | null>(null);
+
+  const timelineEvents = getTimelineEvents(events);
+  const levels = computeMarkerLevels(timelineEvents);
+  const maxLevel = levels.length > 0 ? Math.max(...levels) : 0;
+
+  const liveMinute = status === 'live' && minuteLabel ? parseMinute(minuteLabel) : null;
+  const progressPercent =
+    liveMinute != null
+      ? Math.min((liveMinute / TIMELINE_MAX) * 100, 100)
+      : status === 'finished'
+        ? 100
+        : 0;
+
+  // Vertical padding to accommodate stacked labels (base 44px + 22px per extra level)
+  const vertPad = Math.max(44, 36 + maxLevel * 24);
+
+  function handleMarkerSelect(anchor: HTMLElement, ev: MatchDetailEvent) {
+    setPopover((prev) =>
+      prev?.event === ev && prev.anchor === anchor ? null : { anchor, event: ev }
+    );
+  }
+
+  const htPct = (45 / TIMELINE_MAX) * 100;
+  const ftPct = (90 / TIMELINE_MAX) * 100;
+
+  return (
+    <Box sx={{ px: { xs: 0.5, sm: 1.5 }, py: 0.5 }}>
+      {/* Side labels */}
+      <Stack direction='row' justifyContent='space-between' sx={{ mb: 0.5, px: 0.5 }}>
+        <Typography variant='caption' sx={{ color: 'text.disabled', fontWeight: 700, letterSpacing: 0.5 }}>
+          {homeCode || 'LOCAL'}
+        </Typography>
+        <Typography variant='caption' sx={{ color: 'text.disabled', fontWeight: 700, letterSpacing: 0.5 }}>
+          {awayCode || 'VISIT'}
+        </Typography>
+      </Stack>
+
+      {/* Track — scrollable on mobile */}
+      <Box sx={{ overflowX: 'auto' }}>
+        <Box
+          sx={{
+            minWidth: 300,
+            position: 'relative',
+            pt: `${vertPad}px`,
+            pb: `${vertPad}px`,
+          }}
+        >
+          {/* Track background */}
+          <Box
+            sx={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              height: 3,
+              bgcolor: alpha(theme.palette.common.white, 0.08),
+              borderRadius: 2,
+            }}
+          />
+
+          {/* Progress fill */}
+          {progressPercent > 0 && (
+            <Box
+              sx={{
+                position: 'absolute',
+                left: 0,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: `${progressPercent}%`,
+                height: 3,
+                bgcolor:
+                  status === 'live'
+                    ? theme.palette.success.main
+                    : alpha(theme.palette.common.white, 0.18),
+                borderRadius: 2,
+                transition: 'width 1s ease',
+              }}
+            />
+          )}
+
+          {/* HT marker */}
+          <Box
+            sx={{
+              position: 'absolute',
+              left: `${htPct}%`,
+              top: '50%',
+              transform: 'translate(-50%, -50%)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              zIndex: 1,
+            }}
+          >
+            <Box sx={{ width: 1, height: 14, bgcolor: alpha(theme.palette.common.white, 0.25) }} />
+            <Typography sx={{ fontSize: '0.52rem', color: 'text.disabled', mt: '2px' }}>HT</Typography>
+          </Box>
+
+          {/* FT marker */}
+          <Box
+            sx={{
+              position: 'absolute',
+              left: `${ftPct}%`,
+              top: '50%',
+              transform: 'translate(-50%, -50%)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              zIndex: 1,
+            }}
+          >
+            <Box sx={{ width: 1, height: 14, bgcolor: alpha(theme.palette.common.white, 0.25) }} />
+            <Typography sx={{ fontSize: '0.52rem', color: 'text.disabled', mt: '2px' }}>FT</Typography>
+          </Box>
+
+          {/* Live cursor */}
+          {status === 'live' && liveMinute != null && (
+            <Box
+              sx={{
+                position: 'absolute',
+                left: `${progressPercent}%`,
+                top: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: 12,
+                height: 12,
+                borderRadius: '50%',
+                bgcolor: theme.palette.success.main,
+                border: '2px solid',
+                borderColor: 'background.paper',
+                boxShadow: `0 0 8px ${theme.palette.success.main}`,
+                animation: 'livePulse 1.4s ease-in-out infinite',
+                '@keyframes livePulse': {
+                  '0%, 100%': { opacity: 1, transform: 'translate(-50%, -50%) scale(1)' },
+                  '50%': { opacity: 0.7, transform: 'translate(-50%, -50%) scale(1.3)' },
+                },
+                zIndex: 3,
+              }}
+            />
+          )}
+
+          {/* Event markers — home above line, away below line */}
+          {timelineEvents.map((e, i) => (
+            <TimelineMarker
+              key={i}
+              event={e}
+              position={minuteToPercent(e.minute)}
+              level={levels[i]}
+              onSelect={handleMarkerSelect}
+            />
+          ))}
+        </Box>
+      </Box>
+
+      {/* Popover for event detail */}
+      <Popover
+        open={Boolean(popover)}
+        anchorEl={popover?.anchor ?? null}
+        onClose={() => setPopover(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'center' }}
+        disableRestoreFocus
+        slotProps={{
+          paper: {
+            elevation: 8,
+            sx: {
+              bgcolor: 'background.paper',
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: 2,
+              mt: 0.5,
+            },
+          },
+        }}
+      >
+        {popover && (
+          <EventDetailContent
+            event={popover.event}
+            homeCode={homeCode}
+            awayCode={awayCode}
+          />
+        )}
+      </Popover>
+
+      {/* Collapsible event list */}
+      {timelineEvents.length > 0 && (
+        <Box sx={{ mt: 1.5, borderTop: '1px solid', borderColor: 'divider', pt: 1 }}>
+          <Button
+            size='small'
+            variant='text'
+            onClick={() => setShowList((v) => !v)}
+            endIcon={
+              <ExpandMoreIcon
+                sx={{
+                  fontSize: 18,
+                  transition: 'transform 0.2s ease',
+                  transform: showList ? 'rotate(180deg)' : 'rotate(0deg)',
+                }}
+              />
+            }
+            sx={{
+              color: 'text.secondary',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              px: 0.5,
+              '&:hover': { color: 'text.primary', bgcolor: 'transparent' },
+            }}
+          >
+            {showList ? 'Ocultar eventos' : `Ver eventos (${timelineEvents.length})`}
+          </Button>
+          <Collapse in={showList}>
+            <Stack spacing={0} sx={{ mt: 1 }}>
+              {timelineEvents.map((e, i) => (
+                <TimelineEventListRow key={i} event={e} />
+              ))}
+            </Stack>
+          </Collapse>
+        </Box>
+      )}
+    </Box>
   );
 }
 
@@ -799,6 +980,8 @@ function MatchTimelineCard({ match, detail }: { match: Match; detail: MatchDetai
   const status = detail?.status ?? match.status;
   const events = detail?.events ?? [];
   const minuteLabel = detail?.minuteLabel ?? null;
+  const homeCode = detail?.homeTeam.code ?? match.homeTeamCode ?? '';
+  const awayCode = detail?.awayTeam.code ?? match.awayTeamCode ?? '';
   const isScheduled = status === 'scheduled';
   const hasEvents = getTimelineEvents(events).length > 0;
 
@@ -806,7 +989,7 @@ function MatchTimelineCard({ match, detail }: { match: Match; detail: MatchDetai
     <Card elevation={0} sx={{ borderRadius: 2 }}>
       <CardContent sx={{ p: 2.5 }}>
         <Stack spacing={2}>
-          {/* Header row */}
+          {/* Header */}
           <Stack direction='row' alignItems='center' justifyContent='space-between' flexWrap='wrap' gap={1}>
             <Stack direction='row' alignItems='center' spacing={1}>
               <AccessTimeIcon sx={{ fontSize: 18, color: 'text.disabled' }} />
@@ -814,12 +997,15 @@ function MatchTimelineCard({ match, detail }: { match: Match; detail: MatchDetai
                 Cronología del partido
               </Typography>
             </Stack>
-
-            {/* Legend */}
             {!isScheduled && (
               <Stack direction='row' spacing={1.5} flexWrap='wrap'>
                 {LEGEND_ITEMS.map((item) => (
-                  <LegendItem key={item.type} type={item.type} label={item.label} />
+                  <Stack key={item.type} direction='row' alignItems='center' spacing={0.5}>
+                    <EventTypeIcon type={item.type} size={13} />
+                    <Typography variant='caption' sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>
+                      {item.label}
+                    </Typography>
+                  </Stack>
                 ))}
               </Stack>
             )}
@@ -833,7 +1019,13 @@ function MatchTimelineCard({ match, detail }: { match: Match; detail: MatchDetai
               </Typography>
             </Stack>
           ) : hasEvents ? (
-            <MatchTimeline events={events} status={status} minuteLabel={minuteLabel} />
+            <MatchTimeline
+              events={events}
+              status={status}
+              minuteLabel={minuteLabel}
+              homeCode={homeCode}
+              awayCode={awayCode}
+            />
           ) : (
             <Stack alignItems='center' spacing={1} sx={{ py: 3 }}>
               <SportsSoccerIcon sx={{ fontSize: 32, color: 'text.disabled', opacity: 0.4 }} />
