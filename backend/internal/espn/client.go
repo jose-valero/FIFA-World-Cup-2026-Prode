@@ -72,6 +72,7 @@ type EventSummary struct {
 		Competitions []SummaryCompetition `json:"competitions"`
 	} `json:"header"`
 	ScoringPlays []ScoringPlay `json:"scoringPlays"`
+	Plays        []Play        `json:"plays"`
 }
 
 // SummaryCompetition holds live status and competitors from the summary response.
@@ -112,6 +113,21 @@ type ScoringParticipant struct {
 		ShortName   string `json:"shortName"`
 		DisplayName string `json:"displayName"`
 	} `json:"athlete"`
+}
+
+// Play is a single event from the play-by-play array in the summary response.
+// Covers goals, cards, and substitutions (richer than ScoringPlays which is goals-only).
+type Play struct {
+	Clock struct {
+		DisplayValue string `json:"displayValue"`
+	} `json:"clock"`
+	Type struct {
+		Text string `json:"text"`
+	} `json:"type"`
+	Team struct {
+		ID string `json:"id"`
+	} `json:"team"`
+	Participants []ScoringParticipant `json:"participants"`
 }
 
 // HomeAbbrev returns the home team's abbreviation for this event (empty if not found).

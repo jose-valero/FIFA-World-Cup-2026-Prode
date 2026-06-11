@@ -199,24 +199,13 @@ func enrichFromESPN(r *Response, s *espn.EventSummary) {
 		r.Score = &Score{Home: *home, Away: *away}
 	}
 
-	// Scoring plays → events list
-	for _, sp := range s.ScoringPlays {
-		side := sideForTeam(sp.Team.ID, comp.Competitors)
-		player := firstPlayerName(sp.Participants)
-		minute := sp.Clock.DisplayValue
-
-		label := minute
-		if player != "" {
-			label = minute + " " + player
-		}
-
-		r.Events = append(r.Events, Event{
-			Minute: minute,
-			Side:   side,
-			Type:   mapPlayType(sp.Type.Text),
-			Player: player,
-			Label:  label,
-		})
+	// Events: prefer full play-by-play (goals + cards + subs); fall back to scoring plays (goals only).
+	events := eventsFromPlays(s.Plays, comp.Competitors)
+	if len(events) == 0 {
+		events = eventsFromScoringPlays(s.ScoringPlays, comp.Competitors)
+	}
+	if len(events) > 0 {
+		r.Events = events
 	}
 }
 
@@ -258,26 +247,93 @@ func firstPlayerName(participants []espn.ScoringParticipant) string {
 	return a.DisplayName
 }
 
-func mapPlayType(text string) string {
+// eventsFromPlays extracts relevant events from ESPN's full play-by-play array.
+// Only goal, card, and substitution types are included; all other plays are skipped.
+func eventsFromPlays(plays []espn.Play, comps []espn.SummaryCompetitor) []Event {
+	var events []Event
+	for _, p := range plays {
+		eventType, ok := mapPlayTypeFromText(p.Type.Text)
+		if !ok {
+			continue
+		}
+		player := firstPlayerName(p.Participants)
+		minute := p.Clock.DisplayValue
+		side := sideForTeam(p.Team.ID, comps)
+		events = append(events, Event{
+			Minute: minute,
+			Side:   side,
+			Type:   eventType,
+			Player: player,
+			Label:  buildEventLabel(minute, player),
+		})
+	}
+	return events
+}
+
+// eventsFromScoringPlays extracts goal events from the scoring plays array (goals only).
+func eventsFromScoringPlays(plays []espn.ScoringPlay, comps []espn.SummaryCompetitor) []Event {
+	var events []Event
+	for _, sp := range plays {
+		player := firstPlayerName(sp.Participants)
+		minute := sp.Clock.DisplayValue
+		side := sideForTeam(sp.Team.ID, comps)
+		eventType, _ := mapPlayTypeFromText(sp.Type.Text)
+		if eventType == "" {
+			eventType = "goal"
+		}
+		events = append(events, Event{
+			Minute: minute,
+			Side:   side,
+			Type:   eventType,
+			Player: player,
+			Label:  buildEventLabel(minute, player),
+		})
+	}
+	return events
+}
+
+// mapPlayTypeFromText maps an ESPN play type text to our event type enum.
+// Returns ("", false) for play types we don't surface (fouls, corners, etc.).
+func mapPlayTypeFromText(text string) (string, bool) {
 	lower := strings.ToLower(text)
 	switch {
-	case strings.Contains(lower, "own"):
-		return "own_goal"
-	case strings.Contains(lower, "penalty"):
-		return "penalty_goal"
+	case strings.Contains(lower, "own goal"):
+		return "own_goal", true
+	case strings.Contains(lower, "penalty") && strings.Contains(lower, "goal"):
+		return "penalty_goal", true
+	case strings.Contains(lower, "goal") || strings.Contains(lower, "score"):
+		return "goal", true
+	case strings.Contains(lower, "yellow card"):
+		return "yellow_card", true
+	case strings.Contains(lower, "red card"):
+		return "red_card", true
+	case strings.Contains(lower, "substitut"):
+		return "substitution", true
 	default:
-		return "goal"
+		return "", false
 	}
+}
+
+func buildEventLabel(minute, player string) string {
+	if player == "" {
+		return minute
+	}
+	return minute + " " + player
 }
 
 func mapESPNStatus(name string) (string, bool) {
 	switch name {
 	case "STATUS_SCHEDULED":
 		return "scheduled", true
-	case "STATUS_IN_PROGRESS", "STATUS_HALFTIME", "STATUS_END_PERIOD",
-		"STATUS_EXTRA_TIME", "STATUS_SHOOTOUT":
+	case "STATUS_IN_PROGRESS",
+		"STATUS_FIRST_HALF",
+		"STATUS_SECOND_HALF",
+		"STATUS_HALFTIME",
+		"STATUS_END_PERIOD",
+		"STATUS_EXTRA_TIME",
+		"STATUS_SHOOTOUT":
 		return "live", true
-	case "STATUS_FINAL":
+	case "STATUS_FINAL", "STATUS_FULL_TIME":
 		return "finished", true
 	default:
 		return "", false
