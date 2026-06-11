@@ -1,6 +1,12 @@
 export type MatchDetailStatus = 'scheduled' | 'live' | 'finished';
 export type MatchDetailEventSide = 'home' | 'away';
-export type MatchDetailEventType = 'goal' | 'penalty_goal' | 'own_goal';
+export type MatchDetailEventType =
+  | 'goal'
+  | 'penalty_goal'
+  | 'own_goal'
+  | 'yellow_card'
+  | 'red_card'
+  | 'substitution';
 
 export interface MatchDetailTeam {
   name: string;
