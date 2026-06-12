@@ -86,11 +86,43 @@ function PerformanceBar({ item }: { item: ScoredMatch }) {
   );
 }
 
+const ChartLegend = () => (
+  <Stack direction='row' spacing={2} flexWrap='wrap' useFlexGap>
+    <Stack direction='row' spacing={0.75} alignItems='center'>
+      <Box sx={{ width: 10, height: 10, borderRadius: 0.5, bgcolor: 'success.main', flexShrink: 0 }} />
+      <Typography variant='caption' color='text.secondary'>
+        5 pts — exacto
+      </Typography>
+    </Stack>
+    <Stack direction='row' spacing={0.75} alignItems='center'>
+      <Box sx={{ width: 10, height: 10, borderRadius: 0.5, bgcolor: 'primary.main', flexShrink: 0 }} />
+      <Typography variant='caption' color='text.secondary'>
+        3 pts — signo
+      </Typography>
+    </Stack>
+    <Stack direction='row' spacing={0.75} alignItems='center'>
+      <Box
+        sx={(t) => ({
+          width: 10,
+          height: 10,
+          borderRadius: 0.5,
+          bgcolor: t.palette.action.selected,
+          flexShrink: 0
+        })}
+      />
+      <Typography variant='caption' color='text.secondary'>
+        0 pts — fallo
+      </Typography>
+    </Stack>
+  </Stack>
+);
+
 type PerformanceChartSectionProps = {
   userId: string | null;
+  standalone?: boolean;
 };
 
-export function PerformanceChartSection({ userId }: PerformanceChartSectionProps) {
+export function PerformanceChartSection({ userId, standalone = true }: PerformanceChartSectionProps) {
   const {
     data: predictionRows = [],
     isLoading: isPredictionsLoading,
@@ -130,34 +162,18 @@ export function PerformanceChartSection({ userId }: PerformanceChartSectionProps
     return { total, exacts, outcomes, count: scoredMatches.length };
   }, [scoredMatches]);
 
-  return (
-    <Paper
-      elevation={0}
-      sx={{
-        p: 3,
-        borderRadius: 2,
-        border: (t) => `1px solid ${t.palette.divider}`
-      }}
-    >
-      <Stack spacing={0.5} sx={{ mb: 2.5 }}>
-        <Typography variant='subtitle1' fontWeight={800}>
-          Desempeño partido a partido
-        </Typography>
-        <Typography variant='body2' color='text.secondary'>
-          Puntos obtenidos en cada partido evaluado, en orden cronológico.
-        </Typography>
+  const chartContent =
+    isLoading ? (
+      <Stack alignItems='center' sx={{ py: 3 }}>
+        <CircularProgress size={28} />
       </Stack>
-
-      {isLoading ? (
-        <Stack alignItems='center' sx={{ py: 3 }}>
-          <CircularProgress size={28} />
-        </Stack>
-      ) : isError ? (
-        <Alert severity='error'>No se pudo cargar el historial de pronósticos.</Alert>
-      ) : scoredMatches.length === 0 ? (
-        <Alert severity='info'>Aún no hay partidos evaluados para mostrar.</Alert>
-      ) : (
-        <Stack spacing={2}>
+    ) : isError ? (
+      <Alert severity='error'>No se pudo cargar el historial de pronósticos.</Alert>
+    ) : scoredMatches.length === 0 ? (
+      <Alert severity='info'>Aún no hay partidos evaluados para mostrar.</Alert>
+    ) : (
+      <Stack spacing={2}>
+        {standalone ? (
           <Stack direction='row' spacing={1} flexWrap='wrap' useFlexGap>
             <Typography variant='caption' color='text.secondary'>
               {summary.count} evaluados ·{' '}
@@ -175,59 +191,51 @@ export function PerformanceChartSection({ userId }: PerformanceChartSectionProps
               · {summary.total} pts acumulados
             </Typography>
           </Stack>
+        ) : null}
 
+        <Box sx={{ overflowX: 'auto', pb: 1 }}>
           <Box
             sx={{
-              overflowX: 'auto',
-              pb: 1
+              display: 'flex',
+              alignItems: 'flex-end',
+              gap: `${BAR_GAP}px`,
+              minWidth: scoredMatches.length * (BAR_WIDTH + BAR_GAP),
+              borderBottom: (t) => `2px solid ${t.palette.divider}`,
+              pt: 1
             }}
           >
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'flex-end',
-                gap: `${BAR_GAP}px`,
-                minWidth: scoredMatches.length * (BAR_WIDTH + BAR_GAP),
-                borderBottom: (t) => `2px solid ${t.palette.divider}`,
-                pt: 1
-              }}
-            >
-              {scoredMatches.map((item) => (
-                <PerformanceBar key={item.match.id} item={item} />
-              ))}
-            </Box>
+            {scoredMatches.map((item) => (
+              <PerformanceBar key={item.match.id} item={item} />
+            ))}
           </Box>
+        </Box>
 
-          <Stack direction='row' spacing={2} flexWrap='wrap' useFlexGap>
-            <Stack direction='row' spacing={0.75} alignItems='center'>
-              <Box sx={{ width: 10, height: 10, borderRadius: 0.5, bgcolor: 'success.main', flexShrink: 0 }} />
-              <Typography variant='caption' color='text.secondary'>
-                5 pts — exacto
-              </Typography>
-            </Stack>
-            <Stack direction='row' spacing={0.75} alignItems='center'>
-              <Box sx={{ width: 10, height: 10, borderRadius: 0.5, bgcolor: 'primary.main', flexShrink: 0 }} />
-              <Typography variant='caption' color='text.secondary'>
-                3 pts — signo
-              </Typography>
-            </Stack>
-            <Stack direction='row' spacing={0.75} alignItems='center'>
-              <Box
-                sx={(t) => ({
-                  width: 10,
-                  height: 10,
-                  borderRadius: 0.5,
-                  bgcolor: t.palette.action.selected,
-                  flexShrink: 0
-                })}
-              />
-              <Typography variant='caption' color='text.secondary'>
-                0 pts — fallo
-              </Typography>
-            </Stack>
-          </Stack>
-        </Stack>
-      )}
+        <ChartLegend />
+      </Stack>
+    );
+
+  if (!standalone) {
+    return chartContent;
+  }
+
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        p: 3,
+        borderRadius: 2,
+        border: (t) => `1px solid ${t.palette.divider}`
+      }}
+    >
+      <Stack spacing={0.5} sx={{ mb: 2.5 }}>
+        <Typography variant='subtitle1' fontWeight={800}>
+          Desempeño partido a partido
+        </Typography>
+        <Typography variant='body2' color='text.secondary'>
+          Puntos obtenidos en cada partido evaluado, en orden cronológico.
+        </Typography>
+      </Stack>
+      {chartContent}
     </Paper>
   );
 }

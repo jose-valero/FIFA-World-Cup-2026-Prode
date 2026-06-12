@@ -11,5 +11,5 @@ export function getTournamentPhase(matches: Match[]) {
   const isGroupStageFinished =
     groupStageMatches.length > 0 && groupStageMatches.every((match) => match.status === 'finished');
 
-  return isGroupStageFinished ? 'Eliminación' : 'Grupos';
+  return isGroupStageFinished ? 'Eliminación' : 'Fase de Grupos';
 }

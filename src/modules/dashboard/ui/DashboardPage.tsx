@@ -1,31 +1,117 @@
 import * as React from 'react';
-import { Alert, Box, Button, Card, CardContent, Chip, CircularProgress, Grid, Stack, Typography } from '@mui/material';
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  CircularProgress,
+  Divider,
+  LinearProgress,
+  Stack,
+  Typography
+} from '@mui/material';
 import { Link as RouterLink } from 'react-router';
 import { useAuth } from '../../auth/hooks/useAuth';
 import { useMatches } from '../../matches/hooks/useMatches';
 import { usePredictionsByUser } from '../../predictions/hooks/usePredictionsByUser';
 import { useLeaderboard } from '../../leaderboard/hooks/useLeaderboard';
 import { useAppSettings } from '../../admin/settings/hooks/useAppSettings';
-import { PageHeader, type PageHeaderBadge } from '../../../shared/components/PageHeader';
-import { MatchVs } from '../../../shared/components/MatchVs';
-import { ComparisonRow } from '../components/ComparisonRow';
-import { ProgressBlock } from '../components/ProgressBlock';
-import { MiniStat } from '../components/MiniStat';
-import { MetricCard } from '../components/MetricCard';
 import { getTournamentPhase } from '../utils/getTournamentPhase';
-import { formatPercent } from '../utils/formatPercent';
 import { sortMatchesByKickoff } from '../utils/sortMatchesByKickoff';
-import { formatDateTime } from '../utils/formatDateTime';
 import { isPredictionsClosed } from '../../../shared/utils/isPredictionsClosed';
-import { routes } from '../../../app/router/routes';
-import { PerformanceChartSection } from '../components/PerformanceChartSection';
+import { routes, matchDetailPath } from '../../../app/router/routes';
 import { TodayMatchesScroller } from '../components/TodayMatchesScroller';
 import { buildLeaderboardRanks } from '../../leaderboard/utils/buildLeaderboardRanks';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import BlockIcon from '@mui/icons-material/Block';
+// Columna compacta reutilizable para las 2 filas del bloque unificado.
+// large=true → fila superior (posición/puntos/líder); large=false → fila inferior (exactos/aciertos/efectividad)
+function StatColumn({
+  label,
+  value,
+  subtext,
+  valueColor,
+  large = false
+}: {
+  label: string;
+  value: string;
+  subtext?: string;
+  valueColor?: string;
+  large?: boolean;
+}) {
+  return (
+    <Stack
+      alignItems='center'
+      spacing={0.25}
+      sx={{ flex: 1, px: { xs: 0.75, sm: 1.5 }, py: { xs: 1, sm: 1.25 }, textAlign: 'center' }}
+    >
+      <Typography
+        sx={{
+          fontSize: '0.6rem',
+          fontWeight: 600,
+          letterSpacing: 1,
+          textTransform: 'uppercase',
+          color: 'text.secondary'
+        }}
+      >
+        {label}
+      </Typography>
+      <Typography
+        sx={{
+          fontSize: large ? { xs: '1.625rem', sm: '1.875rem' } : { xs: '1.375rem', sm: '1.625rem' },
+          fontWeight: large ? 800 : 700,
+          lineHeight: 1.1,
+          color: valueColor ?? 'text.primary'
+        }}
+      >
+        {value}
+      </Typography>
+      <Typography sx={{ fontSize: '0.65rem', color: subtext ? 'text.disabled' : 'transparent', lineHeight: 1 }}>
+        {subtext ?? 'x'}
+      </Typography>
+    </Stack>
+  );
+}
+
+function TournamentProgressRow({ label, value, progress }: { label: string; value: string; progress: number }) {
+  return (
+    <Stack spacing={0.5}>
+      <Stack direction='row' justifyContent='space-between' alignItems='baseline' spacing={1}>
+        <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>{label}</Typography>
+        <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: 'text.primary', flexShrink: 0 }}>
+          {value}
+        </Typography>
+      </Stack>
+      <LinearProgress
+        variant='determinate'
+        value={Math.max(0, Math.min(progress, 100))}
+        sx={{ height: 6, borderRadius: 999 }}
+      />
+    </Stack>
+  );
+}
+
+// efectividad = puntos obtenidos / máximo posible (5 pts × partidos evaluados)
+// Math.min(100) como salvaguarda ante inconsistencias en los contadores del backend
+function calculateEffectiveness(points: number, scoredCount: number): number | null {
+  if (scoredCount <= 0) return null;
+  return Math.min(100, Math.round((points / (scoredCount * 5)) * 100));
+}
 
 // Sports day boundary: 06:00 local. Matches between 00:00–05:59 belong to the previous day's matchday.
 function getSportsDayKey(date: Date): string {
   const adjusted = new Date(date.getTime() - 6 * 60 * 60 * 1000);
   return adjusted.toDateString();
+}
+
+type StreakResult = 'exact' | 'sign' | 'miss';
+
+function scoreResult(pH: number, pA: number, oH: number, oA: number): StreakResult {
+  if (pH === oH && pA === oA) return 'exact';
+  const predSign = pH > pA ? 1 : pH < pA ? -1 : 0;
+  const officialSign = oH > oA ? 1 : oH < oA ? -1 : 0;
+  return predSign === officialSign ? 'sign' : 'miss';
 }
 
 export function DashboardPage() {
@@ -63,44 +149,19 @@ export function DashboardPage() {
   const isError = isMatchesError || isPredictionsError || isLeaderboardError || isSettingsError;
   const firstError = matchesError || predictionsError || leaderboardError || settingsError;
 
-  const predictedMatchIds = React.useMemo(() => {
-    return new Set(predictions.map((prediction) => prediction.match_id));
-  }, [predictions]);
-
   const sortedMatches = React.useMemo(() => sortMatchesByKickoff(matches), [matches]);
-
-  const scheduledMatches = React.useMemo(() => {
-    return sortedMatches.filter((match) => match.status === 'scheduled');
-  }, [sortedMatches]);
-
-  const finishedMatches = React.useMemo(() => {
-    return matches.filter((match) => match.status === 'finished');
-  }, [matches]);
-
-  const liveMatches = React.useMemo(() => {
-    return matches.filter((match) => match.status === 'live');
-  }, [matches]);
 
   const todayMatches = React.useMemo(() => {
     const todayKey = getSportsDayKey(new Date());
-    return sortedMatches.filter(
-      (m) => m.status === 'live' || getSportsDayKey(new Date(m.kickoffAt)) === todayKey
-    );
+    return sortedMatches.filter((m) => m.status === 'live' || getSportsDayKey(new Date(m.kickoffAt)) === todayKey);
   }, [sortedMatches]);
-
-  const pendingPredictionMatches = React.useMemo(() => {
-    return scheduledMatches.filter((match) => !predictedMatchIds.has(match.id));
-  }, [scheduledMatches, predictedMatchIds]);
-
-  const nextPendingMatch = pendingPredictionMatches[0] ?? null;
-  const nextTournamentMatch = scheduledMatches[0] ?? null;
 
   const currentUserRow = React.useMemo(() => {
     if (!user?.id) return null;
     return leaderboard.find((row) => row.user_id === user.id) ?? null;
   }, [leaderboard, user?.id]);
 
-  const leaderRow = leaderboard[0] ?? null;
+  const leaderRow = leaderboard.filter((r) => !r.is_disabled)[0] ?? null;
   const leaderPoints = leaderRow?.total_points ?? 0;
   const myPoints = currentUserRow?.total_points ?? 0;
   const distanceToLeader = Math.max(leaderPoints - myPoints, 0);
@@ -118,58 +179,32 @@ export function DashboardPage() {
 
   const totalMatches = matches.length;
   const loadedPredictions = predictions.length;
-  const pendingPredictions = pendingPredictionMatches.length;
-  const scoredPredictions = currentUserRow?.scored_predictions ?? 0;
   const exactHits = currentUserRow?.exact_hits ?? 0;
   const outcomeHits = currentUserRow?.outcome_hits ?? 0;
-  const missCount = Math.max(scoredPredictions - exactHits - outcomeHits, 0);
+  const scoredPredictions = currentUserRow?.scored_predictions ?? 0;
+
+  const efectividad = calculateEffectiveness(myPoints, scoredPredictions);
 
   const predictionLoadProgress = totalMatches > 0 ? (loadedPredictions / totalMatches) * 100 : 0;
-  const tournamentProgress = totalMatches > 0 ? (finishedMatches.length / totalMatches) * 100 : 0;
-  const evaluatedProgress = finishedMatches.length > 0 ? (scoredPredictions / finishedMatches.length) * 100 : 0;
 
   const tournamentPhase = getTournamentPhase(matches);
 
-  const badges: PageHeaderBadge[] = [
-    {
-      label: predictionsClosed ? 'Pronósticos cerrados' : 'Pronósticos abiertos',
-      color: predictionsClosed ? 'warning' : 'success',
-      variant: predictionsClosed ? 'outlined' : 'filled'
-    },
-    {
-      label: `Posición ${globalPosition ? `#${globalPosition}` : '-'}`,
-      color: 'primary',
-      variant: 'outlined'
-    },
-    {
-      label: `${scoredPredictions} evaluados`,
-      color: 'default',
-      variant: 'outlined'
-    }
-  ];
+  const predictionByMatchId = React.useMemo(
+    () => new Map(predictions.map((p) => [p.match_id, p])),
+    [predictions]
+  );
 
-  const quickStats = [
-    {
-      label: 'Pronósticos cargados',
-      value: loadedPredictions,
-      helper: `${formatPercent(predictionLoadProgress)} del torneo`
-    },
-    {
-      label: 'Pendientes por cargar',
-      value: pendingPredictions,
-      helper: `${totalMatches} partidos totales`
-    },
-    {
-      label: 'Puntos actuales',
-      value: myPoints,
-      helper: currentUserRow ? `${exactHits} exactos` : 'Sin evaluación todavía'
-    },
-    {
-      label: 'Distancia al líder',
-      value: `${distanceToLeader} pts`,
-      helper: leaderRow ? `Líder: ${leaderRow.display_name}` : 'Sin líder definido'
+  const lastFiveStreak = React.useMemo((): StreakResult[] => {
+    const items: StreakResult[] = [];
+    for (const match of sortedMatches) {
+      if (match.status !== 'finished') continue;
+      if (match.officialHomeScore === null || match.officialAwayScore === null) continue;
+      const pred = predictionByMatchId.get(match.id);
+      if (!pred) continue;
+      items.push(scoreResult(pred.home_score, pred.away_score, match.officialHomeScore, match.officialAwayScore));
     }
-  ];
+    return items.slice(-5);
+  }, [sortedMatches, predictionByMatchId]);
 
   if (isLoading) {
     return (
@@ -188,7 +223,8 @@ export function DashboardPage() {
   }
 
   return (
-    <Stack spacing={2.5}>
+    <Stack spacing={2}>
+      {/* 1. Partidos de hoy */}
       {todayMatches.length > 0 ? (
         <Box>
           <Typography variant='subtitle2' color='text.secondary' sx={{ mb: 1 }}>
@@ -198,294 +234,252 @@ export function DashboardPage() {
         </Box>
       ) : null}
 
-      <PageHeader
-        title='Panel de control'
-        description='Sigue el estado del torneo y tu rendimiento dentro de la quiniela desde un solo lugar.'
-        badges={badges}
-        actions={
-          <Button component={RouterLink} to={routes.leaderboard} size='small' variant='outlined'>
-            Ir al Ranking
-          </Button>
-        }
-      />
+      {/* 2. Resumen unificado: 2 filas × 3 columnas */}
+      <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+        <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
+          {/* Fila 1: posición, puntos, distancia al líder */}
+          <Stack direction='row' divider={<Divider orientation='vertical' flexItem />}>
+            <StatColumn label='Posición' value={globalPosition ? `#${globalPosition}` : '–'} large />
+            <StatColumn label='Puntos' value={String(myPoints)} subtext='pts' large />
+            <StatColumn
+              label='Del líder'
+              value={distanceToLeader === 0 ? 'Líder' : `-${distanceToLeader}`}
+              subtext={distanceToLeader > 0 ? 'pts' : undefined}
+              valueColor={distanceToLeader === 0 ? 'success.main' : undefined}
+              large
+            />
+          </Stack>
 
-      <Grid container spacing={1.5}>
-        {quickStats.map((item) => (
-          <Grid key={item.label} size={{ xs: 12, sm: 6, lg: 3 }}>
-            <MetricCard label={item.label} value={item.value} helper={item.helper} />
-          </Grid>
-        ))}
-      </Grid>
+          <Divider />
 
-      <PerformanceChartSection userId={user?.id ?? null} />
+          {/* Fila 2: exactos, aciertos de signo, efectividad */}
+          <Stack direction='row' divider={<Divider orientation='vertical' flexItem />}>
+            <StatColumn label='Exactos' value={String(exactHits)} />
+            <StatColumn label='Aciertos' value={String(outcomeHits)} />
+            <StatColumn label='Efectividad' value={efectividad !== null ? `${efectividad}%` : '–'} />
+          </Stack>
+        </CardContent>
+      </Card>
 
-      <Grid container spacing={1.5}>
-        <Grid size={{ xs: 12, xl: 7 }}>
-          <Card
-            elevation={0}
-            sx={{
-              height: '100%',
-              borderRadius: 2,
-              border: '1px solid',
-              borderColor: 'divider'
-            }}
-          >
-            <CardContent sx={{ p: 3 }}>
-              <Stack spacing={3}>
-                <Stack spacing={0.75}>
-                  <Typography variant='h5' fontWeight={800}>
-                    Tu participación
+      {/* 3. Estado del torneo */}
+      <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+        <CardContent sx={{ p: { xs: 1.5, sm: 2 }, '&:last-child': { pb: { xs: 1.5, sm: 2 } } }}>
+          <Stack spacing={1.5}>
+            {/* <Typography variant='subtitle1' fontWeight={800}>
+              Estado del torneo
+            </Typography> */}
+
+            {/* Fase izquierda · Pronósticos derecha */}
+            <Stack direction='row' justifyContent='space-between' alignItems='center'>
+              <Stack spacing={0.25}>
+                <Typography sx={{ fontSize: { xs: '0.875rem', sm: '1rem' }, fontWeight: 600, color: 'text.primary' }}>
+                  {tournamentPhase}
+                </Typography>
+              </Stack>
+
+              <Stack direction='row' alignItems='flex-end' spacing={1}>
+                <Typography
+                  sx={{
+                    fontSize: { xs: '0.875rem', sm: '1rem' },
+                    fontWeight: 600,
+                    color: 'text.primary'
+                  }}
+                >
+                  Pronósticos:
+                </Typography>
+                <Stack direction='row' alignItems='center' spacing={0.5}>
+                  <Typography
+                    sx={{
+                      fontSize: { xs: '0.875rem', sm: '1rem' },
+                      fontWeight: 700,
+                      color: predictionsClosed ? 'text.secondary' : 'success.main'
+                    }}
+                  >
+                    {predictionsClosed ? 'Cerrados' : 'Abiertos'}
                   </Typography>
-
-                  <Typography variant='body2' color='text.secondary'>
-                    Mira cuánto llevas cargado, cómo vienes puntuando y qué tan lejos estás del líder.
-                  </Typography>
+                  {predictionsClosed ? (
+                    <BlockIcon sx={{ fontSize: '13px' }} color={'disabled'} />
+                  ) : (
+                    <CheckCircleIcon sx={{ fontSize: '13px' }} color={'success'} />
+                  )}
                 </Stack>
+              </Stack>
+            </Stack>
 
-                <Stack direction='row' spacing={1} flexWrap='wrap' useFlexGap>
-                  <Chip label={`${loadedPredictions} cargados`} color='primary' variant='outlined' />
-                  <Chip label={`${pendingPredictions} pendientes`} variant='outlined' />
-                  <Chip label={`${myPoints} pts`} color='primary' />
-                </Stack>
+            <Divider />
 
-                <ProgressBlock
-                  label='Progreso de carga'
-                  valueLabel={`${loadedPredictions} / ${totalMatches}`}
-                  progress={predictionLoadProgress}
-                />
+            <TournamentProgressRow
+              label='Pronósticos cargados'
+              value={`${loadedPredictions} / ${totalMatches}`}
+              progress={predictionLoadProgress}
+            />
+          </Stack>
+        </CardContent>
+      </Card>
 
-                <ProgressBlock
-                  label='Partidos evaluados'
-                  valueLabel={`${scoredPredictions} / ${finishedMatches.length}`}
-                  progress={evaluatedProgress}
-                />
+      {/* 4. Pronósticos de hoy + Racha actual */}
+      {todayMatches.length > 0 || lastFiveStreak.length > 0 ? (
+        <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+          <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
 
-                <Grid container spacing={1.5}>
-                  <Grid size={{ xs: 12, sm: 4 }}>
-                    <MiniStat label='Exactos' value={exactHits} />
-                  </Grid>
-
-                  <Grid size={{ xs: 12, sm: 4 }}>
-                    <MiniStat label='Aciertos de signo' value={outcomeHits} />
-                  </Grid>
-
-                  <Grid size={{ xs: 12, sm: 4 }}>
-                    <MiniStat label='Sin puntuar' value={missCount} />
-                  </Grid>
-                </Grid>
-
-                <Stack spacing={1.25}>
+            {/* Pronósticos de hoy */}
+            {todayMatches.length > 0 ? (
+              <Stack>
+                <Box sx={{ px: { xs: 1.5, sm: 2 }, pt: { xs: 1.5, sm: 2 }, pb: 1 }}>
                   <Typography variant='subtitle1' fontWeight={800}>
-                    Comparación con el líder
+                    Pronósticos de hoy
                   </Typography>
+                </Box>
 
-                  <ComparisonRow label='Tus puntos' value={myPoints} maxValue={Math.max(leaderPoints, myPoints, 1)} />
-                  <ComparisonRow
-                    label='Puntos del líder'
-                    value={leaderPoints}
-                    maxValue={Math.max(leaderPoints, myPoints, 1)}
-                    color='success.main'
-                  />
+                {todayMatches.map((match) => {
+                  const pred = predictionByMatchId.get(match.id);
+                  const isLive = match.status === 'live';
+                  const timeLabel = isLive
+                    ? 'En vivo'
+                    : new Date(match.kickoffAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
 
-                  <Typography variant='body2' color='text.secondary'>
-                    Diferencia actual: {distanceToLeader} pts
-                  </Typography>
-                </Stack>
-
-                <Stack direction='row' spacing={1} flexWrap='wrap' useFlexGap>
-                  <Button component={RouterLink} to={routes.predictionMatches} variant='contained'>
-                    Ir a cargar pronósticos
-                  </Button>
-
-                  <Button component={RouterLink} to={routes.myPredictions} variant='outlined'>
-                    Ver mis pronósticos
-                  </Button>
-
-                  <Button component={RouterLink} to={routes.leaderboard} variant='text'>
-                    Ver ranking
-                  </Button>
-                </Stack>
-              </Stack>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        <Grid size={{ xs: 12, xl: 5 }}>
-          <Card
-            elevation={0}
-            sx={{
-              height: '100%',
-              borderRadius: 2,
-              border: '1px solid',
-              borderColor: 'divider'
-            }}
-          >
-            <CardContent sx={{ p: 3 }}>
-              <Stack spacing={3}>
-                <Stack spacing={0.75}>
-                  <Typography variant='h5' fontWeight={800}>
-                    Estado del torneo
-                  </Typography>
-
-                  <Typography variant='body2' color='text.secondary'>
-                    Información útil del Mundial y del estado global de la quiniela.
-                  </Typography>
-                </Stack>
-
-                <Stack direction='row' spacing={1} flexWrap='wrap' useFlexGap>
-                  <Chip label={`Fase: ${tournamentPhase}`} color='primary' variant='outlined' />
-                  <Chip
-                    label={predictionsClosed ? 'Carga cerrada' : 'Carga habilitada'}
-                    color={predictionsClosed ? 'warning' : 'success'}
-                    variant={predictionsClosed ? 'outlined' : 'filled'}
-                  />
-                </Stack>
-
-                <ProgressBlock
-                  label='Progreso del torneo'
-                  valueLabel={`${finishedMatches.length} / ${totalMatches}`}
-                  progress={tournamentProgress}
-                />
-
-                <Grid container spacing={1.5}>
-                  <Grid size={{ xs: 12, sm: 4 }}>
-                    <MiniStat label='En vivo' value={liveMatches.length} />
-                  </Grid>
-
-                  <Grid size={{ xs: 12, sm: 4 }}>
-                    <MiniStat label='Finalizados' value={finishedMatches.length} />
-                  </Grid>
-
-                  <Grid size={{ xs: 12, sm: 4 }}>
-                    <MiniStat label='Pendientes' value={scheduledMatches.length} />
-                  </Grid>
-                </Grid>
-
-                <Box
-                  sx={{
-                    p: 2,
-                    borderRadius: 2,
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    bgcolor: 'background.paper'
-                  }}
-                >
-                  <Stack spacing={1}>
-                    <Typography variant='subtitle1' fontWeight={800}>
-                      Próximo pendiente sin pronóstico
-                    </Typography>
-
-                    {nextPendingMatch ? (
-                      <>
-                        <Stack direction='row' spacing={1} flexWrap='wrap' useFlexGap>
-                          <Chip label={nextPendingMatch.group} size='small' variant='outlined' />
-                          <Chip
-                            label={predictionsClosed ? 'Carga global cerrada' : 'Disponible para pronosticar'}
-                            size='small'
-                            color={predictionsClosed ? 'warning' : 'success'}
-                            variant={predictionsClosed ? 'outlined' : 'filled'}
-                          />
-                        </Stack>
-                        <Typography variant='h6' fontWeight={800}>
-                          <MatchVs match={nextPendingMatch} />
-                        </Typography>
-
-                        <Typography variant='body2' color='text.secondary'>
-                          {nextPendingMatch.kickoff}
-                        </Typography>
-
-                        <Typography variant='body2' color='text.secondary'>
-                          {nextPendingMatch.stadium} · {nextPendingMatch.city}
-                        </Typography>
-                        <Stack direction='row' spacing={1} flexWrap='wrap' useFlexGap>
-                          <Button
-                            size='small'
-                            component={RouterLink}
-                            to={`${routes.predictionMatches}?matchId=${encodeURIComponent(nextPendingMatch.id)}`}
-                            variant='contained'
+                  return (
+                    <React.Fragment key={match.id}>
+                      <Divider />
+                      <Box
+                        component={RouterLink}
+                        to={matchDetailPath(match.id)}
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          px: { xs: 1.5, sm: 2 },
+                          py: 1.25,
+                          textDecoration: 'none',
+                          color: 'inherit',
+                          '&:hover': { bgcolor: 'action.hover' },
+                          gap: 1
+                        }}
+                      >
+                        <Stack spacing={0.25} sx={{ minWidth: 0 }}>
+                          <Typography
+                            sx={{
+                              fontSize: { xs: '0.8125rem', sm: '0.875rem' },
+                              fontWeight: 700,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap'
+                            }}
                           >
-                            Cargar pronóstico de este partido
-                          </Button>
+                            {match.homeTeam} vs {match.awayTeam}
+                          </Typography>
+                          <Typography
+                            sx={{
+                              fontSize: '0.7rem',
+                              fontWeight: isLive ? 700 : 400,
+                              color: isLive ? 'error.main' : 'text.secondary'
+                            }}
+                          >
+                            {timeLabel}
+                          </Typography>
                         </Stack>
-                      </>
-                    ) : (
-                      <Alert severity='success' sx={{ mt: 0.5 }}>
-                        No tienes partidos pendientes por pronosticar en este momento.
-                      </Alert>
-                    )}
-                  </Stack>
-                </Box>
 
-                <Box
-                  sx={{
-                    p: 2,
-                    borderRadius: 2,
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    bgcolor: 'background.paper'
-                  }}
-                >
-                  <Stack spacing={1}>
-                    <Typography variant='subtitle1' fontWeight={800}>
-                      Info general
-                    </Typography>
-
-                    <Typography variant='body2' color='text.secondary'>
-                      Fecha límite global: {formatDateTime(settings?.predictions_close_at ?? null)}
-                    </Typography>
-
-                    <Typography variant='body2' color='text.secondary'>
-                      Próximo partido del torneo:{' '}
-                      {nextTournamentMatch
-                        ? `${nextTournamentMatch.homeTeam} vs ${nextTournamentMatch.awayTeam}`
-                        : 'Sin partidos pendientes'}
-                    </Typography>
-                  </Stack>
-                </Box>
-
-                <Stack direction='row' spacing={1} flexWrap='wrap' useFlexGap>
-                  <Button component={RouterLink} to={routes.fixture} variant='outlined'>
-                    Ver fixture
-                  </Button>
-                </Stack>
+                        {pred ? (
+                          <Typography sx={{ fontSize: { xs: '0.875rem', sm: '1rem' }, fontWeight: 800, flexShrink: 0 }}>
+                            {pred.home_score} – {pred.away_score}
+                          </Typography>
+                        ) : (
+                          <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary', flexShrink: 0 }}>
+                            Sin pronóstico
+                          </Typography>
+                        )}
+                      </Box>
+                    </React.Fragment>
+                  );
+                })}
               </Stack>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+            ) : null}
 
+            {/* Racha actual */}
+            {lastFiveStreak.length > 0 ? (
+              <>
+                <Divider />
+                <Box sx={{ px: { xs: 1.5, sm: 2 }, py: { xs: 1.5, sm: 2 } }}>
+                  <Stack direction='row' justifyContent='space-between' alignItems='center' sx={{ mb: 1 }}>
+                    <Typography
+                      sx={{
+                        fontSize: '0.7rem',
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        letterSpacing: 0.5,
+                        color: 'text.secondary'
+                      }}
+                    >
+                      Racha actual
+                    </Typography>
+                    <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>
+                      {lastFiveStreak.filter((r) => r !== 'miss').length} de {lastFiveStreak.length} acertados
+                    </Typography>
+                  </Stack>
+
+                  <Stack direction='row' spacing={0.75}>
+                    {Array.from({ length: 5 }, (_, i) => {
+                      const result = lastFiveStreak[i] ?? null;
+                      const bgcolor =
+                        result === 'exact'
+                          ? 'success.main'
+                          : result === 'sign'
+                            ? 'primary.main'
+                            : result === 'miss'
+                              ? 'error.main'
+                              : 'action.disabledBackground';
+                      return (
+                        <Box
+                          key={i}
+                          sx={{
+                            flex: 1,
+                            height: 26,
+                            borderRadius: 1,
+                            bgcolor,
+                            opacity: result === null ? 0.35 : 1
+                          }}
+                        />
+                      );
+                    })}
+                  </Stack>
+
+                  <Stack direction='row' spacing={2} sx={{ mt: 0.75 }} flexWrap='wrap' useFlexGap>
+                    {([
+                      { key: 'exact', label: 'Exacto', color: 'success.main' },
+                      { key: 'sign', label: 'Acierto', color: 'primary.main' },
+                      { key: 'miss', label: 'Fallo', color: 'error.main' }
+                    ] as const).map(({ key, label, color }) => (
+                      <Stack key={key} direction='row' spacing={0.5} alignItems='center'>
+                        <Box sx={{ width: 8, height: 8, borderRadius: 0.5, bgcolor: color }} />
+                        <Typography sx={{ fontSize: '0.65rem', color: 'text.secondary' }}>{label}</Typography>
+                      </Stack>
+                    ))}
+                  </Stack>
+                </Box>
+              </>
+            ) : null}
+
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {/* 5. Admin */}
       {profile?.is_admin ? (
-        <Card
-          elevation={0}
-          sx={{
-            borderRadius: 2,
-            border: '1px solid',
-            borderColor: 'divider'
-          }}
-        >
-          <CardContent sx={{ p: 3 }}>
-            <Stack spacing={2}>
-              <Stack spacing={0.5}>
-                <Typography variant='h6' fontWeight={800}>
-                  Herramientas de administración
-                </Typography>
-
-                <Typography variant='body2' color='text.secondary'>
-                  Accesos rápidos para gestionar partidos, resultados y configuración global.
-                </Typography>
-              </Stack>
-
+        <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+          <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
+            <Stack spacing={1.5}>
+              <Typography variant='subtitle2' fontWeight={800} color='text.secondary'>
+                Administración
+              </Typography>
               <Stack direction='row' spacing={1} flexWrap='wrap' useFlexGap>
-                <Button component={RouterLink} to={routes.adminMatches} variant='outlined'>
-                  Admin · Partidos
+                <Button component={RouterLink} to={routes.adminMatches} size='small' variant='outlined'>
+                  Partidos
                 </Button>
-
-                <Button component={RouterLink} to={routes.adminResults} variant='outlined'>
-                  Admin · Resultados
+                <Button component={RouterLink} to={routes.adminResults} size='small' variant='outlined'>
+                  Resultados
                 </Button>
-
-                <Button component={RouterLink} to={routes.adminSettings} variant='outlined'>
-                  Admin · Configuración
+                <Button component={RouterLink} to={routes.adminSettings} size='small' variant='outlined'>
+                  Ajustes
                 </Button>
               </Stack>
             </Stack>

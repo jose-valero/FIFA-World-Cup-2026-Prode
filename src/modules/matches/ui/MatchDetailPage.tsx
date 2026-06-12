@@ -40,7 +40,7 @@ const REDUNDANT_SUFFIXES = [
   / red card$/i,
   / substitution$/i,
   / penalty$/i,
-  / own goal$/i,
+  / own goal$/i
 ];
 
 function formatPlayerName(raw: string): string {
@@ -60,13 +60,14 @@ function getGoalEvents(events: MatchDetailEvent[]): MatchDetailEvent[] {
 }
 
 function getTimelineEvents(events: MatchDetailEvent[]): MatchDetailEvent[] {
-  return events.filter((e) =>
-    e.type === 'goal' ||
-    e.type === 'penalty_goal' ||
-    e.type === 'own_goal' ||
-    e.type === 'yellow_card' ||
-    e.type === 'red_card' ||
-    e.type === 'substitution'
+  return events.filter(
+    (e) =>
+      e.type === 'goal' ||
+      e.type === 'penalty_goal' ||
+      e.type === 'own_goal' ||
+      e.type === 'yellow_card' ||
+      e.type === 'red_card' ||
+      e.type === 'substitution'
   );
 }
 
@@ -76,7 +77,6 @@ function parseMinute(minuteStr: string): number {
   const [main, extra] = base.split('+').map((s) => parseInt(s.trim(), 10));
   return (isNaN(main) ? 0 : main) + (isNaN(extra) ? 0 : extra);
 }
-
 
 type EventVisual = {
   color: string;
@@ -140,8 +140,7 @@ function EventTypeIcon({ type, size = 14 }: { type: MatchDetailEventType; size?:
 function fmtDate(kickoffAt: string): string {
   return new Date(kickoffAt).toLocaleDateString('es-AR', {
     day: 'numeric',
-    month: 'short',
-    year: 'numeric'
+    month: 'long'
   });
 }
 
@@ -240,7 +239,8 @@ function ScorerList({ events }: { events: MatchDetailEvent[] }) {
           <Stack key={i} direction='row' spacing={0.5} alignItems='center'>
             {align === 'left' && <SportsSoccerIcon sx={{ fontSize: 12, color: 'success.main', flexShrink: 0 }} />}
             <Typography variant='caption' sx={{ color: 'text.secondary', lineHeight: 1.5, fontWeight: 500 }}>
-              {formatPlayerName(e.player)}{suffix} {e.minute}
+              {formatPlayerName(e.player)}
+              {suffix} {e.minute}
             </Typography>
             {align === 'right' && <SportsSoccerIcon sx={{ fontSize: 12, color: 'success.main', flexShrink: 0 }} />}
           </Stack>
@@ -353,7 +353,7 @@ function MetaBlockAction({
   icon,
   primary,
   isActive,
-  onClick,
+  onClick
 }: {
   icon: React.ReactNode;
   primary: string;
@@ -379,7 +379,7 @@ function MetaBlockAction({
         color: 'inherit',
         transition: 'opacity 0.15s ease',
         '&:hover': { opacity: 0.7 },
-        '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', borderRadius: 1 },
+        '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', borderRadius: 1 }
       }}
     >
       <Box sx={{ color: isActive ? 'primary.main' : 'text.disabled', display: 'flex', transition: 'color 0.2s ease' }}>
@@ -404,7 +404,7 @@ function MatchHero({
   match,
   detail,
   timelineOpen,
-  onToggleTimeline,
+  onToggleTimeline
 }: {
   match: Match;
   detail: MatchDetailPayload | null;
@@ -478,7 +478,11 @@ function MatchHero({
               <Typography
                 fontWeight={800}
                 textAlign='center'
-                sx={{ fontSize: { xs: '0.85rem', sm: '1rem', md: '1.1rem' }, lineHeight: 1.25, maxWidth: { xs: 90, sm: 130 } }}
+                sx={{
+                  fontSize: { xs: '0.85rem', sm: '1rem', md: '1.1rem' },
+                  lineHeight: 1.25,
+                  maxWidth: { xs: 90, sm: 130 }
+                }}
               >
                 {h.homeName}
               </Typography>
@@ -516,7 +520,14 @@ function MatchHero({
                 </Typography>
               ) : (
                 <Stack alignItems='center' spacing={0.25}>
-                  <Typography sx={{ fontSize: { xs: '2rem', sm: '2.5rem' }, fontWeight: 200, color: 'text.secondary', lineHeight: 1 }}>
+                  <Typography
+                    sx={{
+                      fontSize: { xs: '2rem', sm: '2.5rem' },
+                      fontWeight: 200,
+                      color: 'text.secondary',
+                      lineHeight: 1
+                    }}
+                  >
                     vs
                   </Typography>
                   <Typography variant='body2' sx={{ color: 'text.secondary', fontWeight: 600 }}>
@@ -531,7 +542,11 @@ function MatchHero({
               <Typography
                 fontWeight={800}
                 textAlign='center'
-                sx={{ fontSize: { xs: '0.85rem', sm: '1rem', md: '1.1rem' }, lineHeight: 1.25, maxWidth: { xs: 90, sm: 130 } }}
+                sx={{
+                  fontSize: { xs: '0.85rem', sm: '1rem', md: '1.1rem' },
+                  lineHeight: 1.25,
+                  maxWidth: { xs: 90, sm: 130 }
+                }}
               >
                 {h.awayName}
               </Typography>
@@ -556,7 +571,7 @@ function MatchHero({
               <MetaBlock
                 icon={<CalendarTodayIcon sx={{ fontSize: 16 }} />}
                 primary={fmtDate(h.kickoffAt)}
-                secondary={`${fmtTime(h.kickoffAt)} ART`}
+                secondary={`${fmtTime(h.kickoffAt)}`}
               />
               <MetaBlock
                 icon={<StadiumIcon sx={{ fontSize: 16 }} />}
@@ -574,7 +589,7 @@ function MatchHero({
                     sx={{
                       fontSize: 16,
                       transform: timelineOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                      transition: 'transform 0.25s ease',
+                      transition: 'transform 0.25s ease'
                     }}
                   />
                 }
@@ -597,9 +612,7 @@ function MatchEventTimelineItem({ event }: { event: MatchDetailEvent }) {
   const isHome = event.side === 'home';
   const playerName = formatPlayerName(event.player);
 
-  const suffix =
-    event.type === 'penalty_goal' ? ' (P)' :
-    event.type === 'own_goal' ? ' (OG)' : '';
+  const suffix = event.type === 'penalty_goal' ? ' (P)' : event.type === 'own_goal' ? ' (OG)' : '';
 
   const content = (
     <Stack spacing={0.25} alignItems={isHome ? 'flex-end' : 'flex-start'}>
@@ -609,7 +622,8 @@ function MatchEventTimelineItem({ event }: { event: MatchDetailEvent }) {
       <Stack direction='row' alignItems='center' spacing={0.4}>
         {!isHome && <EventTypeIcon type={event.type} size={11} />}
         <Typography variant='caption' sx={{ color: 'text.secondary', fontSize: '0.68rem' }}>
-          {label}{suffix}
+          {label}
+          {suffix}
         </Typography>
         {isHome && <EventTypeIcon type={event.type} size={11} />}
       </Stack>
@@ -624,7 +638,9 @@ function MatchEventTimelineItem({ event }: { event: MatchDetailEvent }) {
       </Box>
 
       {/* Center — dot + minute */}
-      <Box sx={{ width: 44, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
+      <Box
+        sx={{ width: 44, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}
+      >
         <Box
           sx={{
             width: 10,
@@ -635,7 +651,7 @@ function MatchEventTimelineItem({ event }: { event: MatchDetailEvent }) {
             borderColor: 'background.default',
             zIndex: 1,
             flexShrink: 0,
-            boxShadow: `0 0 6px ${color}55`,
+            boxShadow: `0 0 6px ${color}55`
           }}
         />
         <Typography sx={{ fontSize: '0.58rem', fontWeight: 700, color, lineHeight: 1, whiteSpace: 'nowrap' }}>
@@ -690,7 +706,7 @@ function MatchVerticalTimeline({ events, status }: { events: MatchDetailEvent[];
           width: 2,
           bgcolor: 'divider',
           transform: 'translateX(-50%)',
-          borderRadius: 1,
+          borderRadius: 1
         }}
       />
       <Stack>
@@ -776,7 +792,9 @@ export function MatchDetailPage() {
             <Stack spacing={1.5}>
               <Stack direction='row' alignItems='center' spacing={1}>
                 <AccessTimeIcon sx={{ fontSize: 18, color: 'text.disabled' }} />
-                <Typography variant='subtitle1' fontWeight={800}>Cronología del partido</Typography>
+                <Typography variant='subtitle1' fontWeight={800}>
+                  Cronología del partido
+                </Typography>
               </Stack>
               <MatchVerticalTimeline events={timelineEvents} status={timelineStatus} />
             </Stack>
