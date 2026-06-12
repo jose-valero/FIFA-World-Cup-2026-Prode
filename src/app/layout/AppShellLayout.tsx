@@ -3,6 +3,7 @@ import AppTopNav from './AppTopNav';
 import { AppContainer } from './AppContainer';
 import { Outlet } from 'react-router';
 import { AppFooter } from './AppFooter';
+import { AppBottomNav } from './AppBottomNav';
 
 export const AppShellLayout = () => {
   return (
@@ -22,7 +23,16 @@ export const AppShellLayout = () => {
           <Outlet />
         </AppContainer>
       </Box>
-      <AppFooter />
+
+      {/* Footer solo en desktop — en mobile lo reemplaza la BottomNav */}
+      <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
+        <AppFooter />
+      </Box>
+
+      {/* Espacio reservado para la BottomNav fija en mobile */}
+      <Box sx={{ display: { xs: 'block', sm: 'none' }, height: 64, flexShrink: 0 }} />
+
+      <AppBottomNav />
     </Box>
   );
 };
