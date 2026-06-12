@@ -9,6 +9,7 @@ import Typography from '@mui/material/Typography';
 import { useAuditPredictionsByUser } from '../../audits/hooks/useAuditPredictionsByUser';
 import { useMatches } from '../../matches/hooks/useMatches';
 import type { Match } from '../../matches/types/types';
+import { getPredictionResultColor } from '../../../shared/utils/predictionResultColors';
 
 const MAX_POINTS = 5;
 const BAR_WIDTH = 20;
@@ -36,9 +37,9 @@ function scoreMatch(predHome: number, predAway: number, officialHome: number, of
 }
 
 function barSxColor(points: 0 | 3 | 5): string {
-  if (points === 5) return 'success.main';
-  if (points === 3) return 'primary.main';
-  return 'action.selected';
+  if (points === 5) return getPredictionResultColor('exact');
+  if (points === 3) return getPredictionResultColor('sign');
+  return getPredictionResultColor('miss');
 }
 
 function PerformanceBar({ item }: { item: ScoredMatch }) {
@@ -86,34 +87,22 @@ function PerformanceBar({ item }: { item: ScoredMatch }) {
   );
 }
 
+const CHART_LEGEND_ITEMS = [
+  { key: 'exact', text: '5 pts — exacto', color: getPredictionResultColor('exact') },
+  { key: 'sign',  text: '3 pts — signo',  color: getPredictionResultColor('sign') },
+  { key: 'miss',  text: '0 pts — fallo',  color: getPredictionResultColor('miss') }
+] as const;
+
 const ChartLegend = () => (
   <Stack direction='row' spacing={2} flexWrap='wrap' useFlexGap>
-    <Stack direction='row' spacing={0.75} alignItems='center'>
-      <Box sx={{ width: 10, height: 10, borderRadius: 0.5, bgcolor: 'success.main', flexShrink: 0 }} />
-      <Typography variant='caption' color='text.secondary'>
-        5 pts — exacto
-      </Typography>
-    </Stack>
-    <Stack direction='row' spacing={0.75} alignItems='center'>
-      <Box sx={{ width: 10, height: 10, borderRadius: 0.5, bgcolor: 'primary.main', flexShrink: 0 }} />
-      <Typography variant='caption' color='text.secondary'>
-        3 pts — signo
-      </Typography>
-    </Stack>
-    <Stack direction='row' spacing={0.75} alignItems='center'>
-      <Box
-        sx={(t) => ({
-          width: 10,
-          height: 10,
-          borderRadius: 0.5,
-          bgcolor: t.palette.action.selected,
-          flexShrink: 0
-        })}
-      />
-      <Typography variant='caption' color='text.secondary'>
-        0 pts — fallo
-      </Typography>
-    </Stack>
+    {CHART_LEGEND_ITEMS.map(({ key, text, color }) => (
+      <Stack key={key} direction='row' spacing={0.75} alignItems='center'>
+        <Box sx={{ width: 10, height: 10, borderRadius: 0.5, bgcolor: color, flexShrink: 0 }} />
+        <Typography variant='caption' color='text.secondary'>
+          {text}
+        </Typography>
+      </Stack>
+    ))}
   </Stack>
 );
 
@@ -178,7 +167,7 @@ export function PerformanceChartSection({ userId, standalone = true }: Performan
             <Typography variant='caption' color='text.secondary'>
               {summary.count} evaluados ·{' '}
             </Typography>
-            <Typography variant='caption' sx={{ color: 'success.main', fontWeight: 700 }}>
+            <Typography variant='caption' sx={{ color: getPredictionResultColor('exact'), fontWeight: 700 }}>
               {summary.exacts} exactos
             </Typography>
             <Typography variant='caption' color='text.secondary'>

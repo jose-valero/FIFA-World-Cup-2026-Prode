@@ -205,13 +205,6 @@ export function ParticipantAuditDrawer({ open, onClose, participant, auditsVisib
             <Typography variant='h5' fontWeight={800}>
               {participant?.display_name ?? 'Participante'}
             </Typography>
-
-            <Stack direction='row' spacing={1} flexWrap='wrap' useFlexGap>
-              {participant ? <Chip label={`${participant.total_points} pts`} color='primary' /> : null}
-              {participant ? <Chip label={`${participant.exact_hits} exactos`} variant='outlined' /> : null}
-              {participant ? <Chip label={`${participant.outcome_hits} signo`} variant='outlined' /> : null}
-              {participant ? <Chip label={`${participant.scored_predictions} evaluados`} variant='outlined' /> : null}
-            </Stack>
           </Stack>
 
           <IconButton onClick={onClose} aria-label='Cerrar detalle de pronósticos'>

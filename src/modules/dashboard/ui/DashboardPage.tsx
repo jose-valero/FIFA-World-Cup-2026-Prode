@@ -23,6 +23,11 @@ import { isPredictionsClosed } from '../../../shared/utils/isPredictionsClosed';
 import { routes, matchDetailPath } from '../../../app/router/routes';
 import { TodayMatchesScroller } from '../components/TodayMatchesScroller';
 import { buildLeaderboardRanks } from '../../leaderboard/utils/buildLeaderboardRanks';
+import {
+  getPredictionResultColor,
+  PREDICTION_RESULT_CONFIG,
+  type PredictionResult
+} from '../../../shared/utils/predictionResultColors';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import BlockIcon from '@mui/icons-material/Block';
 // Columna compacta reutilizable para las 2 filas del bloque unificado.
@@ -105,9 +110,7 @@ function getSportsDayKey(date: Date): string {
   return adjusted.toDateString();
 }
 
-type StreakResult = 'exact' | 'sign' | 'miss';
-
-function scoreResult(pH: number, pA: number, oH: number, oA: number): StreakResult {
+function scoreResult(pH: number, pA: number, oH: number, oA: number): PredictionResult {
   if (pH === oH && pA === oA) return 'exact';
   const predSign = pH > pA ? 1 : pH < pA ? -1 : 0;
   const officialSign = oH > oA ? 1 : oH < oA ? -1 : 0;
@@ -191,8 +194,8 @@ export function DashboardPage() {
 
   const predictionByMatchId = React.useMemo(() => new Map(predictions.map((p) => [p.match_id, p])), [predictions]);
 
-  const lastFiveStreak = React.useMemo((): StreakResult[] => {
-    const items: StreakResult[] = [];
+  const lastFiveStreak = React.useMemo((): PredictionResult[] => {
+    const items: PredictionResult[] = [];
     for (const match of sortedMatches) {
       if (match.status !== 'finished') continue;
       if (match.officialHomeScore === null || match.officialAwayScore === null) continue;
@@ -417,13 +420,7 @@ export function DashboardPage() {
                     {Array.from({ length: 5 }, (_, i) => {
                       const result = lastFiveStreak[i] ?? null;
                       const bgcolor =
-                        result === 'exact'
-                          ? 'secondary.dark'
-                          : result === 'sign'
-                            ? 'primary.main'
-                            : result === 'miss'
-                              ? 'error.main'
-                              : 'action.disabledBackground';
+                        result !== null ? getPredictionResultColor(result) : 'action.disabledBackground';
                       return (
                         <Box
                           key={i}
@@ -440,13 +437,7 @@ export function DashboardPage() {
                   </Stack>
 
                   <Stack direction='row' spacing={2} sx={{ mt: 0.75 }} flexWrap='wrap' useFlexGap>
-                    {(
-                      [
-                        { key: 'exact', label: 'Exacto', color: 'secondary.dark' },
-                        { key: 'sign', label: 'Acierto', color: 'primary.main' },
-                        { key: 'miss', label: 'Fallo', color: 'error.main' }
-                      ] as const
-                    ).map(({ key, label, color }) => (
+                    {PREDICTION_RESULT_CONFIG.map(({ key, label, color }) => (
                       <Stack key={key} direction='row' spacing={0.5} alignItems='center'>
                         <Box sx={{ width: 8, height: 8, borderRadius: 0.5, bgcolor: color }} />
                         <Typography sx={{ fontSize: '0.65rem', color: 'text.secondary' }}>{label}</Typography>
