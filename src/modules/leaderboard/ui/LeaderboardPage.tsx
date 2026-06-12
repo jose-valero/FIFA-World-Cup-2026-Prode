@@ -14,6 +14,7 @@ import { queryKeys } from '../../../lib/react-query/queryKeys';
 import type { LeaderboardRow } from '../types/leaderboard.types';
 import { PodiumCard } from '../components/PodiumCard';
 import { LeaderboardTable } from '../components/table/LeaderboardTable';
+import { buildLeaderboardRanks } from '../utils/buildLeaderboardRanks';
 
 export function LeaderboardPage() {
   const [selectedParticipant, setSelectedParticipant] = React.useState<LeaderboardRow | null>(null);
@@ -34,16 +35,24 @@ export function LeaderboardPage() {
   const disabledRows = React.useMemo(() => rows.filter((row) => row.is_disabled), [rows]);
   const displayRows = React.useMemo(() => [...activeRows, ...disabledRows], [activeRows, disabledRows]);
 
-  const activePositionMap = React.useMemo(() => {
-    return new Map(activeRows.map((row, index) => [row.user_id, index + 1]));
-  }, [activeRows]);
+  const activePositionMap = React.useMemo(() => buildLeaderboardRanks(activeRows), [activeRows]);
+
+  const tiedPositions = React.useMemo(() => {
+    const posCount = new Map<number, number>();
+    for (const rank of activePositionMap.values()) {
+      posCount.set(rank, (posCount.get(rank) ?? 0) + 1);
+    }
+    const tied = new Set<number>();
+    for (const [rank, count] of posCount) {
+      if (count > 1) tied.add(rank);
+    }
+    return tied;
+  }, [activePositionMap]);
 
   const currentUserPosition = React.useMemo(() => {
     if (!user?.id) return null;
-
-    const index = activeRows.findIndex((row) => row.user_id === user.id);
-    return index >= 0 ? index + 1 : null;
-  }, [activeRows, user?.id]);
+    return activePositionMap.get(user.id) ?? null;
+  }, [activePositionMap, user?.id]);
 
   const leaderPoints = activeRows[0]?.total_points ?? 0;
   const topThree = activeRows.slice(0, 3);
@@ -155,16 +164,20 @@ export function LeaderboardPage() {
           {topThree.length > 0 ? (
             <Stack spacing={1.5}>
               <Grid container spacing={1.5}>
-                {topThree.map((row, index) => (
-                  <Grid key={row.user_id} size={{ xs: 12, md: 4 }}>
-                    <PodiumCard
-                      row={row}
-                      position={index + 1}
-                      isCurrentUser={Boolean(user?.id && row.user_id === user.id)}
-                      avatarUrl={topThreeAvatars.get(row.user_id) ?? null}
-                    />
-                  </Grid>
-                ))}
+                {topThree.map((row) => {
+                  const position = activePositionMap.get(row.user_id) ?? 1;
+                  return (
+                    <Grid key={row.user_id} size={{ xs: 12, md: 4 }}>
+                      <PodiumCard
+                        row={row}
+                        position={position}
+                        isTied={tiedPositions.has(position)}
+                        isCurrentUser={Boolean(user?.id && row.user_id === user.id)}
+                        avatarUrl={topThreeAvatars.get(row.user_id) ?? null}
+                      />
+                    </Grid>
+                  );
+                })}
               </Grid>
             </Stack>
           ) : null}

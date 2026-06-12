@@ -30,9 +30,8 @@ export class ChunkErrorBoundary extends Component<Props, State> {
     };
   }
 
-  componentDidUpdate(_prevProps: Props, prevState: State) {
-    const justErrored = this.state.hasError && !prevState.hasError;
-    if (justErrored && this.state.isChunkError && !this.state.alreadyRetried) {
+  componentDidCatch(error: unknown) {
+    if (isChunkLoadError(error) && !hasReloadBeenAttempted()) {
       performRecoveryReload();
     }
   }

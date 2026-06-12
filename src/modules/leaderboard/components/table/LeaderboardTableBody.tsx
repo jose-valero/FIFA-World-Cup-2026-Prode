@@ -1,9 +1,22 @@
 import React from 'react';
-import { alpha, Avatar, Button, Chip, Stack, TableBody, TableCell, TableRow, Typography } from '@mui/material';
+import {
+  alpha,
+  Avatar,
+  Button,
+  Chip,
+  IconButton,
+  Stack,
+  TableBody,
+  TableCell,
+  TableRow,
+  Typography,
+  useMediaQuery,
+  useTheme
+} from '@mui/material';
 import { podiumStyle } from '../../styles/atoms';
 import { getInitial } from '../../../../shared/utils/getInitial';
 import type { LeaderboardTableProps } from '../../types/leaderboard.types';
-
+import VisibilityIcon from '@mui/icons-material/Visibility';
 export const LeaderboardTableBody = ({
   displayRows,
   adminMap,
@@ -18,6 +31,9 @@ export const LeaderboardTableBody = ({
   handleOpenParticipantAudit,
   handleToggleParticipantStatus
 }: LeaderboardTableProps) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
   return (
     <TableBody>
       {displayRows.map((row, index) => {
@@ -93,7 +109,7 @@ export const LeaderboardTableBody = ({
                     fontWeight={isCurrentUser ? 800 : 700}
                     sx={{
                       cursor: 'pointer',
-                      maxWidth: { xs: 120, sm: 220 },
+                      maxWidth: { xs: 100, sm: 220 },
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap'
@@ -101,6 +117,20 @@ export const LeaderboardTableBody = ({
                   >
                     {row.display_name}
                   </Typography>
+
+                  {isMobile && canInspectPredictions && !isDisabledRow ? (
+                    <IconButton
+                      size='small'
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenParticipantAudit(row);
+                      }}
+                      aria-label={`Ver pronósticos de ${row.display_name}`}
+                      sx={{ flexShrink: 0, color: 'text.secondary' }}
+                    >
+                      <VisibilityIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  ) : null}
                 </Stack>
               </TableCell>
 

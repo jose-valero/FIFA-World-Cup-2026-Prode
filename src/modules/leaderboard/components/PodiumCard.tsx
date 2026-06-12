@@ -7,11 +7,13 @@ import { podiumLabel as _podiumLabel } from '../utils/podiumLabel';
 export function PodiumCard({
   row,
   position,
+  isTied = false,
   isCurrentUser,
   avatarUrl
 }: {
   row: LeaderboardRow;
   position: number;
+  isTied?: boolean;
   isCurrentUser: boolean;
   avatarUrl?: string | null;
 }) {
@@ -79,7 +81,7 @@ export function PodiumCard({
               </Stack>
 
               <Typography variant='body2' color='text.secondary'>
-                Posición #{position}
+                Posición #{position}{isTied ? ' (Empatado)' : ''}
               </Typography>
             </Box>
           </Stack>

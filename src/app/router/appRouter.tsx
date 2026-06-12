@@ -8,6 +8,7 @@ import { routes, slugs } from './routes';
 
 import { NotFoundPage } from '../../shared/components/NotFoundPage';
 import { RouteFallback } from '../../shared/components/RouteFallback';
+import { RouterErrorPage } from './RouterErrorPage';
 import { AppShellLayout } from '../layout/AppShellLayout';
 import { PublicOnlyRoute } from '../../modules/auth/guard/PublicOnlyRoute';
 import { useAuthContext } from '../providers/AuthProvider';
@@ -116,6 +117,7 @@ function HomeRoute() {
 export const appRouter = createBrowserRouter([
   {
     element: <AppShellLayout />,
+    errorElement: <RouterErrorPage />,
     children: [
       { path: routes.home, element: <HomeRoute /> },
       { path: routes.howItWorks, element: withSuspense(<HomePage />) },

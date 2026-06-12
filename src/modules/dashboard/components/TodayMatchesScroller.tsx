@@ -47,9 +47,7 @@ export function TodayMatchesScroller({ matches }: Props) {
     >
       {matches.map((match) => {
         const hasScore =
-          match.status !== 'scheduled' &&
-          match.officialHomeScore != null &&
-          match.officialAwayScore != null;
+          match.status !== 'scheduled' && match.officialHomeScore != null && match.officialAwayScore != null;
 
         const homeLabel = match.homeTeamCode ?? match.homeTeam;
         const awayLabel = match.awayTeamCode ?? match.awayTeam;
@@ -64,10 +62,13 @@ export function TodayMatchesScroller({ matches }: Props) {
               flexShrink: 0,
               border: '1px solid',
               borderColor: match.status === 'live' ? 'error.main' : 'divider',
-              borderRadius: '8px'
+              borderRadius: '28px'
             }}
           >
-            <CardActionArea onClick={() => void navigate(matchDetailPath(match.id))} sx={{ height: '100%', borderRadius: '8px' }}>
+            <CardActionArea
+              onClick={() => void navigate(matchDetailPath(match.id))}
+              sx={{ height: '100%', borderRadius: 2 }}
+            >
               <CardContent sx={{ p: 1.5 }}>
                 <Stack spacing={0.75}>
                   <Stack direction='row' justifyContent='space-between' alignItems='center'>
@@ -85,7 +86,12 @@ export function TodayMatchesScroller({ matches }: Props) {
 
                   {hasScore ? (
                     <Stack direction='row' alignItems='center' justifyContent='center' spacing={1}>
-                      <Stack direction='row' alignItems='center' spacing={0.5} sx={{ flex: 1, justifyContent: 'flex-end' }}>
+                      <Stack
+                        direction='row'
+                        alignItems='center'
+                        spacing={0.5}
+                        sx={{ flex: 1, justifyContent: 'flex-end' }}
+                      >
                         <TeamFlag teamCode={match.homeTeamCode} teamName={match.homeTeam} size={14} />
                         <Typography variant='body2' noWrap fontWeight={700}>
                           {homeLabel}
@@ -94,7 +100,12 @@ export function TodayMatchesScroller({ matches }: Props) {
                       <Typography variant='h6' fontWeight={900} sx={{ minWidth: 44, textAlign: 'center' }}>
                         {match.officialHomeScore}–{match.officialAwayScore}
                       </Typography>
-                      <Stack direction='row' alignItems='center' spacing={0.5} sx={{ flex: 1, justifyContent: 'flex-start' }}>
+                      <Stack
+                        direction='row'
+                        alignItems='center'
+                        spacing={0.5}
+                        sx={{ flex: 1, justifyContent: 'flex-start' }}
+                      >
                         <TeamFlag teamCode={match.awayTeamCode} teamName={match.awayTeam} size={14} />
                         <Typography variant='body2' noWrap fontWeight={700}>
                           {awayLabel}
@@ -103,7 +114,12 @@ export function TodayMatchesScroller({ matches }: Props) {
                     </Stack>
                   ) : (
                     <Stack direction='row' alignItems='center' justifyContent='center' spacing={0.75}>
-                      <Stack direction='row' alignItems='center' spacing={0.5} sx={{ flex: 1, justifyContent: 'flex-end' }}>
+                      <Stack
+                        direction='row'
+                        alignItems='center'
+                        spacing={0.5}
+                        sx={{ flex: 1, justifyContent: 'flex-end' }}
+                      >
                         <TeamFlag teamCode={match.homeTeamCode} teamName={match.homeTeam} size={14} />
                         <Typography variant='body2' noWrap fontWeight={700}>
                           {homeLabel}
@@ -112,7 +128,12 @@ export function TodayMatchesScroller({ matches }: Props) {
                       <Typography variant='caption' color='text.secondary' sx={{ minWidth: 20, textAlign: 'center' }}>
                         vs
                       </Typography>
-                      <Stack direction='row' alignItems='center' spacing={0.5} sx={{ flex: 1, justifyContent: 'flex-start' }}>
+                      <Stack
+                        direction='row'
+                        alignItems='center'
+                        spacing={0.5}
+                        sx={{ flex: 1, justifyContent: 'flex-start' }}
+                      >
                         <TeamFlag teamCode={match.awayTeamCode} teamName={match.awayTeam} size={14} />
                         <Typography variant='body2' noWrap fontWeight={700}>
                           {awayLabel}
@@ -120,10 +141,6 @@ export function TodayMatchesScroller({ matches }: Props) {
                       </Stack>
                     </Stack>
                   )}
-
-                  <Typography variant='caption' color='text.secondary' noWrap sx={{ textAlign: 'center' }}>
-                    {match.city}
-                  </Typography>
                 </Stack>
               </CardContent>
             </CardActionArea>

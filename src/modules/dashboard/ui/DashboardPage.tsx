@@ -20,6 +20,13 @@ import { isPredictionsClosed } from '../../../shared/utils/isPredictionsClosed';
 import { routes } from '../../../app/router/routes';
 import { PerformanceChartSection } from '../components/PerformanceChartSection';
 import { TodayMatchesScroller } from '../components/TodayMatchesScroller';
+import { buildLeaderboardRanks } from '../../leaderboard/utils/buildLeaderboardRanks';
+
+// Sports day boundary: 06:00 local. Matches between 00:00–05:59 belong to the previous day's matchday.
+function getSportsDayKey(date: Date): string {
+  const adjusted = new Date(date.getTime() - 6 * 60 * 60 * 1000);
+  return adjusted.toDateString();
+}
 
 export function DashboardPage() {
   const { user, profile } = useAuth();
@@ -75,8 +82,10 @@ export function DashboardPage() {
   }, [matches]);
 
   const todayMatches = React.useMemo(() => {
-    const todayStr = new Date().toDateString();
-    return sortedMatches.filter((m) => new Date(m.kickoffAt).toDateString() === todayStr);
+    const todayKey = getSportsDayKey(new Date());
+    return sortedMatches.filter(
+      (m) => m.status === 'live' || getSportsDayKey(new Date(m.kickoffAt)) === todayKey
+    );
   }, [sortedMatches]);
 
   const pendingPredictionMatches = React.useMemo(() => {
@@ -98,9 +107,8 @@ export function DashboardPage() {
 
   const globalPosition = React.useMemo(() => {
     if (!user?.id) return null;
-
-    const index = leaderboard.findIndex((row) => row.user_id === user.id);
-    return index >= 0 ? index + 1 : null;
+    const activeLeaderboard = leaderboard.filter((row) => !row.is_disabled);
+    return buildLeaderboardRanks(activeLeaderboard).get(user.id) ?? null;
   }, [leaderboard, user?.id]);
 
   const predictionsClosed = isPredictionsClosed(
