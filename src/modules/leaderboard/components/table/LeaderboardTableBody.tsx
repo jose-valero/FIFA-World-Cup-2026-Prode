@@ -27,6 +27,7 @@ export const LeaderboardTableBody = ({
   canInspectPredictions,
   isAdminOverviewLoading,
   isSetParticipantDisabledPending,
+  bottomThreeIds,
   handleOpenProfile,
   handleOpenParticipantAudit,
   handleToggleParticipantStatus
@@ -44,6 +45,7 @@ export const LeaderboardTableBody = ({
         const isDisabledRow = Boolean(row.is_disabled);
         const position = isDisabledRow ? null : (activePositionMap.get(row.user_id) ?? null);
         const isCurrentUser = Boolean(user?.id && row.user_id === user.id);
+        const isBottomThree = !isDisabledRow && bottomThreeIds.has(row.user_id);
 
         return (
           <React.Fragment key={row.user_id}>
@@ -65,7 +67,9 @@ export const LeaderboardTableBody = ({
                   ? alpha(theme.palette.info.main, 0.08)
                   : isDisabledRow
                     ? alpha(theme.palette.action.disabledBackground, 0.45)
-                    : undefined,
+                    : isBottomThree
+                      ? alpha(theme.palette.error.dark, 0.15)
+                      : undefined,
                 '& td': {
                   color: isDisabledRow ? theme.palette.text.disabled : undefined
                 },
@@ -147,7 +151,7 @@ export const LeaderboardTableBody = ({
               <TableCell align='right'>{row.outcome_hits}</TableCell>
               <TableCell align='right'>{row.scored_predictions}</TableCell>
 
-              {canInspectPredictions ? (
+              {canInspectPredictions && !isMobile ? (
                 <TableCell align='right' onClick={(e) => e.stopPropagation()}>
                   <Button size='small' variant='outlined' onClick={() => handleOpenParticipantAudit(row)}>
                     Ver pronósticos

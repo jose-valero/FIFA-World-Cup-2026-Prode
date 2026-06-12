@@ -27,6 +27,7 @@ export interface LeaderboardTableProps {
   canInspectPredictions: boolean;
   isAdminOverviewLoading: boolean;
   isSetParticipantDisabledPending: boolean;
+  bottomThreeIds: Set<string>;
   handleOpenProfile: (row: LeaderboardRow) => void;
   handleOpenParticipantAudit: (row: LeaderboardRow) => void;
   handleToggleParticipantStatus: (row: LeaderboardRow) => void;

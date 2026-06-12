@@ -13,6 +13,7 @@ export const LeaderboardTable = ({
   canInspectPredictions,
   isAdminOverviewLoading,
   isSetParticipantDisabledPending,
+  bottomThreeIds,
   handleOpenProfile,
   handleOpenParticipantAudit,
   handleToggleParticipantStatus
@@ -31,6 +32,7 @@ export const LeaderboardTable = ({
           canInspectPredictions={canInspectPredictions}
           isAdminOverviewLoading={isAdminOverviewLoading}
           isSetParticipantDisabledPending={isSetParticipantDisabledPending}
+          bottomThreeIds={bottomThreeIds}
           handleOpenProfile={handleOpenProfile}
           handleOpenParticipantAudit={handleOpenParticipantAudit}
           handleToggleParticipantStatus={handleToggleParticipantStatus}

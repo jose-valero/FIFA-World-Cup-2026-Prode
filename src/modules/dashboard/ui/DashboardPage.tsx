@@ -189,10 +189,7 @@ export function DashboardPage() {
 
   const tournamentPhase = getTournamentPhase(matches);
 
-  const predictionByMatchId = React.useMemo(
-    () => new Map(predictions.map((p) => [p.match_id, p])),
-    [predictions]
-  );
+  const predictionByMatchId = React.useMemo(() => new Map(predictions.map((p) => [p.match_id, p])), [predictions]);
 
   const lastFiveStreak = React.useMemo((): StreakResult[] => {
     const items: StreakResult[] = [];
@@ -321,7 +318,6 @@ export function DashboardPage() {
       {todayMatches.length > 0 || lastFiveStreak.length > 0 ? (
         <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
           <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
-
             {/* Pronósticos de hoy */}
             {todayMatches.length > 0 ? (
               <Stack>
@@ -422,7 +418,7 @@ export function DashboardPage() {
                       const result = lastFiveStreak[i] ?? null;
                       const bgcolor =
                         result === 'exact'
-                          ? 'success.main'
+                          ? 'secondary.dark'
                           : result === 'sign'
                             ? 'primary.main'
                             : result === 'miss'
@@ -444,11 +440,13 @@ export function DashboardPage() {
                   </Stack>
 
                   <Stack direction='row' spacing={2} sx={{ mt: 0.75 }} flexWrap='wrap' useFlexGap>
-                    {([
-                      { key: 'exact', label: 'Exacto', color: 'success.main' },
-                      { key: 'sign', label: 'Acierto', color: 'primary.main' },
-                      { key: 'miss', label: 'Fallo', color: 'error.main' }
-                    ] as const).map(({ key, label, color }) => (
+                    {(
+                      [
+                        { key: 'exact', label: 'Exacto', color: 'secondary.dark' },
+                        { key: 'sign', label: 'Acierto', color: 'primary.main' },
+                        { key: 'miss', label: 'Fallo', color: 'error.main' }
+                      ] as const
+                    ).map(({ key, label, color }) => (
                       <Stack key={key} direction='row' spacing={0.5} alignItems='center'>
                         <Box sx={{ width: 8, height: 8, borderRadius: 0.5, bgcolor: color }} />
                         <Typography sx={{ fontSize: '0.65rem', color: 'text.secondary' }}>{label}</Typography>
@@ -458,7 +456,6 @@ export function DashboardPage() {
                 </Box>
               </>
             ) : null}
-
           </CardContent>
         </Card>
       ) : null}

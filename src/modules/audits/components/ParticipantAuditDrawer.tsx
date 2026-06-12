@@ -20,9 +20,20 @@ import { MatchVs } from '../../../shared/components/MatchVs';
 import { getStatusColor } from '../../../shared/utils/getStatusColor';
 import { getStatusLabel } from '../../../shared/utils/getStatusLabel';
 import { getUniqueGroupOptions, getUniqueStageOptions, type StageFilterValue } from '../../matches/utils/listFilters';
-import type { Match } from '../../matches/types/types';
+import type { Match, MatchStatus } from '../../matches/types/types';
 import { useAuditPredictionsByUser } from '../hooks/useAuditPredictionsByUser';
 import type { LeaderboardRow } from '../../leaderboard/types/leaderboard.types';
+
+type StatusFilterValue = MatchStatus | '';
+
+const STATUS_OPTIONS: { value: StatusFilterValue; label: string }[] = [
+  { value: '', label: 'Todos' },
+  { value: 'live', label: getStatusLabel('live') },
+  { value: 'scheduled', label: getStatusLabel('scheduled') },
+  { value: 'finished', label: getStatusLabel('finished') }
+];
+
+const STATUS_ORDER: Record<MatchStatus, number> = { live: 0, scheduled: 1, finished: 2 };
 
 type ParticipantAuditDrawerProps = {
   open: boolean;
@@ -76,8 +87,11 @@ function getPredictionPoints(prediction: { homeScore: number; awayScore: number 
   };
 }
 
-function sortByKickoff(items: PredictionItem[]) {
+function sortAuditItems(items: PredictionItem[]): PredictionItem[] {
   return [...items].sort((a, b) => {
+    const aOrder = a.match ? STATUS_ORDER[a.match.status] : 1;
+    const bOrder = b.match ? STATUS_ORDER[b.match.status] : 1;
+    if (aOrder !== bOrder) return aOrder - bOrder;
     const aTime = a.match ? new Date(a.match.kickoffAt).getTime() : Number.MAX_SAFE_INTEGER;
     const bTime = b.match ? new Date(b.match.kickoffAt).getTime() : Number.MAX_SAFE_INTEGER;
     return aTime - bTime;
@@ -90,11 +104,13 @@ export function ParticipantAuditDrawer({ open, onClose, participant, auditsVisib
 
   const [stageFilter, setStageFilter] = React.useState<StageFilterValue>('');
   const [groupFilter, setGroupFilter] = React.useState('');
+  const [statusFilter, setStatusFilter] = React.useState<StatusFilterValue>('');
 
   React.useEffect(() => {
     if (!open) return;
     setStageFilter('');
     setGroupFilter('');
+    setStatusFilter('');
   }, [open, participant?.user_id]);
 
   React.useEffect(() => {
@@ -146,7 +162,7 @@ export function ParticipantAuditDrawer({ open, onClose, participant, auditsVisib
       };
     });
 
-    return sortByKickoff(items);
+    return sortAuditItems(items);
   }, [predictionRows, matchMap]);
 
   const validMatches = React.useMemo(() => {
@@ -166,25 +182,11 @@ export function ParticipantAuditDrawer({ open, onClose, participant, auditsVisib
 
       const matchesStage = !stageFilter || item.match.stage === stageFilter;
       const matchesGroup = stageFilter !== 'group_stage' || !groupFilter || item.match.groupCode === groupFilter;
+      const matchesStatus = !statusFilter || item.match.status === statusFilter;
 
-      return matchesStage && matchesGroup;
+      return matchesStage && matchesGroup && matchesStatus;
     });
-  }, [predictionItems, stageFilter, groupFilter]);
-
-  const scopeSummary = React.useMemo(() => {
-    const exactHits = filteredItems.filter((item) => item.isExactHit).length;
-    const outcomeHits = filteredItems.filter((item) => item.isOutcomeHit).length;
-    const evaluated = filteredItems.filter((item) => item.points !== null).length;
-    const totalPoints = filteredItems.reduce((acc, item) => acc + (item.points ?? 0), 0);
-
-    return {
-      loaded: filteredItems.length,
-      evaluated,
-      exactHits,
-      outcomeHits,
-      totalPoints
-    };
-  }, [filteredItems]);
+  }, [predictionItems, stageFilter, groupFilter, statusFilter]);
 
   return (
     <Drawer
@@ -280,12 +282,22 @@ export function ParticipantAuditDrawer({ open, onClose, participant, auditsVisib
                 </Box>
               ) : null}
 
-              <Stack direction='row' spacing={1} flexWrap='wrap' useFlexGap>
-                <Chip label={`${scopeSummary.loaded} cargados`} variant='outlined' />
-                <Chip label={`${scopeSummary.evaluated} evaluados`} variant='outlined' />
-                <Chip label={`${scopeSummary.totalPoints} pts`} color='primary' variant='outlined' />
-                <Chip label={`${scopeSummary.exactHits} exactos`} variant='outlined' />
-              </Stack>
+              <Box sx={{ overflowX: 'auto', pb: 0.25 }}>
+                <ToggleButtonGroup
+                  exclusive
+                  value={statusFilter}
+                  onChange={(_, value: StatusFilterValue | null) => {
+                    setStatusFilter(value ?? '');
+                  }}
+                  sx={{ flexWrap: 'wrap', gap: 1 }}
+                >
+                  {STATUS_OPTIONS.map((option) => (
+                    <ToggleButton key={option.value} value={option.value} sx={{ borderRadius: 999 }}>
+                      {option.label}
+                    </ToggleButton>
+                  ))}
+                </ToggleButtonGroup>
+              </Box>
             </Stack>
 
             <Divider />

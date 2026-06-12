@@ -8,11 +8,12 @@ import { useAdminParticipantsOverview } from '../../admin/participants/hooks/use
 import { useSetParticipantDisabled } from '../../admin/participants/hooks/useSetParticipantDisabled';
 import { ParticipantAuditDrawer } from '../../audits/components/ParticipantAuditDrawer';
 import { ParticipantProfileDrawer } from '../components/ParticipantProfileDrawer';
-import { PageHeader, type PageHeaderBadge } from '../../../shared/components/PageHeader';
+// import { PageHeader, type PageHeaderBadge } from '../../../shared/components/PageHeader';
 import { getTopThreeAvatars } from '../api/leaderboard.api';
 import { queryKeys } from '../../../lib/react-query/queryKeys';
 import type { LeaderboardRow } from '../types/leaderboard.types';
 import { PodiumCard } from '../components/PodiumCard';
+import { BottomThreeSection } from '../components/BottomThreeSection';
 import { LeaderboardTable } from '../components/table/LeaderboardTable';
 import { buildLeaderboardRanks } from '../utils/buildLeaderboardRanks';
 
@@ -33,7 +34,10 @@ export function LeaderboardPage() {
 
   const activeRows = React.useMemo(() => rows.filter((row) => !row.is_disabled), [rows]);
   const disabledRows = React.useMemo(() => rows.filter((row) => row.is_disabled), [rows]);
-  const displayRows = React.useMemo(() => [...activeRows, ...disabledRows], [activeRows, disabledRows]);
+  const displayRows = React.useMemo(
+    () => (isAdmin ? [...activeRows, ...disabledRows] : activeRows),
+    [isAdmin, activeRows, disabledRows]
+  );
 
   const activePositionMap = React.useMemo(() => buildLeaderboardRanks(activeRows), [activeRows]);
 
@@ -49,13 +53,15 @@ export function LeaderboardPage() {
     return tied;
   }, [activePositionMap]);
 
-  const currentUserPosition = React.useMemo(() => {
-    if (!user?.id) return null;
-    return activePositionMap.get(user.id) ?? null;
-  }, [activePositionMap, user?.id]);
+  // const currentUserPosition = React.useMemo(() => {
+  //   if (!user?.id) return null;
+  //   return activePositionMap.get(user.id) ?? null;
+  // }, [activePositionMap, user?.id]);
 
-  const leaderPoints = activeRows[0]?.total_points ?? 0;
+  // const leaderPoints = activeRows[0]?.total_points ?? 0;
   const topThree = activeRows.slice(0, 3);
+  const bottomThree = React.useMemo(() => (activeRows.length > 3 ? activeRows.slice(-3) : []), [activeRows]);
+  const bottomThreeIds = React.useMemo(() => new Set(bottomThree.map((r) => r.user_id)), [bottomThree]);
 
   const topThreeIds = React.useMemo(() => topThree.map((r) => r.user_id), [topThree]);
 
@@ -79,23 +85,23 @@ export function LeaderboardPage() {
     return new Map(adminOverview.map((row) => [row.user_id, row]));
   }, [adminOverview]);
 
-  const badges: PageHeaderBadge[] = [
-    {
-      label: `${activeRows.length} participantes activos`,
-      color: 'primary',
-      variant: 'outlined'
-    },
-    {
-      label: `Líder: ${leaderPoints} pts`,
-      color: 'primary',
-      variant: 'filled'
-    },
-    {
-      label: `Tu posición: ${currentUserPosition ? `#${currentUserPosition}` : '-'}`,
-      color: 'default',
-      variant: 'outlined'
-    }
-  ];
+  // const badges: PageHeaderBadge[] = [
+  //   {
+  //     label: `${activeRows.length} participantes activos`,
+  //     color: 'primary',
+  //     variant: 'outlined'
+  //   },
+  //   {
+  //     label: `Líder: ${leaderPoints} pts`,
+  //     color: 'primary',
+  //     variant: 'filled'
+  //   },
+  //   {
+  //     label: `Tu posición: ${currentUserPosition ? `#${currentUserPosition}` : '-'}`,
+  //     color: 'default',
+  //     variant: 'outlined'
+  //   }
+  // ];
 
   const handleOpenParticipantAudit = (row: LeaderboardRow) => {
     setProfileParticipant(null);
@@ -139,17 +145,11 @@ export function LeaderboardPage() {
 
   return (
     <Stack spacing={2.5}>
-      <PageHeader
+      {/* <PageHeader
         title='Tabla global'
-        description='Ranking general de participantes según los resultados oficiales cargados.'
+        // description='Ranking general de participantes según los resultados oficiales cargados.'
         badges={badges}
-      />
-
-      {canInspectPredictions ? (
-        <Alert severity='info'>
-          Abre el detalle de cualquier participante para revisar sus pronósticos por etapa o grupo.
-        </Alert>
-      ) : null}
+      /> */}
 
       {isError ? (
         <Alert severity='error'>{error instanceof Error ? error.message : 'No se pudo cargar el leaderboard'}</Alert>
@@ -182,6 +182,15 @@ export function LeaderboardPage() {
             </Stack>
           ) : null}
 
+          {bottomThree.length > 0 ? (
+            <BottomThreeSection
+              rows={bottomThree}
+              positionMap={activePositionMap}
+              avatarMap={participantAvatars}
+              currentUserId={user?.id}
+            />
+          ) : null}
+
           <Card
             elevation={0}
             sx={{
@@ -201,6 +210,7 @@ export function LeaderboardPage() {
                 canInspectPredictions={canInspectPredictions}
                 isAdminOverviewLoading={isAdminOverviewLoading}
                 isSetParticipantDisabledPending={isSetParticipantDisabledPending}
+                bottomThreeIds={bottomThreeIds}
                 handleOpenProfile={handleOpenProfile}
                 handleOpenParticipantAudit={handleOpenParticipantAudit}
                 handleToggleParticipantStatus={handleToggleParticipantStatus}
