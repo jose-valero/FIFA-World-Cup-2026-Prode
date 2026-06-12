@@ -4,16 +4,16 @@ import {
   Card,
   CardContent,
   CircularProgress,
+  Collapse,
   Divider,
-  Grid,
   IconButton,
-  Popover,
   Stack,
   Typography,
   useTheme
 } from '@mui/material';
-import { alpha } from '@mui/material/styles';
+
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import StadiumIcon from '@mui/icons-material/Stadium';
 import GroupsIcon from '@mui/icons-material/Groups';
@@ -77,12 +77,6 @@ function parseMinute(minuteStr: string): number {
   return (isNaN(main) ? 0 : main) + (isNaN(extra) ? 0 : extra);
 }
 
-// Convert a minute string to a 0–100 percentage on the timeline (clamp at 100)
-const TIMELINE_MAX = 95;
-function minuteToPercent(minuteStr: string): number {
-  const min = parseMinute(minuteStr);
-  return Math.min((min / TIMELINE_MAX) * 100, 100);
-}
 
 type EventVisual = {
   color: string;
@@ -355,9 +349,68 @@ function MetaDivider() {
   return <Divider orientation='vertical' flexItem sx={{ borderColor: 'divider', alignSelf: 'stretch', my: 0.5 }} />;
 }
 
+function MetaBlockAction({
+  icon,
+  primary,
+  isActive,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  primary: string;
+  isActive: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Box
+      component='button'
+      onClick={onClick}
+      sx={{
+        flex: 1,
+        minWidth: 0,
+        px: 1,
+        py: 0,
+        background: 'none',
+        border: 'none',
+        cursor: 'pointer',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '4px',
+        color: 'inherit',
+        transition: 'opacity 0.15s ease',
+        '&:hover': { opacity: 0.7 },
+        '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', borderRadius: 1 },
+      }}
+    >
+      <Box sx={{ color: isActive ? 'primary.main' : 'text.disabled', display: 'flex', transition: 'color 0.2s ease' }}>
+        {icon}
+      </Box>
+      <Typography
+        variant='caption'
+        fontWeight={700}
+        textAlign='center'
+        noWrap
+        sx={{ width: '100%', color: isActive ? 'primary.main' : 'text.primary', transition: 'color 0.2s ease' }}
+      >
+        {primary}
+      </Typography>
+    </Box>
+  );
+}
+
 // ── MatchHero ─────────────────────────────────────────────────────────────────
 
-function MatchHero({ match, detail }: { match: Match; detail: MatchDetailPayload | null }) {
+function MatchHero({
+  match,
+  detail,
+  timelineOpen,
+  onToggleTimeline,
+}: {
+  match: Match;
+  detail: MatchDetailPayload | null;
+  timelineOpen: boolean;
+  onToggleTimeline: () => void;
+}) {
   const navigate = useNavigate();
 
   function handleBack() {
@@ -515,6 +568,20 @@ function MatchHero({ match, detail }: { match: Match; detail: MatchDetailPayload
                 primary={h.groupCode ? `Grupo ${h.groupCode}` : stageLabel}
                 secondary={h.displayOrder != null ? `Partido #${h.displayOrder}` : undefined}
               />
+              <MetaBlockAction
+                icon={
+                  <KeyboardArrowDownIcon
+                    sx={{
+                      fontSize: 16,
+                      transform: timelineOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                      transition: 'transform 0.25s ease',
+                    }}
+                  />
+                }
+                primary={timelineOpen ? 'Ocultar' : 'Cronología'}
+                isActive={timelineOpen}
+                onClick={onToggleTimeline}
+              />
             </Stack>
           </Box>
         </Stack>
@@ -523,379 +590,115 @@ function MatchHero({ match, detail }: { match: Match; detail: MatchDetailPayload
   );
 }
 
-// ── Timeline helpers ──────────────────────────────────────────────────────────
+// ── Vertical timeline ─────────────────────────────────────────────────────────
 
-const LEGEND_ITEMS: { type: MatchDetailEventType; label: string }[] = [
-  { type: 'goal', label: 'Gol' },
-  { type: 'yellow_card', label: 'Amarilla' },
-  { type: 'red_card', label: 'Roja' },
-  { type: 'substitution', label: 'Cambio' },
-];
+function MatchEventTimelineItem({ event }: { event: MatchDetailEvent }) {
+  const { color, label } = useEventVisual(event.type);
+  const isHome = event.side === 'home';
+  const playerName = formatPlayerName(event.player);
 
-const LANE_BASE = 46;  // px — minimum height per team lane
-const LEVEL_STEP = 22; // px — extra height per stacking level
-const CLUSTER_GAP = 6; // % — clusters closer than this get stacked
+  const suffix =
+    event.type === 'penalty_goal' ? ' (P)' :
+    event.type === 'own_goal' ? ' (OG)' : '';
 
-// Priority used to pick the "dominant" event when a cluster has multiple types.
-const TYPE_PRIORITY: Partial<Record<MatchDetailEventType, number>> = {
-  goal: 6, penalty_goal: 5, own_goal: 4, red_card: 3, yellow_card: 2, substitution: 1,
-};
-
-type EventCluster = {
-  key: string;
-  minute: string;
-  side: 'home' | 'away';
-  position: number; // 0–100 %
-  events: MatchDetailEvent[];
-};
-
-function groupEventsByMinute(events: MatchDetailEvent[]): EventCluster[] {
-  const map = new Map<string, EventCluster>();
-  for (const e of events) {
-    const key = `${e.side}|${e.minute}`;
-    if (!map.has(key)) {
-      map.set(key, { key, minute: e.minute, side: e.side, position: minuteToPercent(e.minute), events: [] });
-    }
-    map.get(key)!.events.push(e);
-  }
-  return Array.from(map.values());
-}
-
-function dominantEvent(events: MatchDetailEvent[]): MatchDetailEvent {
-  return events.reduce((best, e) =>
-    (TYPE_PRIORITY[e.type] ?? 0) > (TYPE_PRIORITY[best.type] ?? 0) ? e : best
-  );
-}
-
-// Stack levels for clusters of the same side that are too close positionally.
-function computeClusterLevels(clusters: EventCluster[]): number[] {
-  const levels = new Array(clusters.length).fill(0) as number[];
-  for (let i = 1; i < clusters.length; i++) {
-    for (let j = 0; j < i; j++) {
-      if (
-        clusters[i].side === clusters[j].side &&
-        Math.abs(clusters[i].position - clusters[j].position) < CLUSTER_GAP
-      ) {
-        levels[i] = Math.max(levels[i], levels[j] + 1);
-      }
-    }
-  }
-  return levels;
-}
-
-// ── Cluster detail popover ────────────────────────────────────────────────────
-
-function ClusterDetailContent({
-  cluster,
-  homeCode,
-  awayCode,
-}: {
-  cluster: EventCluster;
-  homeCode: string;
-  awayCode: string;
-}) {
-  const teamCode = cluster.side === 'home' ? homeCode || 'Local' : awayCode || 'Visit.';
-  return (
-    <Stack spacing={0.75} sx={{ p: 1.5, minWidth: 150, maxWidth: 230 }}>
-      <Typography variant='caption' sx={{ color: 'text.disabled', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>
-        {cluster.minute} · {teamCode}
+  const content = (
+    <Stack spacing={0.25} alignItems={isHome ? 'flex-end' : 'flex-start'}>
+      <Typography variant='caption' fontWeight={700} sx={{ lineHeight: 1.3, color: 'text.primary' }}>
+        {playerName}
       </Typography>
-      {cluster.events.map((e, i) => (
-        <Stack key={i} direction='row' alignItems='center' spacing={0.75}>
-          <EventTypeIcon type={e.type} size={14} />
-          <Typography variant='body2' sx={{ fontWeight: 500, lineHeight: 1.25, color: 'text.primary' }}>
-            {formatPlayerName(e.player)}
-            {e.type === 'penalty_goal' && <Typography component='span' variant='caption' sx={{ color: 'text.secondary', ml: 0.5 }}>(P)</Typography>}
-            {e.type === 'own_goal' && <Typography component='span' variant='caption' sx={{ color: 'error.main', ml: 0.5 }}>(OG)</Typography>}
-          </Typography>
-        </Stack>
-      ))}
+      <Stack direction='row' alignItems='center' spacing={0.4}>
+        {!isHome && <EventTypeIcon type={event.type} size={11} />}
+        <Typography variant='caption' sx={{ color: 'text.secondary', fontSize: '0.68rem' }}>
+          {label}{suffix}
+        </Typography>
+        {isHome && <EventTypeIcon type={event.type} size={11} />}
+      </Stack>
+    </Stack>
+  );
+
+  return (
+    <Stack direction='row' alignItems='center'>
+      {/* Left — home events */}
+      <Box sx={{ flex: 1, display: 'flex', justifyContent: 'flex-end', pr: 1.5, py: 0.85 }}>
+        {isHome ? content : null}
+      </Box>
+
+      {/* Center — dot + minute */}
+      <Box sx={{ width: 44, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
+        <Box
+          sx={{
+            width: 10,
+            height: 10,
+            borderRadius: '50%',
+            bgcolor: color,
+            border: '2px solid',
+            borderColor: 'background.default',
+            zIndex: 1,
+            flexShrink: 0,
+            boxShadow: `0 0 6px ${color}55`,
+          }}
+        />
+        <Typography sx={{ fontSize: '0.58rem', fontWeight: 700, color, lineHeight: 1, whiteSpace: 'nowrap' }}>
+          {event.minute}
+        </Typography>
+      </Box>
+
+      {/* Right — away events */}
+      <Box sx={{ flex: 1, display: 'flex', justifyContent: 'flex-start', pl: 1.5, py: 0.85 }}>
+        {!isHome ? content : null}
+      </Box>
     </Stack>
   );
 }
 
-// ── Cluster marker ────────────────────────────────────────────────────────────
-
-function ClusterMarker({
-  cluster,
-  level,
-  onSelect,
-}: {
-  cluster: EventCluster;
-  level: number;
-  onSelect: (anchor: HTMLElement, c: EventCluster) => void;
-}) {
-  const dominant = dominantEvent(cluster.events);
-  const { color } = useEventVisual(dominant.type);
-  const isHome = cluster.side === 'home';
-  const hasMultiple = cluster.events.length > 1;
-
-  // home: anchor at bottom of lane, grows upward; away: anchor at top, grows downward
-  const anchorProp = isHome ? 'bottom' : 'top';
-
-  return (
-    <Box
-      component='button'
-      onClick={(e: React.MouseEvent<HTMLButtonElement>) => onSelect(e.currentTarget, cluster)}
-      aria-label={`${cluster.minute}${hasMultiple ? ` ×${cluster.events.length}` : ` ${formatPlayerName(dominant.player)}`}`}
-      sx={{
-        position: 'absolute',
-        left: `${cluster.position}%`,
-        [anchorProp]: level * LEVEL_STEP,
-        transform: 'translateX(-50%)',
-        display: 'flex',
-        flexDirection: isHome ? 'column' : 'column-reverse',
-        alignItems: 'center',
-        gap: '2px',
-        cursor: 'pointer',
-        background: 'none',
-        border: 'none',
-        p: 0,
-        zIndex: 2,
-        '&:hover .cdot, &:focus-visible .cdot': {
-          transform: 'scale(1.45)',
-          boxShadow: `0 0 8px ${color}`,
-        },
-        '&:focus-visible': { outline: 'none' },
-      }}
-    >
-      {/* minute [+ count] — furthest from line */}
-      <Stack direction='row' alignItems='center' spacing='2px' sx={{ pointerEvents: 'none' }}>
-        <Typography sx={{ fontSize: '0.55rem', fontWeight: 700, color, lineHeight: 1, whiteSpace: 'nowrap', textShadow: '0 1px 3px rgba(0,0,0,0.85)' }}>
-          {cluster.minute}
-        </Typography>
-        {hasMultiple && (
-          <Typography sx={{ fontSize: '0.5rem', fontWeight: 800, color: alpha(color, 0.75), lineHeight: 1 }}>
-            ×{cluster.events.length}
-          </Typography>
-        )}
-      </Stack>
-      {/* icon */}
-      <Box sx={{ display: 'flex', pointerEvents: 'none' }}>
-        <EventTypeIcon type={dominant.type} size={11} />
-      </Box>
-      {/* dot — closest to line */}
-      <Box
-        className='cdot'
-        sx={{
-          width: hasMultiple ? 11 : 9,
-          height: hasMultiple ? 11 : 9,
-          borderRadius: '50%',
-          bgcolor: color,
-          border: '2px solid',
-          borderColor: 'background.paper',
-          boxShadow: `0 0 4px ${color}80`,
-          transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-          flexShrink: 0,
-          ...(hasMultiple && { outline: `2px solid ${alpha(color, 0.35)}` }),
-        }}
-      />
-    </Box>
-  );
-}
-
-// ── MatchTimeline ─────────────────────────────────────────────────────────────
-
-function MatchTimeline({
-  events,
-  status,
-  minuteLabel,
-  homeCode,
-  awayCode,
-}: {
-  events: MatchDetailEvent[];
-  status: string;
-  minuteLabel: string | null;
-  homeCode: string;
-  awayCode: string;
-}) {
-  const theme = useTheme();
-  const [popover, setPopover] = React.useState<{ anchor: HTMLElement; cluster: EventCluster } | null>(null);
-
+function MatchVerticalTimeline({ events, status }: { events: MatchDetailEvent[]; status: string }) {
   const timelineEvents = getTimelineEvents(events);
-  const clusters = groupEventsByMinute(timelineEvents);
-  const levels = computeClusterLevels(clusters);
 
-  const homeClusters = clusters.filter((c) => c.side === 'home');
-  const awayClusters = clusters.filter((c) => c.side === 'away');
-
-  const maxHomeLevel = homeClusters.length > 0
-    ? Math.max(...homeClusters.map((c) => levels[clusters.indexOf(c)]))
-    : 0;
-  const maxAwayLevel = awayClusters.length > 0
-    ? Math.max(...awayClusters.map((c) => levels[clusters.indexOf(c)]))
-    : 0;
-
-  const homeLaneH = LANE_BASE + maxHomeLevel * LEVEL_STEP;
-  const awayLaneH = LANE_BASE + maxAwayLevel * LEVEL_STEP;
-  const totalH = homeLaneH + 20 + awayLaneH;
-
-  const liveMinute = status === 'live' && minuteLabel ? parseMinute(minuteLabel) : null;
-  const progressPct = liveMinute != null
-    ? Math.min((liveMinute / TIMELINE_MAX) * 100, 100)
-    : status === 'finished' ? 100 : 0;
-
-  const htPct = (45 / TIMELINE_MAX) * 100;
-  const ftPct = (90 / TIMELINE_MAX) * 100;
-
-  function handleSelect(anchor: HTMLElement, c: EventCluster) {
-    setPopover((prev) => (prev?.cluster === c ? null : { anchor, cluster: c }));
+  if (status === 'scheduled') {
+    return (
+      <Stack alignItems='center' spacing={1} sx={{ py: 3 }}>
+        <AccessTimeIcon sx={{ fontSize: 32, color: 'text.disabled', opacity: 0.5 }} />
+        <Typography variant='body2' color='text.secondary' textAlign='center'>
+          La cronología aparecerá cuando comience el encuentro.
+        </Typography>
+      </Stack>
+    );
   }
 
-  return (
-    <Box sx={{ py: 0.5 }}>
-      <Stack direction='row' alignItems='stretch' spacing={0}>
-
-        {/* Left column: team flags + codes */}
-        <Stack
-          sx={{ width: 38, flexShrink: 0, pr: 1, height: totalH, userSelect: 'none' }}
-          justifyContent='space-between'
-        >
-          {/* Home: top-aligned */}
-          <Stack alignItems='flex-end' spacing={0.25} sx={{ pt: 0.25 }}>
-            <TeamFlag teamCode={homeCode} size={14} />
-            <Typography sx={{ fontSize: '0.52rem', fontWeight: 800, color: 'text.disabled', letterSpacing: 0.3, lineHeight: 1, textAlign: 'right' }}>
-              {homeCode || 'LOC'}
-            </Typography>
-          </Stack>
-          {/* Away: bottom-aligned */}
-          <Stack alignItems='flex-end' spacing={0.25} sx={{ pb: 0.25 }}>
-            <TeamFlag teamCode={awayCode} size={14} />
-            <Typography sx={{ fontSize: '0.52rem', fontWeight: 800, color: 'text.disabled', letterSpacing: 0.3, lineHeight: 1, textAlign: 'right' }}>
-              {awayCode || 'VIS'}
-            </Typography>
-          </Stack>
-        </Stack>
-
-        {/* Right column: track */}
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-
-          {/* Home lane — clusters anchored at bottom */}
-          <Box sx={{ position: 'relative', height: homeLaneH }}>
-            {homeClusters.map((c) => (
-              <ClusterMarker
-                key={c.key}
-                cluster={c}
-                level={levels[clusters.indexOf(c)]}
-                onSelect={handleSelect}
-              />
-            ))}
-          </Box>
-
-          {/* Center line */}
-          <Box sx={{ position: 'relative', height: 20 }}>
-            {/* Track */}
-            <Box sx={{ position: 'absolute', left: 0, right: 0, top: '50%', transform: 'translateY(-50%)', height: 2, bgcolor: alpha(theme.palette.common.white, 0.10), borderRadius: 1 }} />
-            {/* Progress */}
-            {progressPct > 0 && (
-              <Box sx={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', width: `${progressPct}%`, height: 2, bgcolor: status === 'live' ? theme.palette.success.main : alpha(theme.palette.common.white, 0.22), borderRadius: 1, transition: 'width 1s ease' }} />
-            )}
-            {/* 0' */}
-            <Typography sx={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(4px)', fontSize: '0.48rem', color: 'text.disabled', lineHeight: 1 }}>0'</Typography>
-            {/* HT */}
-            <Box sx={{ position: 'absolute', left: `${htPct}%`, top: '50%', transform: 'translate(-50%, -50%)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <Box sx={{ width: 1, height: 8, bgcolor: alpha(theme.palette.common.white, 0.25) }} />
-              <Typography sx={{ fontSize: '0.46rem', color: 'text.disabled', lineHeight: 1, mt: '1px' }}>HT</Typography>
-            </Box>
-            {/* FT */}
-            <Box sx={{ position: 'absolute', left: `${ftPct}%`, top: '50%', transform: 'translate(-50%, -50%)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <Box sx={{ width: 1, height: 8, bgcolor: alpha(theme.palette.common.white, 0.25) }} />
-              <Typography sx={{ fontSize: '0.46rem', color: 'text.disabled', lineHeight: 1, mt: '1px' }}>FT</Typography>
-            </Box>
-            {/* Live cursor */}
-            {status === 'live' && liveMinute != null && (
-              <Box sx={{ position: 'absolute', left: `${progressPct}%`, top: '50%', transform: 'translate(-50%, -50%)', width: 10, height: 10, borderRadius: '50%', bgcolor: theme.palette.success.main, border: '2px solid', borderColor: 'background.paper', boxShadow: `0 0 6px ${theme.palette.success.main}`, animation: 'lp 1.4s ease-in-out infinite', '@keyframes lp': { '0%,100%': { opacity: 1, transform: 'translate(-50%,-50%) scale(1)' }, '50%': { opacity: 0.6, transform: 'translate(-50%,-50%) scale(1.3)' } }, zIndex: 3 }} />
-            )}
-          </Box>
-
-          {/* Away lane — clusters anchored at top */}
-          <Box sx={{ position: 'relative', height: awayLaneH }}>
-            {awayClusters.map((c) => (
-              <ClusterMarker
-                key={c.key}
-                cluster={c}
-                level={levels[clusters.indexOf(c)]}
-                onSelect={handleSelect}
-              />
-            ))}
-          </Box>
-
-        </Box>
+  if (timelineEvents.length === 0) {
+    return (
+      <Stack alignItems='center' spacing={1} sx={{ py: 3 }}>
+        <SportsSoccerIcon sx={{ fontSize: 32, color: 'text.disabled', opacity: 0.4 }} />
+        <Typography variant='body2' color='text.secondary' textAlign='center'>
+          Aún no hay eventos registrados para este partido.
+        </Typography>
       </Stack>
+    );
+  }
 
-      {/* Cluster detail popover */}
-      <Popover
-        open={Boolean(popover)}
-        anchorEl={popover?.anchor ?? null}
-        onClose={() => setPopover(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-        transformOrigin={{ vertical: 'top', horizontal: 'center' }}
-        disableRestoreFocus
-        slotProps={{
-          paper: {
-            elevation: 8,
-            sx: { bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 2, mt: 0.5 },
-          },
-        }}
-      >
-        {popover && <ClusterDetailContent cluster={popover.cluster} homeCode={homeCode} awayCode={awayCode} />}
-      </Popover>
-    </Box>
-  );
-}
-
-// ── MatchTimelineCard ─────────────────────────────────────────────────────────
-
-function MatchTimelineCard({ match, detail }: { match: Match; detail: MatchDetailPayload | null }) {
-  const status = detail?.status ?? match.status;
-  const events = detail?.events ?? [];
-  const minuteLabel = detail?.minuteLabel ?? null;
-  const homeCode = detail?.homeTeam.code ?? match.homeTeamCode ?? '';
-  const awayCode = detail?.awayTeam.code ?? match.awayTeamCode ?? '';
-  const isScheduled = status === 'scheduled';
-  const hasEvents = getTimelineEvents(events).length > 0;
+  const sorted = [...timelineEvents].sort((a, b) => parseMinute(a.minute) - parseMinute(b.minute));
 
   return (
-    <Card elevation={0} sx={{ borderRadius: 2 }}>
-      <CardContent sx={{ p: 2.5 }}>
-        <Stack spacing={2}>
-          <Stack direction='row' alignItems='center' justifyContent='space-between' flexWrap='wrap' gap={1}>
-            <Stack direction='row' alignItems='center' spacing={1}>
-              <AccessTimeIcon sx={{ fontSize: 18, color: 'text.disabled' }} />
-              <Typography variant='subtitle1' fontWeight={800}>Cronología del partido</Typography>
-            </Stack>
-            {!isScheduled && (
-              <Stack direction='row' spacing={1.5} flexWrap='wrap'>
-                {LEGEND_ITEMS.map((item) => (
-                  <Stack key={item.type} direction='row' alignItems='center' spacing={0.5}>
-                    <EventTypeIcon type={item.type} size={12} />
-                    <Typography variant='caption' sx={{ color: 'text.secondary', fontSize: '0.68rem' }}>{item.label}</Typography>
-                  </Stack>
-                ))}
-              </Stack>
-            )}
-          </Stack>
-
-          {isScheduled ? (
-            <Stack alignItems='center' spacing={1} sx={{ py: 3 }}>
-              <AccessTimeIcon sx={{ fontSize: 32, color: 'text.disabled', opacity: 0.5 }} />
-              <Typography variant='body2' color='text.secondary' textAlign='center'>
-                La cronología aparecerá cuando comience el encuentro.
-              </Typography>
-            </Stack>
-          ) : hasEvents ? (
-            <MatchTimeline events={events} status={status} minuteLabel={minuteLabel} homeCode={homeCode} awayCode={awayCode} />
-          ) : (
-            <Stack alignItems='center' spacing={1} sx={{ py: 3 }}>
-              <SportsSoccerIcon sx={{ fontSize: 32, color: 'text.disabled', opacity: 0.4 }} />
-              <Typography variant='body2' color='text.secondary' textAlign='center'>
-                Aún no hay eventos registrados para este partido.
-              </Typography>
-            </Stack>
-          )}
-        </Stack>
-      </CardContent>
-    </Card>
+    <Box sx={{ position: 'relative' }}>
+      {/* Vertical center axis */}
+      <Box
+        sx={{
+          position: 'absolute',
+          left: '50%',
+          top: 0,
+          bottom: 0,
+          width: 2,
+          bgcolor: 'divider',
+          transform: 'translateX(-50%)',
+          borderRadius: 1,
+        }}
+      />
+      <Stack>
+        {sorted.map((event, i) => (
+          <MatchEventTimelineItem key={i} event={event} />
+        ))}
+      </Stack>
+    </Box>
   );
 }
 
@@ -924,6 +727,7 @@ export function MatchDetailPage() {
   const { matchId } = useParams<{ matchId: string }>();
   const { data: matches = [], isLoading } = useMatches();
   const { data: detail = null } = useMatchDetail(matchId);
+  const [timelineOpen, setTimelineOpen] = React.useState(false);
 
   if (isLoading) {
     return (
@@ -954,15 +758,31 @@ export function MatchDetailPage() {
     );
   }
 
+  const timelineStatus = detail?.status ?? match.status;
+  const timelineEvents = detail?.events ?? [];
+
   return (
     <Stack spacing={2.5}>
-      <MatchHero match={match} detail={detail} />
+      <MatchHero
+        match={match}
+        detail={detail}
+        timelineOpen={timelineOpen}
+        onToggleTimeline={() => setTimelineOpen((o) => !o)}
+      />
 
-      <Grid container spacing={2}>
-        <Grid size={{ xs: 12 }}>
-          <MatchTimelineCard match={match} detail={detail} />
-        </Grid>
-      </Grid>
+      <Collapse in={timelineOpen} timeout={280} unmountOnExit>
+        <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+          <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
+            <Stack spacing={1.5}>
+              <Stack direction='row' alignItems='center' spacing={1}>
+                <AccessTimeIcon sx={{ fontSize: 18, color: 'text.disabled' }} />
+                <Typography variant='subtitle1' fontWeight={800}>Cronología del partido</Typography>
+              </Stack>
+              <MatchVerticalTimeline events={timelineEvents} status={timelineStatus} />
+            </Stack>
+          </CardContent>
+        </Card>
+      </Collapse>
 
       <ComingSoonCard />
     </Stack>
