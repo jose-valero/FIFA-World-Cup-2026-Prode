@@ -20,8 +20,8 @@ import { useAppSettings } from '../../admin/settings/hooks/useAppSettings';
 import { getTournamentPhase } from '../utils/getTournamentPhase';
 import { sortMatchesByKickoff } from '../utils/sortMatchesByKickoff';
 import { isPredictionsClosed } from '../../../shared/utils/isPredictionsClosed';
+import { getSportsDayKey } from '../../../shared/utils/getSportsDayKey';
 import { routes, matchDetailPath } from '../../../app/router/routes';
-import { TodayMatchesScroller } from '../components/TodayMatchesScroller';
 import { buildLeaderboardRanks } from '../../leaderboard/utils/buildLeaderboardRanks';
 import {
   getPredictionResultColor,
@@ -104,11 +104,6 @@ function calculateEffectiveness(points: number, scoredCount: number): number | n
   return Math.min(100, Math.round((points / (scoredCount * 5)) * 100));
 }
 
-// Sports day boundary: 06:00 local. Matches between 00:00–05:59 belong to the previous day's matchday.
-function getSportsDayKey(date: Date): string {
-  const adjusted = new Date(date.getTime() - 6 * 60 * 60 * 1000);
-  return adjusted.toDateString();
-}
 
 function scoreResult(pH: number, pA: number, oH: number, oA: number): PredictionResult {
   if (pH === oH && pA === oA) return 'exact';
@@ -224,17 +219,7 @@ export function DashboardPage() {
 
   return (
     <Stack spacing={2}>
-      {/* 1. Partidos de hoy */}
-      {todayMatches.length > 0 ? (
-        <Box>
-          <Typography variant='subtitle2' color='text.secondary' sx={{ mb: 1 }}>
-            Partidos de hoy
-          </Typography>
-          <TodayMatchesScroller matches={todayMatches} />
-        </Box>
-      ) : null}
-
-      {/* 2. Resumen unificado: 2 filas × 3 columnas */}
+      {/* 1. Resumen unificado: 2 filas × 3 columnas */}
       <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
         <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
           {/* Fila 1: posición, puntos, distancia al líder */}

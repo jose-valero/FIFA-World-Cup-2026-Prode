@@ -1,5 +1,6 @@
 import * as React from 'react';
 import AppBar from '@mui/material/AppBar';
+import { AppScrollerBand } from './AppScrollerBand';
 import Avatar from '@mui/material/Avatar';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -345,6 +346,7 @@ export default function AppTopNav() {
           </Box>
         </Toolbar>
       </AppContainer>
+      <AppScrollerBand />
     </AppBar>
   );
 }

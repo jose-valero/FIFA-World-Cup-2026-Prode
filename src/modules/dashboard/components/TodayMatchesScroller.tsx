@@ -1,8 +1,10 @@
+import React from 'react';
 import { Box, Card, CardActionArea, CardContent, Chip, Stack, Typography } from '@mui/material';
 import { useNavigate } from 'react-router';
 import type { Match, MatchStatus } from '../../matches/types/types';
 import { matchDetailPath } from '../../../app/router/routes';
 import { TeamFlag } from '../../../shared/components/TeamFlag';
+import { sortScrollerMatches } from '../utils/sortScrollerMatches';
 
 type Props = { matches: Match[] };
 
@@ -24,8 +26,9 @@ function kickoffTime(kickoffAt: string): string {
 
 export function TodayMatchesScroller({ matches }: Props) {
   const navigate = useNavigate();
+  const sorted = React.useMemo(() => sortScrollerMatches(matches), [matches]);
 
-  if (matches.length === 0) {
+  if (sorted.length === 0) {
     return (
       <Typography variant='body2' color='text.secondary'>
         Sin partidos hoy.
@@ -45,7 +48,7 @@ export function TodayMatchesScroller({ matches }: Props) {
         '&::-webkit-scrollbar-thumb': { borderRadius: '8px', bgcolor: 'divider' }
       }}
     >
-      {matches.map((match) => {
+      {sorted.map((match) => {
         const hasScore =
           match.status !== 'scheduled' && match.officialHomeScore != null && match.officialAwayScore != null;
 
