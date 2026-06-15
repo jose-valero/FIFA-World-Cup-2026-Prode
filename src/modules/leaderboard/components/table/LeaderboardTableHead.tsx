@@ -1,4 +1,4 @@
-import { TableCell, TableHead, TableRow, Typography } from '@mui/material';
+import { TableCell, TableHead, TableRow, Typography, useMediaQuery, useTheme } from '@mui/material';
 
 interface LeaderboardTableHeadProps {
   canInspectPredictions: boolean;
@@ -6,6 +6,9 @@ interface LeaderboardTableHeadProps {
 }
 
 export const LeaderboardTableHead = ({ canInspectPredictions, isAdmin }: LeaderboardTableHeadProps) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
   return (
     <TableHead>
       <TableRow>
@@ -31,28 +34,20 @@ export const LeaderboardTableHead = ({ canInspectPredictions, isAdmin }: Leaderb
 
         <TableCell align='right'>
           <Typography variant='body2' fontWeight={700}>
-            Aciertos de signo
+            Aciertos
           </Typography>
         </TableCell>
 
         <TableCell align='right'>
           <Typography variant='body2' fontWeight={700}>
-            Partidos evaluados
+            Evaluados
           </Typography>
         </TableCell>
 
-        {canInspectPredictions ? (
+        {canInspectPredictions && !isMobile ? (
           <TableCell align='right'>
             <Typography variant='body2' fontWeight={700}>
               Pronósticos
-            </Typography>
-          </TableCell>
-        ) : null}
-
-        {isAdmin ? (
-          <TableCell align='right'>
-            <Typography variant='body2' fontWeight={700}>
-              Cuenta
             </Typography>
           </TableCell>
         ) : null}
@@ -64,12 +59,6 @@ export const LeaderboardTableHead = ({ canInspectPredictions, isAdmin }: Leaderb
             </Typography>
           </TableCell>
         ) : null}
-
-        <TableCell align='right'>
-          <Typography variant='body2' fontWeight={700}>
-            Estado
-          </Typography>
-        </TableCell>
       </TableRow>
     </TableHead>
   );

@@ -20,7 +20,7 @@ export function BottomThreeSection({ rows, positionMap, avatarMap, currentUserId
           variant='overline'
           sx={{ color: 'text.disabled', letterSpacing: 1.2, lineHeight: 1.5, fontSize: '0.65rem' }}
         >
-          Detrás de la ambulancia
+          El hueco e los muertos
         </Typography>
       </Stack>
 

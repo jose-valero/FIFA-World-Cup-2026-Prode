@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Alert, Box, Card, CardContent, CircularProgress, Divider, Grid, Stack, Typography } from '@mui/material';
+import { Alert, Box, Card, CardContent, CircularProgress, Divider, Grid, Snackbar, Stack, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../auth/hooks/useAuth';
 import { useLeaderboard } from '../hooks/useLeaderboard';
@@ -8,6 +8,11 @@ import { useAdminParticipantsOverview } from '../../admin/participants/hooks/use
 import { useSetParticipantDisabled } from '../../admin/participants/hooks/useSetParticipantDisabled';
 import { ParticipantAuditDrawer } from '../../audits/components/ParticipantAuditDrawer';
 import { ParticipantProfileDrawer } from '../components/ParticipantProfileDrawer';
+import { useMatches } from '../../matches/hooks/useMatches';
+import { useAuditPredictionsByMatch } from '../../audits/hooks/useAuditPredictionsByMatch';
+import { useReactionsByMatch } from '../hooks/useReactionsByMatch';
+import { useIncrementMaranita } from '../hooks/useIncrementMaranita';
+import type { InlinePrediction } from '../types/leaderboard.types';
 // import { PageHeader, type PageHeaderBadge } from '../../../shared/components/PageHeader';
 import { getTopThreeAvatars } from '../api/leaderboard.api';
 import { queryKeys } from '../../../lib/react-query/queryKeys';
@@ -84,6 +89,79 @@ export function LeaderboardPage() {
   const adminMap = React.useMemo(() => {
     return new Map(adminOverview.map((row) => [row.user_id, row]));
   }, [adminOverview]);
+
+  const { data: matches = [] } = useMatches();
+
+  const relevantMatch = React.useMemo(() => {
+    const live = matches.filter((m) => m.status === 'live');
+    if (live.length > 0) return live.sort((a, b) => a.kickoffAt.localeCompare(b.kickoffAt))[0];
+    const now = Date.now();
+    return (
+      matches
+        .filter((m) => m.status === 'scheduled')
+        .sort((a, b) => a.kickoffAt.localeCompare(b.kickoffAt))
+        .find((m) => new Date(m.kickoffAt).getTime() >= now - 3 * 60 * 60 * 1000) ?? null
+    );
+  }, [matches]);
+
+  const liveMatchCount = React.useMemo(
+    () => matches.filter((m) => m.status === 'live').length,
+    [matches]
+  );
+
+  const { data: matchPredictionRows = [] } = useAuditPredictionsByMatch(
+    relevantMatch?.id ?? null,
+    canInspectPredictions && Boolean(relevantMatch)
+  );
+
+  const predictionsByUserId = React.useMemo((): Map<string, InlinePrediction> => {
+    return new Map(
+      matchPredictionRows.map((r) => [r.user_id, { homeScore: r.home_score, awayScore: r.away_score }])
+    );
+  }, [matchPredictionRows]);
+
+  const isRelevantMatchLive = relevantMatch?.status === 'live';
+
+  const { data: reactionRows = [] } = useReactionsByMatch(
+    relevantMatch?.id ?? null,
+    isRelevantMatchLive && canInspectPredictions
+  );
+
+  const reactionsByReceiver = React.useMemo(() => {
+    const map = new Map<string, { total: number; myCount: number }>();
+    for (const row of reactionRows) {
+      const existing = map.get(row.receiver_id) ?? { total: 0, myCount: 0 };
+      map.set(row.receiver_id, {
+        total: existing.total + row.count,
+        myCount: row.giver_id === user?.id ? row.count : existing.myCount
+      });
+    }
+    return map;
+  }, [reactionRows, user?.id]);
+
+  const { mutate: mutateMaranita, isPending: isMaranitaPending } = useIncrementMaranita(
+    relevantMatch?.id ?? null
+  );
+
+  const alreadyAlertedIds = React.useRef(new Set<string>());
+  const [limitSnackbarOpen, setLimitSnackbarOpen] = React.useState(false);
+
+  const handleMaranita = React.useCallback(
+    (receiverId: string) => {
+      mutateMaranita(
+        { receiverId },
+        {
+          onSuccess: (result) => {
+            if (result.ok && result.at_limit && !alreadyAlertedIds.current.has(receiverId)) {
+              alreadyAlertedIds.current.add(receiverId);
+              setLimitSnackbarOpen(true);
+            }
+          }
+        }
+      );
+    },
+    [mutateMaranita]
+  );
 
   // const badges: PageHeaderBadge[] = [
   //   {
@@ -211,6 +289,12 @@ export function LeaderboardPage() {
                 isAdminOverviewLoading={isAdminOverviewLoading}
                 isSetParticipantDisabledPending={isSetParticipantDisabledPending}
                 bottomThreeIds={bottomThreeIds}
+                relevantMatch={relevantMatch}
+                predictionsByUserId={predictionsByUserId}
+                liveMatchCount={liveMatchCount}
+                reactionsByReceiver={reactionsByReceiver}
+                onMaranita={handleMaranita}
+                isMaranitaPending={isMaranitaPending}
                 handleOpenProfile={handleOpenProfile}
                 handleOpenParticipantAudit={handleOpenParticipantAudit}
                 handleToggleParticipantStatus={handleToggleParticipantStatus}
@@ -245,6 +329,17 @@ export function LeaderboardPage() {
         participant={selectedParticipant}
         auditsVisible={auditsVisible}
       />
+
+      <Snackbar
+        open={limitSnackbarOpen}
+        autoHideDuration={3500}
+        onClose={() => setLimitSnackbarOpen(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity='warning' variant='filled' onClose={() => setLimitSnackbarOpen(false)}>
+          🕯️ Loco, basta de marañitas, pareces brujo
+        </Alert>
+      </Snackbar>
     </Stack>
   );
 }

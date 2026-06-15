@@ -13,9 +13,11 @@ export const queryKeys = {
   adminResults: ['admin-results'] as const,
   auditPredictions: ['audit-predictions'] as const,
   auditPredictionsByUser: (userId: string) => ['audit-predictions', 'user', userId] as const,
+  auditPredictionsByMatch: (matchId: string) => ['audit-predictions', 'match', matchId] as const,
   predictions: (userId: string) => ['predictions', userId] as const,
   adminParticipantsOverview: ['admin-participants-overview'] as const,
   topThreeAvatars: (userIds: string[]) => ['top-three-avatars', ...userIds.sort()] as const,
   participantAvatars: (userIds: string[]) => ['participant-avatars', ...userIds.sort()] as const,
-  matchDetail: (matchId: string) => ['match-detail', matchId] as const
+  matchDetail: (matchId: string) => ['match-detail', matchId] as const,
+  reactionsByMatch: (matchId: string) => ['reactions', 'match', matchId] as const
 };

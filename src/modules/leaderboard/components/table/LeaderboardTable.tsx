@@ -14,13 +14,19 @@ export const LeaderboardTable = ({
   isAdminOverviewLoading,
   isSetParticipantDisabledPending,
   bottomThreeIds,
+  relevantMatch,
+  predictionsByUserId,
+  liveMatchCount,
+  reactionsByReceiver,
+  onMaranita,
+  isMaranitaPending,
   handleOpenProfile,
   handleOpenParticipantAudit,
   handleToggleParticipantStatus
 }: LeaderboardTableProps) => {
   return (
     <TableContainer>
-      <Table sx={{ minWidth: isAdmin ? 1060 : 840 }}>
+      <Table sx={{ minWidth: isAdmin ? 820 : 680 }}>
         <LeaderboardTableHead isAdmin={isAdmin} canInspectPredictions={canInspectPredictions} />
         <LeaderboardTableBody
           displayRows={displayRows}
@@ -33,6 +39,12 @@ export const LeaderboardTable = ({
           isAdminOverviewLoading={isAdminOverviewLoading}
           isSetParticipantDisabledPending={isSetParticipantDisabledPending}
           bottomThreeIds={bottomThreeIds}
+          relevantMatch={relevantMatch}
+          predictionsByUserId={predictionsByUserId}
+          liveMatchCount={liveMatchCount}
+          reactionsByReceiver={reactionsByReceiver}
+          onMaranita={onMaranita}
+          isMaranitaPending={isMaranitaPending}
           handleOpenProfile={handleOpenProfile}
           handleOpenParticipantAudit={handleOpenParticipantAudit}
           handleToggleParticipantStatus={handleToggleParticipantStatus}

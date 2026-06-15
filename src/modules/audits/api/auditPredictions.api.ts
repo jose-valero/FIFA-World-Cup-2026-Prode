@@ -14,3 +14,22 @@ export async function getAuditPredictionsByUser(userId: string): Promise<AuditPr
 
   return data ?? [];
 }
+
+export type MatchPredictionRow = {
+  user_id: string;
+  home_score: number;
+  away_score: number;
+};
+
+export async function getAuditPredictionsByMatch(matchId: string): Promise<MatchPredictionRow[]> {
+  const { data, error } = await supabase
+    .from('predictions')
+    .select('user_id, home_score, away_score')
+    .eq('match_id', matchId);
+
+  if (error) {
+    throw error;
+  }
+
+  return data ?? [];
+}

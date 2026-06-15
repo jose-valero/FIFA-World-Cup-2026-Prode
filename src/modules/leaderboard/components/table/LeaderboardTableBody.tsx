@@ -2,6 +2,7 @@ import React from 'react';
 import {
   alpha,
   Avatar,
+  Box,
   Button,
   Chip,
   IconButton,
@@ -15,8 +16,74 @@ import {
 } from '@mui/material';
 import { podiumStyle } from '../../styles/atoms';
 import { getInitial } from '../../../../shared/utils/getInitial';
-import type { LeaderboardTableProps } from '../../types/leaderboard.types';
+import type { InlinePrediction, LeaderboardTableProps, ReactionSummary } from '../../types/leaderboard.types';
+import type { Match } from '../../../matches/types/types';
+import { TeamFlag } from '../../../../shared/components/TeamFlag';
+import { MaranitaButton } from '../MaranitaButton';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+
+function teamCode(code: string | null, name: string): string {
+  return code ?? name.substring(0, 3).toUpperCase();
+}
+
+function InlinePredictionLine({
+  match,
+  pred,
+  liveMatchCount,
+  reaction,
+  isCurrentUser,
+  onMaranita,
+  isMaranitaPending
+}: {
+  match: Match;
+  pred: InlinePrediction | undefined;
+  liveMatchCount: number;
+  reaction: ReactionSummary | undefined;
+  isCurrentUser: boolean;
+  onMaranita: () => void;
+  isMaranitaPending: boolean;
+}) {
+  const home = teamCode(match.homeTeamCode, match.homeTeam);
+  const away = teamCode(match.awayTeamCode, match.awayTeam);
+  const isLive = match.status === 'live';
+  const siblings = liveMatchCount - 1;
+
+  if (!pred) {
+    return (
+      <Typography variant='caption' color='text.disabled' sx={{ fontSize: '0.7rem' }}>
+        Sin pronóstico
+      </Typography>
+    );
+  }
+
+  return (
+    <Stack direction='row' spacing={0.4} alignItems='center'>
+      {/* {isLive ? (
+        <FiberManualRecordIcon sx={{ fontSize: 7, color: 'error.main', flexShrink: 0 }} />
+      ) : null} */}
+      <TeamFlag teamCode={match.homeTeamCode} teamName={match.homeTeam} size={12} />
+      <Typography variant='caption' sx={{ fontSize: '0.7rem', color: 'text.secondary' }} noWrap>
+        {home} {pred.homeScore}–{pred.awayScore} {away}
+      </Typography>
+      <TeamFlag teamCode={match.awayTeamCode} teamName={match.awayTeam} size={12} />
+      {siblings > 0 ? (
+        <Typography variant='caption' sx={{ fontSize: '0.65rem', color: 'text.disabled' }}>
+          +{siblings}
+        </Typography>
+      ) : null}
+      {isLive ? (
+        <MaranitaButton
+          total={reaction?.total ?? 0}
+          myCount={reaction?.myCount ?? 0}
+          isCurrentUser={isCurrentUser}
+          isPending={isMaranitaPending}
+          onClick={onMaranita}
+        />
+      ) : null}
+    </Stack>
+  );
+}
+
 export const LeaderboardTableBody = ({
   displayRows,
   adminMap,
@@ -25,15 +92,22 @@ export const LeaderboardTableBody = ({
   user,
   isAdmin,
   canInspectPredictions,
-  isAdminOverviewLoading,
   isSetParticipantDisabledPending,
   bottomThreeIds,
+  relevantMatch,
+  predictionsByUserId,
+  liveMatchCount,
+  reactionsByReceiver,
+  onMaranita,
+  isMaranitaPending,
   handleOpenProfile,
   handleOpenParticipantAudit,
   handleToggleParticipantStatus
 }: LeaderboardTableProps) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
+  const colSpan = 6 + (canInspectPredictions && !isMobile ? 1 : 0) + (isAdmin ? 1 : 0);
 
   return (
     <TableBody>
@@ -47,11 +121,16 @@ export const LeaderboardTableBody = ({
         const isCurrentUser = Boolean(user?.id && row.user_id === user.id);
         const isBottomThree = !isDisabledRow && bottomThreeIds.has(row.user_id);
 
+        const inlinePred =
+          canInspectPredictions && relevantMatch && !isDisabledRow ? predictionsByUserId.get(row.user_id) : undefined;
+
+        const showInlinePred = canInspectPredictions && Boolean(relevantMatch) && !isDisabledRow;
+
         return (
           <React.Fragment key={row.user_id}>
             {startsDisabledSection ? (
               <TableRow>
-                <TableCell colSpan={isAdmin ? 10 : canInspectPredictions ? 8 : 7} align='center'>
+                <TableCell colSpan={colSpan} align='center'>
                   <Typography variant='body2' color='text.secondary' sx={{ px: 2, py: 1.5, fontWeight: 700 }}>
                     Participantes deshabilitados
                   </Typography>
@@ -89,7 +168,6 @@ export const LeaderboardTableBody = ({
                   ) : (
                     <Typography fontWeight={800}>—</Typography>
                   )}
-
                   {isCurrentUser ? <Chip label='Tú' size='small' variant='outlined' /> : null}
                 </Stack>
               </TableCell>
@@ -98,43 +176,52 @@ export const LeaderboardTableBody = ({
                 <Stack direction='row' spacing={1.5} alignItems='center'>
                   <Avatar
                     src={avatarMap.get(row.user_id) ?? undefined}
-                    sx={{
-                      width: 32,
-                      height: 32,
-                      fontSize: 14,
-                      fontWeight: 800
-                    }}
+                    sx={{ width: 32, height: 32, fontSize: 14, fontWeight: 800, flexShrink: 0 }}
                   >
                     {getInitial(row.display_name)}
                   </Avatar>
 
-                  <Typography
-                    onClick={() => handleOpenProfile(row)}
-                    fontWeight={isCurrentUser ? 800 : 700}
-                    sx={{
-                      cursor: 'pointer',
-                      maxWidth: { xs: 100, sm: 220 },
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    {row.display_name}
-                  </Typography>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Stack direction='row' spacing={0.75} alignItems='center' flexWrap='wrap' useFlexGap>
+                      <Typography
+                        onClick={() => handleOpenProfile(row)}
+                        fontWeight={isCurrentUser ? 800 : 700}
+                        noWrap
+                        sx={{
+                          cursor: 'pointer',
+                          maxWidth: { xs: 90, sm: 200 }
+                        }}
+                      >
+                        {row.display_name}
+                      </Typography>
 
-                  {isMobile && canInspectPredictions && !isDisabledRow ? (
-                    <IconButton
-                      size='small'
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenParticipantAudit(row);
-                      }}
-                      aria-label={`Ver pronósticos de ${row.display_name}`}
-                      sx={{ flexShrink: 0, color: 'text.secondary' }}
-                    >
-                      <VisibilityIcon sx={{ fontSize: 16 }} />
-                    </IconButton>
-                  ) : null}
+                      {isMobile && canInspectPredictions && !isDisabledRow ? (
+                        <IconButton
+                          size='small'
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenParticipantAudit(row);
+                          }}
+                          aria-label={`Ver pronósticos de ${row.display_name}`}
+                          sx={{ flexShrink: 0, color: 'text.secondary', width: 26, height: 26 }}
+                        >
+                          <VisibilityIcon sx={{ fontSize: 14 }} />
+                        </IconButton>
+                      ) : null}
+                    </Stack>
+
+                    {showInlinePred && relevantMatch ? (
+                      <InlinePredictionLine
+                        match={relevantMatch}
+                        pred={inlinePred}
+                        liveMatchCount={liveMatchCount}
+                        reaction={reactionsByReceiver.get(row.user_id)}
+                        isCurrentUser={isCurrentUser}
+                        onMaranita={() => onMaranita(row.user_id)}
+                        isMaranitaPending={isMaranitaPending}
+                      />
+                    ) : null}
+                  </Box>
                 </Stack>
               </TableCell>
 
@@ -160,23 +247,6 @@ export const LeaderboardTableBody = ({
               ) : null}
 
               {isAdmin ? (
-                <TableCell align='right'>
-                  {isAdminOverviewLoading ? (
-                    <Chip label='Cargando...' size='small' variant='outlined' />
-                  ) : adminRow ? (
-                    <Chip
-                      label={adminRow.email_confirmed ? 'Verificada' : 'Pendiente'}
-                      size='small'
-                      color={adminRow.email_confirmed ? 'success' : 'warning'}
-                      variant='outlined'
-                    />
-                  ) : (
-                    '—'
-                  )}
-                </TableCell>
-              ) : null}
-
-              {isAdmin ? (
                 <TableCell align='right' onClick={(e) => e.stopPropagation()}>
                   {adminRow?.user_id === user?.id ? (
                     <Chip label='Admin' size='small' variant='outlined' />
@@ -193,14 +263,6 @@ export const LeaderboardTableBody = ({
                   )}
                 </TableCell>
               ) : null}
-
-              <TableCell align='right'>
-                {row.is_disabled ? (
-                  <Chip label='Deshabilitado' size='small' color='default' variant='outlined' />
-                ) : (
-                  <Chip label='Activo' size='small' color='success' variant='outlined' />
-                )}
-              </TableCell>
             </TableRow>
           </React.Fragment>
         );
@@ -208,7 +270,7 @@ export const LeaderboardTableBody = ({
 
       {displayRows.length === 0 ? (
         <TableRow>
-          <TableCell colSpan={isAdmin ? 10 : canInspectPredictions ? 8 : 7}>
+          <TableCell colSpan={colSpan}>
             <Typography color='text.secondary' sx={{ py: 2, px: 2 }}>
               Aún no hay datos suficientes para mostrar el ranking.
             </Typography>

@@ -42,7 +42,6 @@ export function TeamFlag({ teamCode, teamName, size = 16, rounded = false }: Tea
         height: flagHeight,
         objectFit: 'contain',
         borderRadius: rounded ? '999px' : '3px',
-        boxShadow: '0 0 0 1px rgba(255,255,255,0.1)',
         display: 'block',
         flexShrink: 0
       }}
