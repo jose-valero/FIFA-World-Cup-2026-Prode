@@ -6,7 +6,10 @@ import type { LineupPlayer, MatchLineups, TeamLineup } from '../types/matchDetai
 // ── Pitch layout helpers ──────────────────────────────────────────────────────
 
 function parseFormationRows(summary: string): number[] {
-  return summary.split('-').map((n) => parseInt(n, 10)).filter((n) => !isNaN(n) && n > 0);
+  return summary
+    .split('-')
+    .map((n) => parseInt(n, 10))
+    .filter((n) => !isNaN(n) && n > 0);
 }
 
 function groupStartersByRow(starters: LineupPlayer[], formationSummary: string | null): LineupPlayer[][] {
@@ -119,13 +122,7 @@ function TeamRows({ rows, reversed }: { rows: LineupPlayer[][]; reversed: boolea
   );
 }
 
-function FootballPitch({
-  homeLineup,
-  awayLineup
-}: {
-  homeLineup: TeamLineup;
-  awayLineup: TeamLineup;
-}) {
+function FootballPitch({ homeLineup, awayLineup }: { homeLineup: TeamLineup; awayLineup: TeamLineup }) {
   const homeRows = groupStartersByRow(homeLineup.starters, homeLineup.formation?.summary ?? null);
   const awayRows = groupStartersByRow(awayLineup.starters, awayLineup.formation?.summary ?? null);
 
@@ -218,13 +215,7 @@ function BenchList({ players, label }: { players: LineupPlayer[]; label: string 
       </Typography>
       <Stack spacing={0.25}>
         {players.map((p) => (
-          <Stack
-            key={p.playerId || p.jersey}
-            direction='row'
-            alignItems='center'
-            spacing={1}
-            sx={{ py: 0.25 }}
-          >
+          <Stack key={p.playerId || p.jersey} direction='row' alignItems='center' spacing={1} sx={{ py: 0.25 }}>
             <Typography
               sx={{
                 fontSize: '0.7rem',
@@ -238,7 +229,11 @@ function BenchList({ players, label }: { players: LineupPlayer[]; label: string 
             </Typography>
             <Typography
               variant='caption'
-              sx={{ flex: 1, color: p.subbedIn.didSub ? 'text.primary' : 'text.secondary', fontWeight: p.subbedIn.didSub ? 700 : 400 }}
+              sx={{
+                flex: 1,
+                color: p.subbedIn.didSub ? 'text.primary' : 'text.secondary',
+                fontWeight: p.subbedIn.didSub ? 700 : 400
+              }}
             >
               {p.name}
             </Typography>
@@ -247,7 +242,13 @@ function BenchList({ players, label }: { players: LineupPlayer[]; label: string 
                 icon={<SwapHorizIcon sx={{ fontSize: 10 }} />}
                 label={p.subbedIn.minute ?? 'Entró'}
                 size='small'
-                sx={{ height: 16, fontSize: '0.6rem', bgcolor: 'success.dark', color: '#fff', '& .MuiChip-icon': { color: '#fff', ml: 0.5 } }}
+                sx={{
+                  height: 16,
+                  fontSize: '0.6rem',
+                  bgcolor: 'success.dark',
+                  color: '#fff',
+                  '& .MuiChip-icon': { color: '#fff', ml: 0.5 }
+                }}
               />
             )}
           </Stack>

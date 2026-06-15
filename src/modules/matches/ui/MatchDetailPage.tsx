@@ -758,6 +758,8 @@ export function MatchDetailPage() {
   const timelineStatus = detail?.status ?? match.status;
   const timelineEvents = detail?.events ?? [];
   const lineups = detail?.lineups ?? null;
+  console.log('🚀 ~ MatchDetailPage.tsx ~ MatchDetailPage ~ detail:', detail);
+  console.log('🚀 ~ MatchDetailPage.tsx ~ MatchDetailPage ~ lineups:', lineups);
 
   return (
     <Stack spacing={2.5}>
