@@ -106,6 +106,10 @@ func Fetch(ctx context.Context, supabaseURL, supabaseKey string, espnClient *esp
 		// Fetch play-by-play events (primary source for goals/cards/subs).
 		// Falls back to keyMoments then scoringPlays from summary.
 		resp.Events = fetchEvents(ctx, espnClient, espnID, summary, teamSides)
+
+		// Reconcile score and status against the events we just fetched.
+		// This handles the case where ESPN summary lags behind Core API plays.
+		reconcileFromEvents(resp)
 	}
 
 	return resp, nil
@@ -455,6 +459,46 @@ func buildEventLabel(minute, player string) string {
 		return minute
 	}
 	return minute + " " + player
+}
+
+// reconcileFromEvents adjusts score and status using events already fetched
+// from Core API plays. Fixes cases where ESPN summary lags behind plays.
+//
+// Status: bumps "scheduled" → "live" when any relevant event exists.
+// Score: replaces current score only when derived total (goal + penalty_goal)
+//        is strictly greater — never lowers the score.
+// own_goal is excluded from score derivation in V1 (side attribution unverified).
+func reconcileFromEvents(r *Response) {
+	if len(r.Events) == 0 {
+		return
+	}
+
+	// Any event (goal, card, sub) means the match has started.
+	if r.Status == "scheduled" {
+		r.Status = "live"
+	}
+
+	// Derive score from goal and penalty_goal only.
+	var derivedHome, derivedAway int
+	for _, e := range r.Events {
+		if e.Type == "goal" || e.Type == "penalty_goal" {
+			if e.Side == "home" {
+				derivedHome++
+			} else {
+				derivedAway++
+			}
+		}
+	}
+
+	derivedTotal := derivedHome + derivedAway
+	currentTotal := 0
+	if r.Score != nil {
+		currentTotal = r.Score.Home + r.Score.Away
+	}
+
+	if derivedTotal > currentTotal {
+		r.Score = &Score{Home: derivedHome, Away: derivedAway}
+	}
 }
 
 func mapESPNStatus(name string) (string, bool) {
