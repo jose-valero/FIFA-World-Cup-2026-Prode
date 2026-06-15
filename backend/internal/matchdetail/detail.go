@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 
 	"quiniela-backend/internal/espn"
 )
@@ -34,8 +35,9 @@ type Response struct {
 	HomeTeam     TeamInfo `json:"homeTeam"`
 	AwayTeam     TeamInfo `json:"awayTeam"`
 	Score        *Score   `json:"score"`
-	Events       []Event  `json:"events"`
-	EspnEnriched bool     `json:"espnEnriched"`
+	Events       []Event       `json:"events"`
+	EspnEnriched bool          `json:"espnEnriched"`
+	Lineups      *MatchLineups `json:"lineups"`
 }
 
 // TeamInfo identifies one side of the match.
@@ -103,9 +105,19 @@ func Fetch(ctx context.Context, supabaseURL, supabaseKey string, espnClient *esp
 			teamSides = buildTeamSides(summary)
 		}
 
-		// Fetch play-by-play events (primary source for goals/cards/subs).
-		// Falls back to keyMoments then scoringPlays from summary.
-		resp.Events = fetchEvents(ctx, espnClient, espnID, summary, teamSides)
+		// Fetch events and lineups concurrently.
+		var wg sync.WaitGroup
+		wg.Add(2)
+
+		go func() {
+			defer wg.Done()
+			resp.Events = fetchEvents(ctx, espnClient, espnID, summary, teamSides)
+		}()
+		go func() {
+			defer wg.Done()
+			resp.Lineups = fetchLineups(ctx, espnClient, espnID, summary)
+		}()
+		wg.Wait()
 
 		// Reconcile score and status against the events we just fetched.
 		// This handles the case where ESPN summary lags behind Core API plays.

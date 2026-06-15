@@ -325,6 +325,120 @@ func (c *Client) GetEventSummary(ctx context.Context, eventID string) (*EventSum
 	return &summary, nil
 }
 
+// ── Roster / lineup types ─────────────────────────────────────────────────────
+
+// RosterResponse is the response from ESPN's Core API competitor roster endpoint.
+type RosterResponse struct {
+	Formation RosterFormation `json:"formation"`
+	Entries   []RosterEntry   `json:"entries"`
+}
+
+// RosterFormation holds the tactical shape of a team.
+type RosterFormation struct {
+	Summary string `json:"summary"` // e.g. "4-3-3"
+	Name    string `json:"name"`
+	NumRows int    `json:"numRows"`
+}
+
+// RosterEntry is a single player entry in the roster response.
+type RosterEntry struct {
+	Starter        bool    `json:"starter"`
+	Jersey         string  `json:"jersey"`
+	FormationPlace int     `json:"formationPlace"`
+	SubbedIn       bool    `json:"subbedIn"`
+	SubbedOut      bool    `json:"subbedOut"`
+	Active         bool    `json:"active"`
+	Athlete        RefOnly `json:"athlete"`
+	Position       RefOnly `json:"position"`
+}
+
+// RefOnly holds a single ESPN Core API $ref URL.
+type RefOnly struct {
+	Ref string `json:"$ref"`
+}
+
+// AthleteInfo holds the resolved data from an ESPN athlete ref.
+type AthleteInfo struct {
+	ID          string `json:"id"`
+	DisplayName string `json:"displayName"`
+	ShortName   string `json:"shortName"`
+}
+
+// PositionInfo holds the resolved data from an ESPN position ref.
+type PositionInfo struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Abbreviation string `json:"abbreviation"`
+}
+
+// GetRoster fetches the roster for one team (competitor) within a given ESPN event.
+func (c *Client) GetRoster(ctx context.Context, eventID, competitorID string) (*RosterResponse, error) {
+	const league = "fifa.world"
+	url := fmt.Sprintf(
+		"%s/sports/soccer/leagues/%s/events/%s/competitions/%s/competitors/%s/roster",
+		c.coreBaseURL, league, eventID, eventID, competitorID,
+	)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("ESPN roster request: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("ESPN roster HTTP %d for event %s competitor %s", resp.StatusCode, eventID, competitorID)
+	}
+	var r RosterResponse
+	if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
+		return nil, fmt.Errorf("decoding roster: %w", err)
+	}
+	return &r, nil
+}
+
+// GetAthleteInfo resolves an ESPN athlete $ref URL and returns basic athlete data.
+func (c *Client) GetAthleteInfo(ctx context.Context, ref string) (*AthleteInfo, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ref, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("athlete ref fetch: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("athlete ref HTTP %d", resp.StatusCode)
+	}
+	var a AthleteInfo
+	if err := json.NewDecoder(resp.Body).Decode(&a); err != nil {
+		return nil, fmt.Errorf("decoding athlete: %w", err)
+	}
+	return &a, nil
+}
+
+// GetPositionInfo resolves an ESPN position $ref URL.
+func (c *Client) GetPositionInfo(ctx context.Context, ref string) (*PositionInfo, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ref, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("position ref fetch: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("position ref HTTP %d", resp.StatusCode)
+	}
+	var p PositionInfo
+	if err := json.NewDecoder(resp.Body).Decode(&p); err != nil {
+		return nil, fmt.Errorf("decoding position: %w", err)
+	}
+	return &p, nil
+}
+
 // GetScoreboard fetches the scoreboard for a given date (YYYYMMDD).
 func (c *Client) GetScoreboard(ctx context.Context, date string) ([]Event, error) {
 	url := fmt.Sprintf("%s/sports/soccer/fifa.world/scoreboard?dates=%s&limit=100", c.baseURL, date)

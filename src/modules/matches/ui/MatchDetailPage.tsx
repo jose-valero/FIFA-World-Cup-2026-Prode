@@ -13,14 +13,13 @@ import {
 } from '@mui/material';
 
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import StadiumIcon from '@mui/icons-material/Stadium';
-import GroupsIcon from '@mui/icons-material/Groups';
 import SportsSoccerIcon from '@mui/icons-material/SportsSoccer';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import StyleIcon from '@mui/icons-material/Style';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
 import React from 'react';
 import { Link as RouterLink, useNavigate, useParams } from 'react-router';
 import { useMatches } from '../hooks/useMatches';
@@ -30,6 +29,7 @@ import { getStageLabel } from '../../tournament/utils/stages';
 import { routes } from '../../../app/router/routes';
 import type { Match } from '../types/types';
 import type { MatchDetailPayload, MatchDetailEvent, MatchDetailEventType } from '../types/matchDetail.types';
+import { MatchLineupsSection } from '../components/MatchLineupsSection';
 
 // ── Event helpers ─────────────────────────────────────────────────────────────
 
@@ -321,30 +321,6 @@ function heroFromMatch(m: Match): HeroData {
   };
 }
 
-// ── Metadata strip ────────────────────────────────────────────────────────────
-
-function MetaBlock({ icon, primary, secondary }: { icon: React.ReactNode; primary: string; secondary?: string }) {
-  return (
-    <Stack alignItems='center' spacing={0.5} sx={{ flex: 1, minWidth: 0, px: 1 }}>
-      <Box sx={{ color: 'text.disabled', display: 'flex' }}>{icon}</Box>
-      <Typography
-        variant='caption'
-        fontWeight={700}
-        textAlign='center'
-        noWrap
-        sx={{ width: '100%', color: 'text.primary' }}
-      >
-        {primary}
-      </Typography>
-      {secondary && (
-        <Typography variant='caption' textAlign='center' noWrap sx={{ width: '100%', color: 'text.secondary' }}>
-          {secondary}
-        </Typography>
-      )}
-    </Stack>
-  );
-}
-
 function MetaDivider() {
   return <Divider orientation='vertical' flexItem sx={{ borderColor: 'divider', alignSelf: 'stretch', my: 0.5 }} />;
 }
@@ -404,12 +380,16 @@ function MatchHero({
   match,
   detail,
   timelineOpen,
-  onToggleTimeline
+  onToggleTimeline,
+  lineupsOpen,
+  onToggleLineups
 }: {
   match: Match;
   detail: MatchDetailPayload | null;
   timelineOpen: boolean;
   onToggleTimeline: () => void;
+  lineupsOpen: boolean;
+  onToggleLineups: () => void;
 }) {
   const navigate = useNavigate();
 
@@ -565,37 +545,46 @@ function MatchHero({
             </Box>
           )}
 
-          {/* Row 4: metadata strip */}
-          <Box sx={{ borderTop: '1px solid', borderColor: 'divider', pt: 2 }}>
+          {/* Row 4: compact metadata */}
+          <Box sx={{ borderTop: '1px solid', borderColor: 'divider', pt: 1.25, pb: 0.5 }}>
+            <Stack direction='row' flexWrap='wrap' gap={1.5} alignItems='center'>
+              <Stack direction='row' spacing={0.5} alignItems='center'>
+                <CalendarTodayIcon sx={{ fontSize: 12, color: 'text.disabled', flexShrink: 0 }} />
+                <Typography variant='caption' color='text.secondary'>
+                  {fmtDate(h.kickoffAt)} · {fmtTime(h.kickoffAt)}
+                </Typography>
+              </Stack>
+              {h.venueName && (
+                <Stack direction='row' spacing={0.5} alignItems='center' sx={{ minWidth: 0 }}>
+                  <StadiumIcon sx={{ fontSize: 12, color: 'text.disabled', flexShrink: 0 }} />
+                  <Typography
+                    variant='caption'
+                    color='text.secondary'
+                    noWrap
+                    sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}
+                  >
+                    {h.venueName}
+                    {h.venueCity ? `, ${h.venueCity}` : ''}
+                  </Typography>
+                </Stack>
+              )}
+            </Stack>
+          </Box>
+
+          {/* Row 5: content toggles */}
+          <Box sx={{ borderTop: '1px solid', borderColor: 'divider', pt: 1.5 }}>
             <Stack direction='row' alignItems='stretch' sx={{ width: '100%' }} divider={<MetaDivider />}>
-              <MetaBlock
-                icon={<CalendarTodayIcon sx={{ fontSize: 16 }} />}
-                primary={fmtDate(h.kickoffAt)}
-                secondary={`${fmtTime(h.kickoffAt)}`}
-              />
-              <MetaBlock
-                icon={<StadiumIcon sx={{ fontSize: 16 }} />}
-                primary={h.venueName || '–'}
-                secondary={h.venueCity || undefined}
-              />
-              <MetaBlock
-                icon={<GroupsIcon sx={{ fontSize: 16 }} />}
-                primary={h.groupCode ? `Grupo ${h.groupCode}` : stageLabel}
-                secondary={h.displayOrder != null ? `Partido #${h.displayOrder}` : undefined}
-              />
               <MetaBlockAction
-                icon={
-                  <KeyboardArrowDownIcon
-                    sx={{
-                      fontSize: 16,
-                      transform: timelineOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                      transition: 'transform 0.25s ease'
-                    }}
-                  />
-                }
-                primary={timelineOpen ? 'Ocultar' : 'Cronología'}
+                icon={<AccessTimeIcon sx={{ fontSize: 16 }} />}
+                primary='Cronología'
                 isActive={timelineOpen}
                 onClick={onToggleTimeline}
+              />
+              <MetaBlockAction
+                icon={<PeopleAltIcon sx={{ fontSize: 16 }} />}
+                primary='Alineaciones'
+                isActive={lineupsOpen}
+                onClick={onToggleLineups}
               />
             </Stack>
           </Box>
@@ -718,25 +707,6 @@ function MatchVerticalTimeline({ events, status }: { events: MatchDetailEvent[];
   );
 }
 
-// ── Coming soon ───────────────────────────────────────────────────────────────
-
-function ComingSoonCard() {
-  return (
-    <Card elevation={0} sx={{ borderRadius: 2, border: '1px dashed', borderColor: 'divider', bgcolor: 'transparent' }}>
-      <CardContent sx={{ p: 2.5 }}>
-        <Stack spacing={0.5}>
-          <Typography variant='subtitle2' color='text.secondary' fontWeight={700}>
-            Próximamente
-          </Typography>
-          <Typography variant='body2' color='text.disabled'>
-            Estadísticas, alineaciones, eventos del partido y más estarán disponibles durante el Mundial.
-          </Typography>
-        </Stack>
-      </CardContent>
-    </Card>
-  );
-}
-
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function MatchDetailPage() {
@@ -744,6 +714,17 @@ export function MatchDetailPage() {
   const { data: matches = [], isLoading } = useMatches();
   const { data: detail = null } = useMatchDetail(matchId);
   const [timelineOpen, setTimelineOpen] = React.useState(false);
+  const [lineupsOpen, setLineupsOpen] = React.useState(false);
+
+  function handleToggleTimeline() {
+    setTimelineOpen((o) => !o);
+    setLineupsOpen(false);
+  }
+
+  function handleToggleLineups() {
+    setLineupsOpen((o) => !o);
+    setTimelineOpen(false);
+  }
 
   if (isLoading) {
     return (
@@ -776,6 +757,7 @@ export function MatchDetailPage() {
 
   const timelineStatus = detail?.status ?? match.status;
   const timelineEvents = detail?.events ?? [];
+  const lineups = detail?.lineups ?? null;
 
   return (
     <Stack spacing={2.5}>
@@ -783,7 +765,9 @@ export function MatchDetailPage() {
         match={match}
         detail={detail}
         timelineOpen={timelineOpen}
-        onToggleTimeline={() => setTimelineOpen((o) => !o)}
+        onToggleTimeline={handleToggleTimeline}
+        lineupsOpen={lineupsOpen}
+        onToggleLineups={handleToggleLineups}
       />
 
       <Collapse in={timelineOpen} timeout={280} unmountOnExit>
@@ -802,7 +786,34 @@ export function MatchDetailPage() {
         </Card>
       </Collapse>
 
-      <ComingSoonCard />
+      <Collapse in={lineupsOpen} timeout={280} unmountOnExit>
+        <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+          <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
+            <Stack spacing={1.5}>
+              <Stack direction='row' alignItems='center' spacing={1}>
+                <PeopleAltIcon sx={{ fontSize: 18, color: 'text.disabled' }} />
+                <Typography variant='subtitle1' fontWeight={800}>
+                  Alineaciones
+                </Typography>
+              </Stack>
+              {lineups ? (
+                <MatchLineupsSection
+                  lineups={lineups}
+                  homeCode={detail?.homeTeam.code ?? match.homeTeamCode ?? ''}
+                  awayCode={detail?.awayTeam.code ?? match.awayTeamCode ?? ''}
+                />
+              ) : (
+                <Stack alignItems='center' spacing={1} sx={{ py: 3 }}>
+                  <PeopleAltIcon sx={{ fontSize: 32, color: 'text.disabled', opacity: 0.4 }} />
+                  <Typography variant='body2' color='text.secondary' textAlign='center'>
+                    Las alineaciones estarán disponibles cuando el partido comience.
+                  </Typography>
+                </Stack>
+              )}
+            </Stack>
+          </CardContent>
+        </Card>
+      </Collapse>
     </Stack>
   );
 }

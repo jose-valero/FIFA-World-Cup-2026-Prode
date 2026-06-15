@@ -41,4 +41,47 @@ export interface MatchDetailPayload {
   score: MatchDetailScore | null;
   events: MatchDetailEvent[];
   espnEnriched: boolean;
+  lineups: MatchLineups | null;
+}
+
+export interface MatchLineups {
+  available: boolean;
+  home: TeamLineup | null;
+  away: TeamLineup | null;
+}
+
+export interface TeamLineup {
+  formation: LineupFormation | null;
+  starters: LineupPlayer[];
+  bench: LineupPlayer[];
+}
+
+export interface LineupFormation {
+  summary: string;
+  name: string;
+  numRows: number;
+}
+
+export interface LineupPlayer {
+  playerId: string;
+  name: string;
+  shortName: string | null;
+  jersey: string | null;
+  position: LineupPosition | null;
+  starter: boolean;
+  formationPlace: number | null;
+  active: boolean;
+  subbedIn: SubStatus;
+  subbedOut: SubStatus;
+}
+
+export interface LineupPosition {
+  id: string | null;
+  name: string | null;
+  abbreviation: string | null;
+}
+
+export interface SubStatus {
+  didSub: boolean;
+  minute: string | null;
 }
