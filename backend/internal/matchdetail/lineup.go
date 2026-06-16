@@ -2,6 +2,7 @@ package matchdetail
 
 import (
 	"context"
+	"strconv"
 	"sync"
 	"time"
 
@@ -179,8 +180,7 @@ func resolveEntry(ctx context.Context, client *espn.Client, e espn.RosterEntry) 
 		j := e.Jersey
 		p.Jersey = &j
 	}
-	if e.FormationPlace > 0 {
-		fp := e.FormationPlace
+	if fp, err := strconv.Atoi(e.FormationPlace); err == nil && fp > 0 {
 		p.FormationPlace = &fp
 	}
 

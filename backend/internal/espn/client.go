@@ -357,10 +357,11 @@ type SubInfo struct {
 }
 
 // RosterEntry is a single player entry in the roster response.
+// FormationPlace is a string in ESPN's API despite being numeric (e.g. "1", "0").
 type RosterEntry struct {
 	Starter        bool    `json:"starter"`
 	Jersey         string  `json:"jersey"`
-	FormationPlace int     `json:"formationPlace"`
+	FormationPlace string  `json:"formationPlace"`
 	SubbedIn       SubInfo `json:"subbedIn"`
 	SubbedOut      SubInfo `json:"subbedOut"`
 	Active         bool    `json:"active"`
