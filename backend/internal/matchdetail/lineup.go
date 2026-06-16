@@ -165,11 +165,14 @@ func resolveRosterEntries(ctx context.Context, client *espn.Client, entries []es
 
 // resolveEntry fetches athlete and position info for a single roster entry.
 func resolveEntry(ctx context.Context, client *espn.Client, e espn.RosterEntry) LineupPlayer {
+	subbedInMinute := minuteOrNil(e.SubbedIn.Clock.DisplayValue)
+	subbedOutMinute := minuteOrNil(e.SubbedOut.Clock.DisplayValue)
+
 	p := LineupPlayer{
 		Starter:   e.Starter,
 		Active:    e.Active,
-		SubbedIn:  SubStatus{DidSub: e.SubbedIn},
-		SubbedOut: SubStatus{DidSub: e.SubbedOut},
+		SubbedIn:  SubStatus{DidSub: e.SubbedIn.DidSub, Minute: subbedInMinute},
+		SubbedOut: SubStatus{DidSub: e.SubbedOut.DidSub, Minute: subbedOutMinute},
 	}
 
 	if e.Jersey != "" {
@@ -262,6 +265,13 @@ func lastIndex(s string, b byte) int {
 		}
 	}
 	return -1
+}
+
+func minuteOrNil(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }
 
 func nullSafeSlice(s []LineupPlayer) []LineupPlayer {

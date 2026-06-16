@@ -345,13 +345,24 @@ type RosterFormation struct {
 	NumRows int    `json:"numRows"`
 }
 
+// SubInfo models the subbedIn/subbedOut object ESPN returns per roster entry.
+// ESPN returns this as an object, not a plain boolean.
+type SubInfo struct {
+	DidSub bool `json:"didSub"`
+	Clock  struct {
+		Value        float64 `json:"value"`
+		DisplayValue string  `json:"displayValue"`
+	} `json:"clock"`
+	ReplacementAthlete RefOnly `json:"replacementAthlete"`
+}
+
 // RosterEntry is a single player entry in the roster response.
 type RosterEntry struct {
 	Starter        bool    `json:"starter"`
 	Jersey         string  `json:"jersey"`
 	FormationPlace int     `json:"formationPlace"`
-	SubbedIn       bool    `json:"subbedIn"`
-	SubbedOut      bool    `json:"subbedOut"`
+	SubbedIn       SubInfo `json:"subbedIn"`
+	SubbedOut      SubInfo `json:"subbedOut"`
 	Active         bool    `json:"active"`
 	Athlete        RefOnly `json:"athlete"`
 	Position       RefOnly `json:"position"`
