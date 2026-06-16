@@ -510,6 +510,78 @@ func (c *Client) GetPositionInfo(ctx context.Context, ref string) (*PositionInfo
 	return &p, nil
 }
 
+// ── Odds types ────────────────────────────────────────────────────────────────
+
+// OddsCollection is the paged response from ESPN Core API odds endpoint.
+type OddsCollection struct {
+	Items []OddsItem `json:"items"`
+}
+
+// OddsItem is a single bookmaker's 1X2 odds record for an event.
+type OddsItem struct {
+	Provider     OddsProvider `json:"provider"`
+	HomeTeamOdds OddsLine     `json:"homeTeamOdds"`
+	AwayTeamOdds OddsLine     `json:"awayTeamOdds"`
+	DrawOdds     OddsLine     `json:"drawOdds"`
+	OverUnder    *float64     `json:"overUnder"`
+	Details      string       `json:"details"`
+}
+
+// OddsProvider identifies the bookmaker.
+type OddsProvider struct {
+	ID       int    `json:"id"`
+	Name     string `json:"name"`
+	Priority int    `json:"priority"`
+}
+
+// OddsLine holds a moneyline value (American odds format).
+// Pointer because ESPN may omit the field for some markets.
+type OddsLine struct {
+	MoneyLine *float64 `json:"moneyLine"`
+}
+
+// GetEventOdds fetches 1X2 moneyline odds for a single ESPN soccer event.
+// Returns the item from the highest-priority (lowest priority number) provider.
+// Returns (nil, nil) when no odds are available — callers should handle gracefully.
+func (c *Client) GetEventOdds(ctx context.Context, eventID string) (*OddsItem, error) {
+	const league = "fifa.world"
+	url := fmt.Sprintf(
+		"%s/sports/soccer/leagues/%s/events/%s/competitions/%s/odds",
+		c.coreBaseURL, league, eventID, eventID,
+	)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("odds request: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("odds HTTP %d", resp.StatusCode)
+	}
+	var col OddsCollection
+	if err := json.NewDecoder(resp.Body).Decode(&col); err != nil {
+		return nil, fmt.Errorf("decoding odds: %w", err)
+	}
+	if len(col.Items) == 0 {
+		return nil, nil
+	}
+	// Pick the highest-priority provider: priority=1 > priority=2, etc.
+	// Items with priority=0 are ignored when a non-zero priority exists.
+	best := col.Items[0]
+	for _, item := range col.Items[1:] {
+		if item.Provider.Priority == 0 {
+			continue
+		}
+		if best.Provider.Priority == 0 || item.Provider.Priority < best.Provider.Priority {
+			best = item
+		}
+	}
+	return &best, nil
+}
+
 // GetScoreboard fetches the scoreboard for a given date (YYYYMMDD).
 func (c *Client) GetScoreboard(ctx context.Context, date string) ([]Event, error) {
 	url := fmt.Sprintf("%s/sports/soccer/fifa.world/scoreboard?dates=%s&limit=100", c.baseURL, date)

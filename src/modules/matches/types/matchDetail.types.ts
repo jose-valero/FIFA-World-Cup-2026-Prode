@@ -40,6 +40,17 @@ export interface MatchTeamStats {
   away: MatchStatItem[];
 }
 
+// Moneyline odds in American format: negative = favorite, positive = underdog.
+// Probabilities are NOT provided by ESPN — derive them with:
+//   implied(ml) = ml > 0 ? 100/(ml+100) : abs(ml)/(abs(ml)+100)
+//   then normalize home+draw+away to sum to 100%.
+export interface MatchOdds {
+  provider: string;
+  home: number | null;
+  draw: number | null;
+  away: number | null;
+}
+
 export interface MatchDetailPayload {
   id: string;
   stage: string;
@@ -57,6 +68,7 @@ export interface MatchDetailPayload {
   espnEnriched: boolean;
   lineups: MatchLineups | null;
   stats: MatchTeamStats | null;
+  odds: MatchOdds | null;
 }
 
 export interface MatchLineups {

@@ -40,6 +40,20 @@ type Response struct {
 	EspnEnriched bool          `json:"espnEnriched"`
 	Lineups      *MatchLineups `json:"lineups"`
 	Stats        *TeamStats    `json:"stats"`
+	Odds         *MatchOdds    `json:"odds"`
+}
+
+// MatchOdds holds 1X2 moneylines from the bookmaker with the highest ESPN priority.
+// Moneyline format is American: negative = favorite (e.g. -120 means bet 120 to win 100),
+// positive = underdog (e.g. +320 means bet 100 to win 320).
+// Probabilities are not provided by ESPN — derive them client-side with:
+//   implied(ml) = ml > 0 ? 100/(ml+100) : abs(ml)/(abs(ml)+100)
+//   then normalize the three values to sum to 100%.
+type MatchOdds struct {
+	Provider string   `json:"provider"`
+	Home     *float64 `json:"home"`
+	Draw     *float64 `json:"draw"`
+	Away     *float64 `json:"away"`
 }
 
 // StatItem is a single named statistic for one team (e.g. possession, fouls).
@@ -125,9 +139,9 @@ func Fetch(ctx context.Context, supabaseURL, supabaseKey string, espnClient *esp
 			teamSides = buildTeamSides(summary)
 		}
 
-		// Fetch events and lineups concurrently.
+		// Fetch events, lineups, and odds concurrently.
 		var wg sync.WaitGroup
-		wg.Add(2)
+		wg.Add(3)
 
 		go func() {
 			defer wg.Done()
@@ -158,6 +172,10 @@ func Fetch(ctx context.Context, supabaseURL, supabaseKey string, espnClient *esp
 				}(),
 			)
 			resp.Lineups = lineups
+		}()
+		go func() {
+			defer wg.Done()
+			resp.Odds = fetchOdds(ctx, espnClient, espnID)
 		}()
 		wg.Wait()
 
@@ -636,6 +654,29 @@ func reconcileFromEvents(r *Response) {
 
 	if derivedTotal > currentTotal {
 		r.Score = &Score{Home: derivedHome, Away: derivedAway}
+	}
+}
+
+// fetchOdds fetches 1X2 moneyline odds from ESPN Core API and maps them to
+// MatchOdds. Returns nil silently on any error or when no data is available.
+func fetchOdds(ctx context.Context, client *espn.Client, espnID string) *MatchOdds {
+	item, err := client.GetEventOdds(ctx, espnID)
+	if err != nil {
+		log.Printf("[detail] odds fetch silently failed: %v", err)
+		return nil
+	}
+	if item == nil {
+		return nil
+	}
+	provider := item.Provider.Name
+	if provider == "" {
+		provider = "ESPN"
+	}
+	return &MatchOdds{
+		Provider: provider,
+		Home:     item.HomeTeamOdds.MoneyLine,
+		Draw:     item.DrawOdds.MoneyLine,
+		Away:     item.AwayTeamOdds.MoneyLine,
 	}
 }
 
