@@ -6,6 +6,7 @@ import SportsSoccerIcon from '@mui/icons-material/SportsSoccer';
 import type { LineupPlayer, MatchLineups, TeamLineup } from '../types/matchDetail.types';
 import { PlayerShirtIcon } from './PlayerShirtIcon';
 import { TeamFlag } from '../../../shared/components/TeamFlag';
+import { resolveAwayJersey, resolveHomeJersey } from '../utils/jerseyColors';
 
 // ── Formation helpers ─────────────────────────────────────────────────────────
 
@@ -92,73 +93,80 @@ function TeamPitch({ lineup, color, trimColor }: { lineup: TeamLineup; color: st
   const displayRows = [...rows].reverse();
 
   return (
-    <Box sx={{ width: '100%', maxWidth: 480, mx: 'auto' }}>
+    <Box
+      sx={{
+        position: 'relative',
+        width: '100%',
+        aspectRatio: '300 / 230',
+        borderRadius: 1.5,
+        overflow: 'hidden',
+        border: '1px solid rgba(255,255,255,0.10)',
+        boxShadow: 'inset 0 0 40px rgba(0,0,0,0.45)'
+      }}
+    >
+      {/* Turf + pitch geometry — flat, no tilt (keeps the rounded corners clean) */}
       <Box
         sx={{
-          position: 'relative',
-          aspectRatio: '300 / 230',
-          borderRadius: 1.5,
-          overflow: 'hidden',
-          border: '1px solid rgba(255,255,255,0.10)',
-          boxShadow: 'inset 0 0 40px rgba(0,0,0,0.45)'
+          position: 'absolute',
+          inset: 0,
+          background: `repeating-linear-gradient(
+            0deg,
+            #11301f 0px, #11301f 34px,
+            #0d2818 34px, #0d2818 68px
+          )`
         }}
       >
-        {/* Turf + pitch geometry — flat, no tilt (keeps the rounded corners clean) */}
-        <Box
-          sx={{
-            position: 'absolute',
-            inset: 0,
-            background: `repeating-linear-gradient(
-              0deg,
-              #11301f 0px, #11301f 34px,
-              #0d2818 34px, #0d2818 68px
-            )`
-          }}
+        {/* Only the defending half is shown: halfway line + partial center
+            circle at top, own penalty area + goal at bottom. */}
+        <svg
+          viewBox='0 0 300 230'
+          preserveAspectRatio='none'
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
         >
-          {/* Only the defending half is shown: halfway line + partial center
-              circle at top, own penalty area + goal at bottom. */}
-          <svg
-            viewBox='0 0 300 230'
-            preserveAspectRatio='none'
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
-          >
-            <g fill='none' stroke='rgba(255,255,255,0.4)' strokeWidth={1.6}>
-              {/* Perimeter (top edge doubles as the halfway line) */}
-              <rect x={10} y={10} width={280} height={210} stroke='rgba(255,255,255,0.55)' />
-              {/* Center circle (only the half below the halfway line, bulging down into the field) + kickoff spot */}
-              <path d='M 105 10 A 45 45 0 0 0 195 10' />
-              <circle cx={150} cy={10} r={2.2} fill='rgba(255,255,255,0.55)' stroke='none' />
-              {/* Own penalty area + six-yard box */}
-              <rect x={70} y={150} width={160} height={70} />
-              <rect x={110} y={192} width={80} height={28} />
-              {/* D-arc bulges up, away from goal, out into the field */}
-              <path d='M 107.94 150 A 45 45 0 0 1 192.06 150' />
-              <circle cx={150} cy={166} r={2.2} fill='rgba(255,255,255,0.55)' stroke='none' />
-              {/* Goal mouth */}
-              <rect x={128} y={214} width={44} height={12} fill='rgba(255,255,255,0.12)' stroke='rgba(255,255,255,0.5)' />
-            </g>
-          </svg>
-        </Box>
-
-        {/* Players */}
-        <Stack justifyContent='space-evenly' sx={{ position: 'absolute', inset: 0, zIndex: 1, py: 2, px: 1 }}>
-          {displayRows.map((row, i) => (
-            <Stack key={i} direction='row' justifyContent='space-evenly' alignItems='center'>
-              {row.map((player) => (
-                <PlayerShirt
-                  key={player.playerId || player.jersey || String(player.formationPlace)}
-                  player={player}
-                  color={color}
-                  trimColor={trimColor}
-                />
-              ))}
-            </Stack>
-          ))}
-        </Stack>
+          <g fill='none' stroke='rgba(255,255,255,0.4)' strokeWidth={1.6}>
+            {/* Perimeter (top edge doubles as the halfway line) */}
+            <rect x={10} y={10} width={280} height={210} stroke='rgba(255,255,255,0.55)' />
+            {/* Center circle (only the half below the halfway line, bulging down into the field) + kickoff spot */}
+            <path d='M 105 10 A 45 45 0 0 0 195 10' />
+            <circle cx={150} cy={10} r={2.2} fill='rgba(255,255,255,0.55)' stroke='none' />
+            {/* Own penalty area + six-yard box */}
+            <rect x={70} y={150} width={160} height={70} />
+            <rect x={110} y={192} width={80} height={28} />
+            {/* D-arc bulges up, away from goal, out into the field */}
+            <path d='M 107.94 150 A 45 45 0 0 1 192.06 150' />
+            <circle cx={150} cy={166} r={2.2} fill='rgba(255,255,255,0.55)' stroke='none' />
+            {/* Goal mouth */}
+            <rect
+              x={128}
+              y={218}
+              width={44}
+              height={2}
+              fill='rgba(255,255,255,0.12)'
+              stroke='rgba(255,255,255,0.5)'
+            />
+          </g>
+        </svg>
       </Box>
+
+      {/* Players */}
+      <Stack justifyContent='space-evenly' sx={{ position: 'absolute', inset: 0, zIndex: 1, py: 2, px: 1 }}>
+        {displayRows.map((row, i) => (
+          <Stack key={i} direction='row' justifyContent='space-evenly' alignItems='center'>
+            {row.map((player) => (
+              <PlayerShirt
+                key={player.playerId || player.jersey || String(player.formationPlace)}
+                player={player}
+                color={color}
+                trimColor={trimColor}
+              />
+            ))}
+          </Stack>
+        ))}
+      </Stack>
     </Box>
   );
 }
+
 
 // ── Bench section ─────────────────────────────────────────────────────────────
 
@@ -341,15 +349,19 @@ export function MatchLineupsSection({
 
   const { home, away } = lineups;
   const activeLineup = selected === 'home' ? home : away;
+
+  const homeJersey = resolveHomeJersey(homeColor, homeAlternateColor);
+  const awayJersey = resolveAwayJersey(awayColor, awayAlternateColor);
+  const activeJersey = selected === 'home' ? homeJersey : awayJersey;
   const activeColor =
-    selected === 'home' ? homeColor || theme.palette.primary.main : awayColor || theme.palette.secondary.main;
-  const activeTrimColor = (selected === 'home' ? homeAlternateColor : awayAlternateColor) || undefined;
+    activeJersey?.primary ?? (selected === 'home' ? theme.palette.primary.main : theme.palette.secondary.main);
+  const activeTrimColor = activeJersey?.trim;
 
   return (
     <Grid container spacing={2} alignItems='flex-start'>
-      {/* Bloque izquierdo: selector + cancha */}
+      {/* Bloque izquierdo: selector + cancha, mismo ancho para que queden alineados */}
       <Grid size={{ xs: 12, sm: 8 }}>
-        <Stack spacing={1.5}>
+        <Stack spacing={1.5} sx={{ width: '100%', maxWidth: { xs: '100%', sm: 480, md: 560, lg: 600 }, mx: 'auto' }}>
           <TeamSwitcher
             homeCode={homeCode}
             awayCode={awayCode}
