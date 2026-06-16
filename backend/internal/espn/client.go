@@ -134,6 +134,12 @@ type SummaryCompetition struct {
 	Competitors []SummaryCompetitor `json:"competitors"`
 }
 
+// TeamLogo is one entry from ESPN's team.logos[] array.
+type TeamLogo struct {
+	Href string   `json:"href"`
+	Rel  []string `json:"rel"`
+}
+
 // SummaryCompetitor is a team entry in the summary response.
 // ID is the competitor's event-specific identifier used in Core API roster URLs.
 // Team.ID is the global team identifier — do not use for roster endpoint.
@@ -142,10 +148,10 @@ type SummaryCompetitor struct {
 	HomeAway string `json:"homeAway"`
 	Score    string `json:"score"`
 	Team     struct {
-		ID             string `json:"id"`
-		Color          string `json:"color"`
-		AlternateColor string `json:"alternateColor"`
-		Logo           string `json:"logo"`
+		ID             string     `json:"id"`
+		Color          string     `json:"color"`
+		AlternateColor string     `json:"alternateColor"`
+		Logos          []TeamLogo `json:"logos"`
 	} `json:"team"`
 }
 

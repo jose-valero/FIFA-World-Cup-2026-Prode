@@ -271,11 +271,26 @@ func enrichTeamColors(r *Response, competitors []espn.SummaryCompetitor) {
 			alt := normalizeESPNColor(c.Team.AlternateColor)
 			team.AlternateColor = &alt
 		}
-		if c.Team.Logo != "" {
-			logo := c.Team.Logo
+		if logo := pickTeamLogo(c.Team.Logos); logo != "" {
 			team.Logo = &logo
 		}
 	}
+}
+
+// pickTeamLogo prefers the logo tagged "default", falling back to the first
+// one available. Returns "" if ESPN didn't provide any.
+func pickTeamLogo(logos []espn.TeamLogo) string {
+	if len(logos) == 0 {
+		return ""
+	}
+	for _, l := range logos {
+		for _, rel := range l.Rel {
+			if rel == "default" {
+				return l.Href
+			}
+		}
+	}
+	return logos[0].Href
 }
 
 // normalizeESPNColor ensures a usable CSS hex string — ESPN sometimes omits

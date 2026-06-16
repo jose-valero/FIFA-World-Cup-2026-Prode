@@ -228,6 +228,8 @@ type HeroData = {
   awayCode: string;
   homeName: string;
   awayName: string;
+  homeLogo: string | null;
+  awayLogo: string | null;
   scoreHome: number | null;
   scoreAway: number | null;
   events: MatchDetailEvent[];
@@ -248,6 +250,8 @@ function heroFromDetail(d: MatchDetailPayload, m: Match): HeroData {
     awayCode: d.awayTeam.code,
     homeName: d.homeTeam.name,
     awayName: d.awayTeam.name,
+    homeLogo: d.homeTeam.logo ?? null,
+    awayLogo: d.awayTeam.logo ?? null,
     scoreHome: d.score?.home ?? null,
     scoreAway: d.score?.away ?? null,
     events: d.events,
@@ -269,6 +273,8 @@ function heroFromMatch(m: Match): HeroData {
     awayCode: m.awayTeamCode ?? '',
     homeName: m.homeTeam,
     awayName: m.awayTeam,
+    homeLogo: null,
+    awayLogo: null,
     scoreHome: m.officialHomeScore,
     scoreAway: m.officialAwayScore,
     events: [],
@@ -338,6 +344,38 @@ function HeroTab({
         {label}
       </Typography>
     </Box>
+  );
+}
+
+// ── TeamCrest ─────────────────────────────────────────────────────────────────
+// Uses the team's ESPN logo when available; falls back to the flag (current
+// default) if there's no logo or the image fails to load.
+
+function TeamCrest({
+  logo,
+  teamCode,
+  teamName,
+  size = 52
+}: {
+  logo: string | null;
+  teamCode: string;
+  teamName: string;
+  size?: number;
+}) {
+  const [failed, setFailed] = React.useState(false);
+
+  if (!logo || failed) {
+    return <TeamFlag teamCode={teamCode} teamName={teamName} size={size} />;
+  }
+
+  return (
+    <Box
+      component='img'
+      src={logo}
+      alt={`Escudo de ${teamName}`}
+      onError={() => setFailed(true)}
+      sx={{ width: size, height: size, objectFit: 'contain', display: 'block', flexShrink: 0 }}
+    />
   );
 }
 
@@ -445,7 +483,7 @@ function MatchHero({
             sx={{ py: { xs: 1.5, md: 2.5 } }}
           >
             <Stack alignItems='center' spacing={1} sx={{ flex: 1, minWidth: 0 }}>
-              <TeamFlag teamCode={h.homeCode} teamName={h.homeName} size={52} />
+              <TeamCrest logo={h.homeLogo} teamCode={h.homeCode} teamName={h.homeName} size={52} />
               <Typography
                 fontWeight={800}
                 textAlign='center'
@@ -509,7 +547,7 @@ function MatchHero({
             </Stack>
 
             <Stack alignItems='center' spacing={1} sx={{ flex: 1, minWidth: 0 }}>
-              <TeamFlag teamCode={h.awayCode} teamName={h.awayName} size={52} />
+              <TeamCrest logo={h.awayLogo} teamCode={h.awayCode} teamName={h.awayName} size={52} />
               <Typography
                 fontWeight={800}
                 textAlign='center'
