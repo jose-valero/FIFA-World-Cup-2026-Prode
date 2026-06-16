@@ -31,6 +31,7 @@ import { routes } from '../../../app/router/routes';
 import type { Match } from '../types/types';
 import type { MatchDetailPayload, MatchDetailEvent, MatchDetailEventType } from '../types/matchDetail.types';
 import { MatchLineupsSection } from '../components/MatchLineupsSection';
+import { MatchSummarySection } from '../components/MatchSummarySection';
 // MOCK TEMPORAL — cambiar a false para usar datos reales
 import { MOCK_LINEUPS } from '../mocks/mockLineups';
 const USE_MOCK_LINEUPS = false;
@@ -750,6 +751,23 @@ export function MatchDetailPage() {
   return (
     <Stack spacing={2.5}>
       <MatchHero match={match} detail={detail} activeTab={activeTab} onTabChange={handleTabChange} />
+
+      {/* Resumen — pestaña activa por defecto */}
+      <Collapse in={activeTab === 'resumen'} timeout={280} unmountOnExit>
+        <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+          <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
+            <Stack spacing={1.5}>
+              <Stack direction='row' alignItems='center' spacing={1}>
+                <BarChartIcon sx={{ fontSize: 18, color: 'text.disabled' }} />
+                <Typography variant='subtitle1' fontWeight={800}>
+                  Resumen del partido
+                </Typography>
+              </Stack>
+              <MatchSummarySection stats={detail?.stats ?? null} />
+            </Stack>
+          </CardContent>
+        </Card>
+      </Collapse>
 
       {/* Cronología */}
       <Collapse in={activeTab === 'cronologia'} timeout={280} unmountOnExit>

@@ -78,6 +78,28 @@ type EventSummary struct {
 	ScoringPlays []ScoringPlay `json:"scoringPlays"`
 	KeyMoments   []Play        `json:"keyMoments"` // ESPN soccer sometimes uses keyMoments instead of scoringPlays
 	Plays        []Play        `json:"plays"`
+	Boxscore     Boxscore      `json:"boxscore"`
+}
+
+// Boxscore carries per-team match statistics from ESPN's summary endpoint.
+type Boxscore struct {
+	Teams []BoxscoreTeam `json:"teams"`
+}
+
+// BoxscoreTeam is one side's statistics block. HomeAway is already resolved
+// by ESPN here, so no cross-referencing with header competitors is needed.
+type BoxscoreTeam struct {
+	HomeAway   string         `json:"homeAway"`
+	Statistics []BoxscoreStat `json:"statistics"`
+}
+
+// BoxscoreStat is a single named statistic (e.g. possession, shots on target).
+// Name is a stable machine key; Label is ESPN's English display label;
+// DisplayValue is the value already formatted as a string by ESPN.
+type BoxscoreStat struct {
+	Name         string `json:"name"`
+	Label        string `json:"label"`
+	DisplayValue string `json:"displayValue"`
 }
 
 // ── Core API types ────────────────────────────────────────────────────────────

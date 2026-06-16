@@ -18,6 +18,7 @@ function parseFormationRows(summary: string): number[] {
 }
 
 function groupByRows(starters: LineupPlayer[], formationSummary: string | null): LineupPlayer[][] {
+  console.log('🚀 ~ MatchLineupsSection.tsx ~ groupByRows ~ starters:', starters);
   const sorted = [...starters].sort((a, b) => (a.formationPlace ?? 99) - (b.formationPlace ?? 99));
   if (!formationSummary) return [sorted];
 
@@ -136,14 +137,7 @@ function TeamPitch({ lineup, color, trimColor }: { lineup: TeamLineup; color: st
             <path d='M 107.94 150 A 45 45 0 0 1 192.06 150' />
             <circle cx={150} cy={166} r={2.2} fill='rgba(255,255,255,0.55)' stroke='none' />
             {/* Goal mouth */}
-            <rect
-              x={128}
-              y={218}
-              width={44}
-              height={2}
-              fill='rgba(255,255,255,0.12)'
-              stroke='rgba(255,255,255,0.5)'
-            />
+            <rect x={128} y={218} width={44} height={2} fill='rgba(255,255,255,0.12)' stroke='rgba(255,255,255,0.5)' />
           </g>
         </svg>
       </Box>
@@ -166,7 +160,6 @@ function TeamPitch({ lineup, color, trimColor }: { lineup: TeamLineup; color: st
     </Box>
   );
 }
-
 
 // ── Bench section ─────────────────────────────────────────────────────────────
 

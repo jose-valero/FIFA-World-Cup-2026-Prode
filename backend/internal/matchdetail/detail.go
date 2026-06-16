@@ -39,6 +39,22 @@ type Response struct {
 	Events       []Event       `json:"events"`
 	EspnEnriched bool          `json:"espnEnriched"`
 	Lineups      *MatchLineups `json:"lineups"`
+	Stats        *TeamStats    `json:"stats"`
+}
+
+// StatItem is a single named statistic for one team (e.g. possession, fouls).
+// Name is ESPN's stable machine key, used by the frontend to pick which stats
+// to show; Label/Value are passed through from ESPN as-is, never invented.
+type StatItem struct {
+	Name  string `json:"name"`
+	Label string `json:"label"`
+	Value string `json:"value"`
+}
+
+// TeamStats holds the per-side statistic lists for a match.
+type TeamStats struct {
+	Home []StatItem `json:"home"`
+	Away []StatItem `json:"away"`
 }
 
 // TeamInfo identifies one side of the match.
@@ -253,6 +269,39 @@ func enrichFromESPN(r *Response, s *espn.EventSummary) {
 	}
 
 	enrichTeamColors(r, comp.Competitors)
+	enrichStats(r, s.Boxscore.Teams)
+}
+
+// enrichStats fills in r.Stats from ESPN's boxscore when it has data for at
+// least one side. Scheduled matches return empty statistics arrays from ESPN
+// — in that case r.Stats stays nil so the frontend can show an empty state
+// instead of an empty/misleading comparison.
+func enrichStats(r *Response, teams []espn.BoxscoreTeam) {
+	var home, away []StatItem
+	for _, t := range teams {
+		items := toStatItems(t.Statistics)
+		switch t.HomeAway {
+		case "home":
+			home = items
+		case "away":
+			away = items
+		}
+	}
+	if len(home) == 0 && len(away) == 0 {
+		return
+	}
+	r.Stats = &TeamStats{Home: home, Away: away}
+}
+
+func toStatItems(stats []espn.BoxscoreStat) []StatItem {
+	items := make([]StatItem, 0, len(stats))
+	for _, s := range stats {
+		if s.DisplayValue == "" {
+			continue
+		}
+		items = append(items, StatItem{Name: s.Name, Label: s.Label, Value: s.DisplayValue})
+	}
+	return items
 }
 
 // enrichTeamColors fills in color/alternateColor/logo for each side when ESPN

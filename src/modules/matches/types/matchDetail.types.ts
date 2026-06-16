@@ -29,6 +29,17 @@ export interface MatchDetailEvent {
   label: string;
 }
 
+export interface MatchStatItem {
+  name: string;
+  label: string;
+  value: string;
+}
+
+export interface MatchTeamStats {
+  home: MatchStatItem[];
+  away: MatchStatItem[];
+}
+
 export interface MatchDetailPayload {
   id: string;
   stage: string;
@@ -45,6 +56,7 @@ export interface MatchDetailPayload {
   events: MatchDetailEvent[];
   espnEnriched: boolean;
   lineups: MatchLineups | null;
+  stats: MatchTeamStats | null;
 }
 
 export interface MatchLineups {
