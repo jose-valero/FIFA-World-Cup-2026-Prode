@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"time"
 )
@@ -381,6 +383,8 @@ func (c *Client) GetRoster(ctx context.Context, eventID, competitorID string) (*
 		"%s/sports/soccer/leagues/%s/events/%s/competitions/%s/competitors/%s/roster",
 		c.coreBaseURL, league, eventID, eventID, competitorID,
 	)
+	log.Printf("[GetRoster] eventID=%s competitorID=%s", eventID, competitorID)
+	log.Printf("[GetRoster] url=%s", url)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -389,6 +393,22 @@ func (c *Client) GetRoster(ctx context.Context, eventID, competitorID string) (*
 	if err != nil {
 		return nil, fmt.Errorf("ESPN roster request: %w", err)
 	}
+	log.Printf("[GetRoster] status=%d", resp.StatusCode)
+	body, readErr := io.ReadAll(resp.Body)
+	if readErr != nil {
+		log.Printf("[GetRoster] read body err=%v", readErr)
+		return nil, readErr
+	}
+
+	log.Printf("[GetRoster] raw body (first 500)=%s", truncate(string(body), 500))
+
+	var roster RosterResponse
+	if err := json.Unmarshal(body, &roster); err != nil {
+		log.Printf("[GetRoster] unmarshal err=%v", err)
+		return nil, err
+	}
+
+	log.Printf("[GetRoster] decoded entries=%d formation=%+v", len(roster.Entries), roster.Formation)
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("ESPN roster HTTP %d for event %s competitor %s", resp.StatusCode, eventID, competitorID)
@@ -398,6 +418,13 @@ func (c *Client) GetRoster(ctx context.Context, eventID, competitorID string) (*
 		return nil, fmt.Errorf("decoding roster: %w", err)
 	}
 	return &r, nil
+}
+
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n]
 }
 
 // GetAthleteInfo resolves an ESPN athlete $ref URL and returns basic athlete data.
