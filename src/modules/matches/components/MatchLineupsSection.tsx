@@ -38,15 +38,7 @@ function groupByRows(starters: LineupPlayer[], formationSummary: string | null):
 
 // ── Player shirt chip ─────────────────────────────────────────────────────────
 
-function PlayerShirt({
-  player,
-  color,
-  trimColor
-}: {
-  player: LineupPlayer;
-  color: string;
-  trimColor?: string;
-}) {
+function PlayerShirt({ player, color, trimColor }: { player: LineupPlayer; color: string; trimColor?: string }) {
   const name = player.shortName ?? player.name.split(' ').pop() ?? player.name;
   const wasSubbedOut = player.subbedOut.didSub;
 
@@ -94,129 +86,76 @@ function PlayerShirt({
 
 // ── Pitch view ────────────────────────────────────────────────────────────────
 
-function TeamPitch({
-  lineup,
-  color,
-  trimColor
-}: {
-  lineup: TeamLineup;
-  color: string;
-  trimColor?: string;
-}) {
+function TeamPitch({ lineup, color, trimColor }: { lineup: TeamLineup; color: string; trimColor?: string }) {
   const rows = groupByRows(lineup.starters, lineup.formation?.summary ?? null);
   // GK at bottom → reverse so GK row is last rendered (bottom of pitch)
   const displayRows = [...rows].reverse();
 
   return (
-    <Box
-      sx={{
-        position: 'relative',
-        borderRadius: 1,
-        overflow: 'hidden',
-        border: '1px solid rgba(255,255,255,0.08)',
-        background: `repeating-linear-gradient(
-          0deg,
-          #1d4d1d 0px, #1d4d1d 34px,
-          #194419 34px, #194419 68px
-        )`,
-        py: 3,
-        px: 1.5,
-        minHeight: 380
-      }}
-    >
-      {/* Pitch markings */}
-      <Box sx={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-        {/* Goal top */}
+    <Box sx={{ width: '100%', maxWidth: 480, mx: 'auto' }}>
+      <Box
+        sx={{
+          position: 'relative',
+          aspectRatio: '300 / 230',
+          borderRadius: 1.5,
+          overflow: 'hidden',
+          border: '1px solid rgba(255,255,255,0.10)',
+          boxShadow: 'inset 0 0 40px rgba(0,0,0,0.45)'
+        }}
+      >
+        {/* Turf + pitch geometry — flat, no tilt (keeps the rounded corners clean) */}
         <Box
           sx={{
             position: 'absolute',
-            left: '35%',
-            right: '35%',
-            top: 0,
-            height: 14,
-            border: '1.5px solid rgba(255,255,255,0.25)',
-            borderTop: 'none',
-            bgcolor: 'rgba(255,255,255,0.04)'
+            inset: 0,
+            background: `repeating-linear-gradient(
+              0deg,
+              #11301f 0px, #11301f 34px,
+              #0d2818 34px, #0d2818 68px
+            )`
           }}
-        />
-        {/* Penalty area top */}
-        <Box
-          sx={{
-            position: 'absolute',
-            left: '18%',
-            right: '18%',
-            top: 0,
-            height: '15%',
-            border: '1.5px solid rgba(255,255,255,0.14)',
-            borderTop: 'none'
-          }}
-        />
-        {/* Center line */}
-        <Box
-          sx={{
-            position: 'absolute',
-            left: '5%',
-            right: '5%',
-            top: '50%',
-            height: '1px',
-            bgcolor: 'rgba(255,255,255,0.18)'
-          }}
-        />
-        {/* Center circle */}
-        <Box
-          sx={{
-            position: 'absolute',
-            left: '50%',
-            top: '50%',
-            width: 68,
-            height: 68,
-            borderRadius: '50%',
-            border: '1.5px solid rgba(255,255,255,0.15)',
-            transform: 'translate(-50%,-50%)'
-          }}
-        />
-        {/* Penalty area bottom */}
-        <Box
-          sx={{
-            position: 'absolute',
-            left: '18%',
-            right: '18%',
-            bottom: 0,
-            height: '15%',
-            border: '1.5px solid rgba(255,255,255,0.14)',
-            borderBottom: 'none'
-          }}
-        />
-        {/* Goal bottom */}
-        <Box
-          sx={{
-            position: 'absolute',
-            left: '35%',
-            right: '35%',
-            bottom: 0,
-            height: 14,
-            border: '1.5px solid rgba(255,255,255,0.25)',
-            borderBottom: 'none',
-            bgcolor: 'rgba(255,255,255,0.04)'
-          }}
-        />
-      </Box>
+        >
+          {/* Only the defending half is shown: halfway line + partial center
+              circle at top, own penalty area + goal at bottom. */}
+          <svg
+            viewBox='0 0 300 230'
+            preserveAspectRatio='none'
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+          >
+            <g fill='none' stroke='rgba(255,255,255,0.4)' strokeWidth={1.6}>
+              {/* Perimeter (top edge doubles as the halfway line) */}
+              <rect x={10} y={10} width={280} height={210} stroke='rgba(255,255,255,0.55)' />
+              {/* Center circle (only the half below the halfway line, bulging down into the field) + kickoff spot */}
+              <path d='M 105 10 A 45 45 0 0 0 195 10' />
+              <circle cx={150} cy={10} r={2.2} fill='rgba(255,255,255,0.55)' stroke='none' />
+              {/* Own penalty area + six-yard box */}
+              <rect x={70} y={150} width={160} height={70} />
+              <rect x={110} y={192} width={80} height={28} />
+              {/* D-arc bulges up, away from goal, out into the field */}
+              <path d='M 107.94 150 A 45 45 0 0 1 192.06 150' />
+              <circle cx={150} cy={166} r={2.2} fill='rgba(255,255,255,0.55)' stroke='none' />
+              {/* Goal mouth */}
+              <rect x={128} y={214} width={44} height={12} fill='rgba(255,255,255,0.12)' stroke='rgba(255,255,255,0.5)' />
+            </g>
+          </svg>
+        </Box>
 
-      {/* Players */}
-      <Stack spacing={1.5} sx={{ position: 'relative', zIndex: 1 }}>
-        {displayRows.map((row, i) => (
-          <Stack key={i} direction='row' justifyContent='space-evenly' alignItems='center'>
-            {row.map((player) => (
-              <PlayerShirt
-                key={player.playerId || player.jersey || String(player.formationPlace)}
-                player={player}
-                color={color}
-                trimColor={trimColor}
-              />
-            ))}
-          </Stack>
-        ))}
-      </Stack>
+        {/* Players */}
+        <Stack justifyContent='space-evenly' sx={{ position: 'absolute', inset: 0, zIndex: 1, py: 2, px: 1 }}>
+          {displayRows.map((row, i) => (
+            <Stack key={i} direction='row' justifyContent='space-evenly' alignItems='center'>
+              {row.map((player) => (
+                <PlayerShirt
+                  key={player.playerId || player.jersey || String(player.formationPlace)}
+                  player={player}
+                  color={color}
+                  trimColor={trimColor}
+                />
+              ))}
+            </Stack>
+          ))}
+        </Stack>
+      </Box>
     </Box>
   );
 }
@@ -403,11 +342,8 @@ export function MatchLineupsSection({
   const { home, away } = lineups;
   const activeLineup = selected === 'home' ? home : away;
   const activeColor =
-    selected === 'home'
-      ? homeColor || theme.palette.primary.main
-      : awayColor || theme.palette.secondary.main;
-  const activeTrimColor =
-    (selected === 'home' ? homeAlternateColor : awayAlternateColor) || undefined;
+    selected === 'home' ? homeColor || theme.palette.primary.main : awayColor || theme.palette.secondary.main;
+  const activeTrimColor = (selected === 'home' ? homeAlternateColor : awayAlternateColor) || undefined;
 
   return (
     <Grid container spacing={2} alignItems='flex-start'>
