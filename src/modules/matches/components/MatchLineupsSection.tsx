@@ -310,7 +310,7 @@ export function MatchLineupsSection({
       <Stack alignItems='center' spacing={1} sx={{ py: 4 }}>
         <SportsSoccerIcon sx={{ fontSize: 32, color: 'text.disabled', opacity: 0.4 }} />
         <Typography variant='body2' color='text.secondary' textAlign='center'>
-          Las alineaciones estarán disponibles cuando el partido comience.
+          Las alineaciones no están disponibles en este momento.
         </Typography>
       </Stack>
     );

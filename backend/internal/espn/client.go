@@ -132,8 +132,11 @@ type SummaryCompetition struct {
 	Competitors []SummaryCompetitor `json:"competitors"`
 }
 
-// SummaryCompetitor is a team entry in the summary response (includes team ID).
+// SummaryCompetitor is a team entry in the summary response.
+// ID is the competitor's event-specific identifier used in Core API roster URLs.
+// Team.ID is the global team identifier — do not use for roster endpoint.
 type SummaryCompetitor struct {
+	ID       string `json:"id"`
 	HomeAway string `json:"homeAway"`
 	Score    string `json:"score"`
 	Team     struct {

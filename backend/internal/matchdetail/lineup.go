@@ -70,9 +70,9 @@ func fetchLineups(ctx context.Context, client *espn.Client, espnID string, summa
 	var homeID, awayID string
 	for _, c := range summary.Header.Competitions[0].Competitors {
 		if c.HomeAway == "home" {
-			homeID = c.Team.ID
-		} else {
-			awayID = c.Team.ID
+			homeID = c.ID
+		} else if c.HomeAway == "away" {
+			awayID = c.ID
 		}
 	}
 	if homeID == "" || awayID == "" {
