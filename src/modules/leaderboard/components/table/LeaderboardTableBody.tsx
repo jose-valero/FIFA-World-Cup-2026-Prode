@@ -26,6 +26,17 @@ function teamCode(code: string | null, name: string): string {
   return code ?? name.substring(0, 3).toUpperCase();
 }
 
+function getSign(a: number, b: number): -1 | 0 | 1 {
+  const d = a - b;
+  return d > 0 ? 1 : d < 0 ? -1 : 0;
+}
+
+function liveBadgeType(pred: InlinePrediction, officialHome: number, officialAway: number): 'exact' | 'sign' | null {
+  if (pred.homeScore === officialHome && pred.awayScore === officialAway) return 'exact';
+  if (getSign(pred.homeScore, pred.awayScore) === getSign(officialHome, officialAway)) return 'sign';
+  return null;
+}
+
 function InlinePredictionLine({
   match,
   pred,
@@ -48,6 +59,11 @@ function InlinePredictionLine({
   const isLive = match.status === 'live';
   const siblings = liveMatchCount - 1;
 
+  const badge =
+    isLive && pred && match.officialHomeScore !== null && match.officialAwayScore !== null
+      ? liveBadgeType(pred, match.officialHomeScore, match.officialAwayScore)
+      : null;
+
   if (!pred) {
     return (
       <Typography variant='caption' color='text.disabled' sx={{ fontSize: '0.7rem' }}>
@@ -57,29 +73,48 @@ function InlinePredictionLine({
   }
 
   return (
-    <Stack direction='row' spacing={0.4} alignItems='center'>
-      {/* {isLive ? (
-        <FiberManualRecordIcon sx={{ fontSize: 7, color: 'error.main', flexShrink: 0 }} />
-      ) : null} */}
-      <TeamFlag teamCode={match.homeTeamCode} teamName={match.homeTeam} size={12} />
-      <Typography variant='caption' sx={{ fontSize: '0.7rem', color: 'text.secondary' }} noWrap>
-        {home} {pred.homeScore}–{pred.awayScore} {away}
-      </Typography>
-      <TeamFlag teamCode={match.awayTeamCode} teamName={match.awayTeam} size={12} />
-      {siblings > 0 ? (
-        <Typography variant='caption' sx={{ fontSize: '0.65rem', color: 'text.disabled' }}>
-          +{siblings}
+    <Stack spacing={0.3}>
+      <Stack direction='row' spacing={0.4} alignItems='center'>
+        {/* {isLive ? (
+          <FiberManualRecordIcon sx={{ fontSize: 7, color: 'error.main', flexShrink: 0 }} />
+        ) : null} */}
+        <TeamFlag teamCode={match.homeTeamCode} teamName={match.homeTeam} size={12} />
+        <Typography variant='caption' sx={{ fontSize: '0.7rem', color: 'text.secondary' }} noWrap>
+          {home} {pred.homeScore}–{pred.awayScore} {away}
         </Typography>
-      ) : null}
-      {isLive ? (
-        <MaranitaButton
-          total={reaction?.total ?? 0}
-          myCount={reaction?.myCount ?? 0}
-          isCurrentUser={isCurrentUser}
-          isPending={isMaranitaPending}
-          onClick={onMaranita}
+        <TeamFlag teamCode={match.awayTeamCode} teamName={match.awayTeam} size={12} />
+        {siblings > 0 ? (
+          <Typography variant='caption' sx={{ fontSize: '0.65rem', color: 'text.disabled' }}>
+            +{siblings}
+          </Typography>
+        ) : null}
+        {isLive ? (
+          <MaranitaButton
+            total={reaction?.total ?? 0}
+            myCount={reaction?.myCount ?? 0}
+            isCurrentUser={isCurrentUser}
+            isPending={isMaranitaPending}
+            onClick={onMaranita}
+          />
+        ) : null}
+      </Stack>
+      {badge === 'exact' && (
+        <Chip
+          label='Coronando +5'
+          size='small'
+          color='success'
+          sx={{ height: 15, fontSize: '0.58rem', fontWeight: 700, alignSelf: 'flex-start', borderRadius: '4px' }}
         />
-      ) : null}
+      )}
+      {badge === 'sign' && (
+        <Chip
+          label='Sumando +3'
+          size='small'
+          color='success'
+          variant='outlined'
+          sx={{ height: 15, fontSize: '0.58rem', fontWeight: 700, alignSelf: 'flex-start', borderRadius: '4px' }}
+        />
+      )}
     </Stack>
   );
 }
