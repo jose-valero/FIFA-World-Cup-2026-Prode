@@ -17,114 +17,84 @@ function parseFormationRows(summary: string): number[] {
     .filter((n) => !isNaN(n) && n > 0);
 }
 
-// ESPN assigns formationPlace (1-11) from a fixed depth-order template that
-// depends only on back-line size, not on the specific formation — e.g. place
-// 8 is the deep pivot in a back-4 AND the deep pivot in a back-3, but place 7
-// is a midfielder in 4-4-2 and an attacking-mid slot in 4-2-3-1. Verified
-// empirically against real ESPN World Cup 2026 rosters (4-1-4-1, 4-3-3,
-// 4-4-2, 3-4-2-1, 3-1-4-2, 5-3-2) by resolving each player's
-// position.abbreviation. Row membership comes from slicing this chain by the
-// formation's row sizes; lateral order within a row is formationPlace asc.
-const BACK_LINE_PLACES: Record<number, number[]> = {
-  3: [4, 5, 6],
-  4: [2, 3, 5, 6],
-  5: [2, 3, 4, 5, 6]
+// Tactical depth for ESPN position abbreviations — lower = deeper on pitch.
+// GK (tier 0) is identified separately before this map is consulted.
+const POSITION_DEPTH: Record<string, number> = {
+  SW: 1, LB: 1, RB: 1, LWB: 1, RWB: 1,
+  CB: 1, CD: 1, 'CB-L': 1, 'CB-R': 1, 'CB-C': 1, 'CD-L': 1, 'CD-R': 1,
+  DM: 2, 'DM-L': 2, 'DM-R': 2, CDM: 2,
+  CM: 3, 'CM-L': 3, 'CM-R': 3, LM: 3, RM: 3,
+  AM: 4, 'AM-L': 4, 'AM-R': 4, LW: 4, RW: 4,
+  F: 5, CF: 5, 'CF-L': 5, 'CF-R': 5, LF: 5, RF: 5, ST: 5
 };
 
-const MIDFIELD_FORWARD_CHAIN: Record<number, number[]> = {
-  3: [8, 2, 3, 7, 11, 10, 9],
-  4: [4, 8, 7, 11, 10, 9],
-  5: [8, 7, 11, 10, 9]
-};
-
-// Maps an ESPN position abbreviation to a coarse line tier. Used only as the
-// fallback when the formation isn't recognized — formationPlace is the
-// primary source of truth (see groupByTacticalRows).
-const POSITION_TIER: Record<string, number> = {
-  G: 0,
-  CD: 1,
-  'CD-L': 1,
-  'CD-R': 1,
-  LB: 1,
-  RB: 1,
-  SW: 1,
-  DM: 2,
-  CM: 2,
-  'CM-L': 2,
-  'CM-R': 2,
-  LM: 2,
-  RM: 2,
-  AM: 3,
-  'AM-L': 3,
-  'AM-R': 3,
-  F: 4,
-  'CF-L': 4,
-  'CF-R': 4,
-  LF: 4,
-  RF: 4
-};
-
-function buildRow(byPlace: Map<number, LineupPlayer>, places: number[]): LineupPlayer[] {
-  return [...places]
-    .sort((a, b) => a - b)
-    .filter((place) => byPlace.has(place))
-    .map((place) => byPlace.get(place)!);
+// Lateral slot within a row: left (−1), center (0), right (+1).
+function lateralScore(abbr: string): number {
+  if (!abbr) return 0;
+  if (abbr.startsWith('L') || abbr.endsWith('-L')) return -1;
+  if (abbr.startsWith('R') || abbr.endsWith('-R')) return 1;
+  return 0;
 }
 
-// Reconstructs tactical rows from formationPlace using the canonical chain.
-// Returns null when the formation/back-line isn't recognized, or when the
-// sanity check (every starter assigned exactly once) fails — callers should
-// fall back to a less precise but always-stable grouping in that case.
-function groupByTacticalRows(starters: LineupPlayer[], formationSummary: string | null): LineupPlayer[][] | null {
-  if (!formationSummary) return null;
+function sortRowLaterally(row: LineupPlayer[]): LineupPlayer[] {
+  return [...row].sort((a, b) => {
+    const la = lateralScore(a.position?.abbreviation ?? '');
+    const lb = lateralScore(b.position?.abbreviation ?? '');
+    if (la !== lb) return la - lb;
+    return (a.formationPlace ?? 99) - (b.formationPlace ?? 99);
+  });
+}
 
-  const rowSizes = parseFormationRows(formationSummary);
-  const backSize = rowSizes[0];
-  const chain = MIDFIELD_FORWARD_CHAIN[backSize];
-  const backPlaces = BACK_LINE_PLACES[backSize];
-  if (!chain || !backPlaces) return null;
+// Builds tactical rows driven by position.abbreviation depth tiers:
+//   1. Separate GK from outfield.
+//   2. Sort outfield deepest-first by POSITION_DEPTH.
+//   3. If formation summary row sizes match player count, slice the sorted
+//      list by each row size and sort each slice laterally (L→C→R). Works
+//      for any formation without formation-specific lookup tables.
+//   4. Fallback: group by depth tier when formation is missing or counts
+//      don't align (partial lineups, ESPN data gaps).
+function groupByRows(starters: LineupPlayer[], formationSummary: string | null): LineupPlayer[][] {
+  const isGk = (p: LineupPlayer) =>
+    (p.position?.abbreviation ?? '').toUpperCase() === 'G' || p.formationPlace === 1;
 
-  const byPlace = new Map<number, LineupPlayer>();
-  for (const p of starters) {
-    if (p.formationPlace != null) byPlace.set(p.formationPlace, p);
-  }
+  const gks = starters.filter(isGk);
+  const outfield = starters.filter((p) => !isGk(p));
+
+  if (outfield.length === 0) return gks.length > 0 ? [gks] : [];
+
+  const byDepth = [...outfield].sort((a, b) => {
+    const da = POSITION_DEPTH[a.position?.abbreviation ?? ''] ?? 3;
+    const db = POSITION_DEPTH[b.position?.abbreviation ?? ''] ?? 3;
+    if (da !== db) return da - db;
+    return lateralScore(a.position?.abbreviation ?? '') - lateralScore(b.position?.abbreviation ?? '');
+  });
+
+  const rowSizes = formationSummary ? parseFormationRows(formationSummary) : [];
+  const totalFromFormation = rowSizes.reduce((s, n) => s + n, 0);
 
   const rows: LineupPlayer[][] = [];
-  const gk = buildRow(byPlace, [1]);
-  if (gk.length > 0) rows.push(gk);
-  rows.push(buildRow(byPlace, backPlaces));
+  if (gks.length > 0) rows.push(gks);
 
-  let idx = 0;
-  for (const size of rowSizes.slice(1)) {
-    rows.push(buildRow(byPlace, chain.slice(idx, idx + size)));
-    idx += size;
+  if (rowSizes.length > 0 && totalFromFormation === outfield.length) {
+    let idx = 0;
+    for (const size of rowSizes) {
+      rows.push(sortRowLaterally(byDepth.slice(idx, idx + size)));
+      idx += size;
+    }
+  } else {
+    const tiers = new Map<number, LineupPlayer[]>();
+    for (const p of byDepth) {
+      const tier = POSITION_DEPTH[p.position?.abbreviation ?? ''] ?? 3;
+      const list = tiers.get(tier) ?? [];
+      list.push(p);
+      tiers.set(tier, list);
+    }
+    for (const tier of [...tiers.keys()].sort((a, b) => a - b)) {
+      rows.push(sortRowLaterally(tiers.get(tier)!));
+    }
   }
 
-  const assignedCount = rows.reduce((sum, row) => sum + row.length, 0);
-  if (assignedCount !== starters.length) return null;
-
-  return rows.filter((row) => row.length > 0);
-}
-
-// Stable fallback for formations not covered by the canonical chain table.
-// Groups by a coarse tier inferred from position.abbreviation — here the
-// position acts as the primary signal since formationPlace alone can't be
-// trusted without a known formation template.
-function fallbackGroupByPosition(starters: LineupPlayer[]): LineupPlayer[][] {
-  const sorted = [...starters].sort((a, b) => (a.formationPlace ?? 99) - (b.formationPlace ?? 99));
-  const tiers = new Map<number, LineupPlayer[]>();
-  for (const p of sorted) {
-    const abbr = p.position?.abbreviation ?? '';
-    const tier = POSITION_TIER[abbr] ?? 2;
-    const list = tiers.get(tier) ?? [];
-    list.push(p);
-    tiers.set(tier, list);
-  }
-  return [...tiers.keys()].sort((a, b) => a - b).map((t) => tiers.get(t)!);
-}
-
-function groupByRows(starters: LineupPlayer[], formationSummary: string | null): LineupPlayer[][] {
-  return groupByTacticalRows(starters, formationSummary) ?? fallbackGroupByPosition(starters);
+  return rows.filter((r) => r.length > 0);
 }
 
 // ── Player shirt chip ─────────────────────────────────────────────────────────

@@ -57,10 +57,10 @@ export function BottomThreeSection({ rows, positionMap, avatarMap, currentUserId
                           {row.display_name}
                           {isCurrentUser ? ' · Tú' : ''}
                         </Typography>
-                        <Typography variant='caption' sx={{ color: 'text.secondary', fontWeight: 500 }}>
+                        <Typography variant='caption' sx={{ color: 'text.secondary', fontWeight: 400 }}>
                           {position != null ? `#${position}` : '—'}
                           {' · '}
-                          {row.total_points} pts
+                          {row.total_points}p
                         </Typography>
                       </Box>
                     </Stack>

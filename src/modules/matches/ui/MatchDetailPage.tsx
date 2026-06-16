@@ -305,7 +305,7 @@ function HeroTab({
         flex: 1,
         minWidth: 0,
         border: 'none',
-        borderBottom: '2px solid',
+        borderTop: '2px solid',
         borderColor: isActive ? 'primary.main' : 'transparent',
         background: 'none',
         cursor: 'pointer',
@@ -403,8 +403,6 @@ function MatchHero({
         overflow: 'hidden'
       }}
     >
-      {isLive && <Box sx={{ height: 3, bgcolor: 'success.main' }} />}
-
       <CardContent sx={{ p: { xs: 2, sm: 2.5, md: 3 }, '&:last-child': { pb: 0 } }}>
         <Stack spacing={0}>
           {/* Row 1: back + stage/meta (left) · status badge (right) */}

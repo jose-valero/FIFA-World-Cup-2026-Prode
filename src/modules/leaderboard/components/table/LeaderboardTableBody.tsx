@@ -161,14 +161,13 @@ export const LeaderboardTableBody = ({
                 }
               })}
             >
-              <TableCell>
+              <TableCell width={40} sx={{ pr: 0 }}>
                 <Stack direction='row' spacing={1} alignItems='center' flexWrap='wrap' useFlexGap>
                   {position ? (
                     <Typography fontWeight={800}>#{position}</Typography>
                   ) : (
                     <Typography fontWeight={800}>—</Typography>
                   )}
-                  {isCurrentUser ? <Chip label='Tú' size='small' variant='outlined' /> : null}
                 </Stack>
               </TableCell>
 
