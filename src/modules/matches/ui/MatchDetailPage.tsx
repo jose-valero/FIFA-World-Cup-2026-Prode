@@ -34,7 +34,7 @@ import { MatchLineupsSection } from '../components/MatchLineupsSection';
 import { MatchSummarySection } from '../components/MatchSummarySection';
 // MOCK TEMPORAL — cambiar a false para usar datos reales
 import { MOCK_LINEUPS } from '../mocks/mockLineups';
-const USE_MOCK_LINEUPS = true;
+const USE_MOCK_LINEUPS = false;
 
 // ── Tab type ──────────────────────────────────────────────────────────────────
 
