@@ -25,6 +25,7 @@ import { Link as RouterLink, useNavigate, useParams } from 'react-router';
 import { useMatches } from '../hooks/useMatches';
 import { useMatchDetail } from '../hooks/useMatchDetail';
 import { TeamFlag } from '../../../shared/components/TeamFlag';
+import { getCrestSrcByTeamCode } from '../../../shared/utils/crestMap';
 import { getStageLabel } from '../../tournament/utils/stages';
 import { routes } from '../../../app/router/routes';
 import type { Match } from '../types/types';
@@ -228,8 +229,6 @@ type HeroData = {
   awayCode: string;
   homeName: string;
   awayName: string;
-  homeLogo: string | null;
-  awayLogo: string | null;
   scoreHome: number | null;
   scoreAway: number | null;
   events: MatchDetailEvent[];
@@ -250,8 +249,6 @@ function heroFromDetail(d: MatchDetailPayload, m: Match): HeroData {
     awayCode: d.awayTeam.code,
     homeName: d.homeTeam.name,
     awayName: d.awayTeam.name,
-    homeLogo: d.homeTeam.logo ?? null,
-    awayLogo: d.awayTeam.logo ?? null,
     scoreHome: d.score?.home ?? null,
     scoreAway: d.score?.away ?? null,
     events: d.events,
@@ -273,8 +270,6 @@ function heroFromMatch(m: Match): HeroData {
     awayCode: m.awayTeamCode ?? '',
     homeName: m.homeTeam,
     awayName: m.awayTeam,
-    homeLogo: null,
-    awayLogo: null,
     scoreHome: m.officialHomeScore,
     scoreAway: m.officialAwayScore,
     events: [],
@@ -348,30 +343,21 @@ function HeroTab({
 }
 
 // ── TeamCrest ─────────────────────────────────────────────────────────────────
-// Uses the team's ESPN logo when available; falls back to the flag (current
-// default) if there's no logo or the image fails to load.
+// Uses the local team crest asset when available; falls back to the flag if
+// there's no asset for that team code or the image fails to load.
 
-function TeamCrest({
-  logo,
-  teamCode,
-  teamName,
-  size = 52
-}: {
-  logo: string | null;
-  teamCode: string;
-  teamName: string;
-  size?: number;
-}) {
+function TeamCrest({ teamCode, teamName, size = 52 }: { teamCode: string; teamName: string; size?: number }) {
   const [failed, setFailed] = React.useState(false);
+  const crestSrc = getCrestSrcByTeamCode(teamCode);
 
-  if (!logo || failed) {
+  if (!crestSrc || failed) {
     return <TeamFlag teamCode={teamCode} teamName={teamName} size={size} />;
   }
 
   return (
     <Box
       component='img'
-      src={logo}
+      src={crestSrc}
       alt={`Escudo de ${teamName}`}
       onError={() => setFailed(true)}
       sx={{ width: size, height: size, objectFit: 'contain', display: 'block', flexShrink: 0 }}
@@ -483,7 +469,7 @@ function MatchHero({
             sx={{ py: { xs: 1.5, md: 2.5 } }}
           >
             <Stack alignItems='center' spacing={1} sx={{ flex: 1, minWidth: 0 }}>
-              <TeamCrest logo={h.homeLogo} teamCode={h.homeCode} teamName={h.homeName} size={52} />
+              <TeamCrest teamCode={h.homeCode} teamName={h.homeName} size={52} />
               <Typography
                 fontWeight={800}
                 textAlign='center'
@@ -547,7 +533,7 @@ function MatchHero({
             </Stack>
 
             <Stack alignItems='center' spacing={1} sx={{ flex: 1, minWidth: 0 }}>
-              <TeamCrest logo={h.awayLogo} teamCode={h.awayCode} teamName={h.awayName} size={52} />
+              <TeamCrest teamCode={h.awayCode} teamName={h.awayName} size={52} />
               <Typography
                 fontWeight={800}
                 textAlign='center'
