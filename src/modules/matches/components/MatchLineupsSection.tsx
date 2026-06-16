@@ -256,14 +256,24 @@ function TeamPitch({ lineup, color, trimColor }: { lineup: TeamLineup; color: st
 // ── Bench section ─────────────────────────────────────────────────────────────
 
 function BenchSection({ players }: { players: LineupPlayer[] }) {
+  const theme = useTheme();
   if (players.length === 0) return null;
   return (
-    <Stack spacing={0.75}>
+    <Stack
+      spacing={1}
+      sx={{
+        borderRadius: 1.5,
+        border: '1px solid',
+        borderColor: 'divider',
+        bgcolor: alpha(theme.palette.text.primary, 0.025),
+        p: 1.25
+      }}
+    >
       <Typography
         variant='caption'
         fontWeight={700}
-        color='text.secondary'
-        sx={{ letterSpacing: 0.6, textTransform: 'uppercase', fontSize: '0.63rem' }}
+        color='text.disabled'
+        sx={{ letterSpacing: 0.6, textTransform: 'uppercase', fontSize: '0.6rem' }}
       >
         Suplentes
       </Typography>
@@ -443,10 +453,10 @@ export function MatchLineupsSection({
   const activeTrimColor = activeJersey?.trim;
 
   return (
-    <Grid container spacing={2} alignItems='flex-start'>
+    <Grid container spacing={{ xs: 3, sm: 2 }} alignItems='flex-start'>
       {/* Bloque izquierdo: selector + cancha, mismo ancho para que queden alineados */}
       <Grid size={{ xs: 12, sm: 8 }}>
-        <Stack spacing={1.5} sx={{ width: '100%', maxWidth: { xs: '100%', sm: 480, md: 560, lg: 600 }, mx: 'auto' }}>
+        <Stack spacing={1.25} sx={{ width: '100%', maxWidth: { xs: '100%', sm: 480, md: 560, lg: 600 }, mx: 'auto' }}>
           <TeamSwitcher
             homeCode={homeCode}
             awayCode={awayCode}

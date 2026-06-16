@@ -34,7 +34,7 @@ import { MatchLineupsSection } from '../components/MatchLineupsSection';
 import { MatchSummarySection } from '../components/MatchSummarySection';
 // MOCK TEMPORAL — cambiar a false para usar datos reales
 import { MOCK_LINEUPS } from '../mocks/mockLineups';
-const USE_MOCK_LINEUPS = false;
+const USE_MOCK_LINEUPS = true;
 
 // ── Tab type ──────────────────────────────────────────────────────────────────
 
@@ -788,8 +788,16 @@ export function MatchDetailPage() {
 
       {/* Alineaciones */}
       <Collapse in={activeTab === 'alineaciones'} timeout={280} unmountOnExit>
-        <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
-          <CardContent sx={{ p: { xs: 2, sm: 2.5 }, pt: { xs: 1.25, sm: 1.5 } }}>
+        <Card
+          elevation={0}
+          sx={{
+            borderRadius: 2.5,
+            border: '1px solid',
+            borderColor: 'divider',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.12)'
+          }}
+        >
+          <CardContent sx={{ p: { xs: 2, sm: 2.5 }, pt: { xs: 1.5, sm: 1.5 } }}>
             <Stack spacing={1.5}>
               {lineups ? (
                 <MatchLineupsSection
