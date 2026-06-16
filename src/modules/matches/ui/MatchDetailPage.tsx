@@ -789,14 +789,8 @@ export function MatchDetailPage() {
       {/* Alineaciones */}
       <Collapse in={activeTab === 'alineaciones'} timeout={280} unmountOnExit>
         <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
-          <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
+          <CardContent sx={{ p: { xs: 2, sm: 2.5 }, pt: { xs: 1.25, sm: 1.5 } }}>
             <Stack spacing={1.5}>
-              <Stack direction='row' alignItems='center' spacing={1}>
-                <PeopleAltIcon sx={{ fontSize: 18, color: 'text.disabled' }} />
-                <Typography variant='subtitle1' fontWeight={800}>
-                  Alineaciones
-                </Typography>
-              </Stack>
               {lineups ? (
                 <MatchLineupsSection
                   lineups={lineups}

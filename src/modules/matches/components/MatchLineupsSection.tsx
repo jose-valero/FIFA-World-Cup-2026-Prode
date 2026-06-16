@@ -187,7 +187,7 @@ function TeamPitch({ lineup, color, trimColor }: { lineup: TeamLineup; color: st
       sx={{
         position: 'relative',
         width: '100%',
-        aspectRatio: '300 / 230',
+        aspectRatio: '300 / 280',
         borderRadius: 1.5,
         overflow: 'hidden',
         border: '1px solid rgba(255,255,255,0.10)',
@@ -207,32 +207,35 @@ function TeamPitch({ lineup, color, trimColor }: { lineup: TeamLineup; color: st
         }}
       >
         {/* Only the defending half is shown: halfway line + partial center
-            circle at top, own penalty area + goal at bottom. */}
+            circle at top, own penalty area + goal at bottom. Viewbox is
+            taller than wide (300x280) so the GK row gets real breathing
+            room at the bottom on narrow screens — markings below the
+            halfway line are shifted down to match, never stretched. */}
         <svg
-          viewBox='0 0 300 230'
+          viewBox='0 0 300 280'
           preserveAspectRatio='none'
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
         >
           <g fill='none' stroke='rgba(255,255,255,0.4)' strokeWidth={1.6}>
             {/* Perimeter (top edge doubles as the halfway line) */}
-            <rect x={10} y={10} width={280} height={210} stroke='rgba(255,255,255,0.55)' />
+            <rect x={10} y={10} width={280} height={260} stroke='rgba(255,255,255,0.55)' />
             {/* Center circle (only the half below the halfway line, bulging down into the field) + kickoff spot */}
             <path d='M 105 10 A 45 45 0 0 0 195 10' />
             <circle cx={150} cy={10} r={2.2} fill='rgba(255,255,255,0.55)' stroke='none' />
             {/* Own penalty area + six-yard box */}
-            <rect x={70} y={150} width={160} height={70} />
-            <rect x={110} y={192} width={80} height={28} />
+            <rect x={70} y={200} width={160} height={70} />
+            <rect x={110} y={242} width={80} height={28} />
             {/* D-arc bulges up, away from goal, out into the field */}
-            <path d='M 107.94 150 A 45 45 0 0 1 192.06 150' />
-            <circle cx={150} cy={166} r={2.2} fill='rgba(255,255,255,0.55)' stroke='none' />
+            <path d='M 107.94 200 A 45 45 0 0 1 192.06 200' />
+            <circle cx={150} cy={216} r={2.2} fill='rgba(255,255,255,0.55)' stroke='none' />
             {/* Goal mouth */}
-            <rect x={128} y={218} width={44} height={2} fill='rgba(255,255,255,0.12)' stroke='rgba(255,255,255,0.5)' />
+            <rect x={128} y={268} width={44} height={2} fill='rgba(255,255,255,0.12)' stroke='rgba(255,255,255,0.5)' />
           </g>
         </svg>
       </Box>
 
       {/* Players */}
-      <Stack justifyContent='space-evenly' sx={{ position: 'absolute', inset: 0, zIndex: 1, py: 2, px: 1 }}>
+      <Stack justifyContent='space-evenly' sx={{ position: 'absolute', inset: 0, zIndex: 1, py: 2.5, px: 1 }}>
         {displayRows.map((row, i) => (
           <Stack key={i} direction='row' justifyContent='space-evenly' alignItems='center'>
             {row.map((player) => (
