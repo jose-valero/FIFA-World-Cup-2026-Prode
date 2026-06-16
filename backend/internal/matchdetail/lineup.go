@@ -2,6 +2,7 @@ package matchdetail
 
 import (
 	"context"
+	"log"
 	"strconv"
 	"sync"
 	"time"
@@ -98,15 +99,24 @@ func fetchLineups(ctx context.Context, client *espn.Client, espnID string, summa
 	}()
 	wg.Wait()
 
+	log.Printf("[LINEUPS][fetchLineups] after wait: espnID=%s homeID=%s awayID=%s homeNil=%v awayNil=%v",
+		espnID, homeID, awayID, homeLineup == nil, awayLineup == nil,
+	)
+
 	if homeLineup == nil && awayLineup == nil {
+		log.Printf("[LINEUPS][fetchLineups] both nil → returning available=false")
 		return &MatchLineups{Available: false}
 	}
 
-	return &MatchLineups{
+	result := &MatchLineups{
 		Available: true,
 		Home:      homeLineup,
 		Away:      awayLineup,
 	}
+	log.Printf("[LINEUPS][fetchLineups] returning available=true homeNil=%v awayNil=%v",
+		result.Home == nil, result.Away == nil,
+	)
+	return result
 }
 
 // fetchTeamLineup fetches and normalizes one team's roster from ESPN.
@@ -136,6 +146,14 @@ func fetchTeamLineup(ctx context.Context, client *espn.Client, espnID, competito
 			NumRows: roster.Formation.NumRows,
 		}
 	}
+
+	log.Printf("[LINEUPS][fetchTeamLineup] competitorID=%s players=%d starters=%d bench=%d formation=%v",
+		competitorID,
+		len(players),
+		len(starters),
+		len(bench),
+		formation,
+	)
 
 	return &TeamLineup{
 		Formation: formation,

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -115,9 +116,33 @@ func Fetch(ctx context.Context, supabaseURL, supabaseKey string, espnClient *esp
 		}()
 		go func() {
 			defer wg.Done()
-			resp.Lineups = fetchLineups(ctx, espnClient, espnID, summary)
+			lineups := fetchLineups(ctx, espnClient, espnID, summary)
+			log.Printf("[detail] fetchLineups returned: lineups=%v available=%v homeNil=%v awayNil=%v",
+				lineups != nil,
+				func() bool {
+					if lineups != nil {
+						return lineups.Available
+					}
+					return false
+				}(),
+				func() bool {
+					if lineups != nil {
+						return lineups.Home == nil
+					}
+					return true
+				}(),
+				func() bool {
+					if lineups != nil {
+						return lineups.Away == nil
+					}
+					return true
+				}(),
+			)
+			resp.Lineups = lineups
 		}()
 		wg.Wait()
+
+		log.Printf("[detail] after wg.Wait: resp.Lineups=%v", resp.Lineups != nil)
 
 		// Reconcile score and status against the events we just fetched.
 		// This handles the case where ESPN summary lags behind Core API plays.
