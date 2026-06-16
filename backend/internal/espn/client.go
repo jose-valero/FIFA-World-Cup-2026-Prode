@@ -405,7 +405,13 @@ func (c *Client) GetRoster(ctx context.Context, eventID, competitorID string) (*
 	if err != nil {
 		return nil, fmt.Errorf("ESPN roster request: %w", err)
 	}
+	defer resp.Body.Close()
+
 	log.Printf("[GetRoster] status=%d", resp.StatusCode)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("ESPN roster HTTP %d for event %s competitor %s", resp.StatusCode, eventID, competitorID)
+	}
+
 	body, readErr := io.ReadAll(resp.Body)
 	if readErr != nil {
 		log.Printf("[GetRoster] read body err=%v", readErr)
@@ -421,15 +427,7 @@ func (c *Client) GetRoster(ctx context.Context, eventID, competitorID string) (*
 	}
 
 	log.Printf("[GetRoster] decoded entries=%d formation=%+v", len(roster.Entries), roster.Formation)
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("ESPN roster HTTP %d for event %s competitor %s", resp.StatusCode, eventID, competitorID)
-	}
-	var r RosterResponse
-	if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
-		return nil, fmt.Errorf("decoding roster: %w", err)
-	}
-	return &r, nil
+	return &roster, nil
 }
 
 func truncate(s string, n int) string {
