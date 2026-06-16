@@ -5,7 +5,6 @@ import {
   CardContent,
   CircularProgress,
   Collapse,
-  Divider,
   IconButton,
   Stack,
   Typography,
@@ -20,6 +19,7 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import StyleIcon from '@mui/icons-material/Style';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
+import BarChartIcon from '@mui/icons-material/BarChart';
 import React from 'react';
 import { Link as RouterLink, useNavigate, useParams } from 'react-router';
 import { useMatches } from '../hooks/useMatches';
@@ -30,6 +30,13 @@ import { routes } from '../../../app/router/routes';
 import type { Match } from '../types/types';
 import type { MatchDetailPayload, MatchDetailEvent, MatchDetailEventType } from '../types/matchDetail.types';
 import { MatchLineupsSection } from '../components/MatchLineupsSection';
+// MOCK TEMPORAL — cambiar a false para usar datos reales
+import { MOCK_LINEUPS } from '../mocks/mockLineups';
+const USE_MOCK_LINEUPS = false;
+
+// ── Tab type ──────────────────────────────────────────────────────────────────
+
+type DetailTab = 'resumen' | 'cronologia' | 'alineaciones' | 'estadisticas';
 
 // ── Event helpers ─────────────────────────────────────────────────────────────
 
@@ -71,17 +78,13 @@ function getTimelineEvents(events: MatchDetailEvent[]): MatchDetailEvent[] {
   );
 }
 
-// Parse "9'", "45'+4'", "90'+2'" → numeric minute
 function parseMinute(minuteStr: string): number {
   const base = minuteStr.replace(/'/g, '').trim();
   const [main, extra] = base.split('+').map((s) => parseInt(s.trim(), 10));
   return (isNaN(main) ? 0 : main) + (isNaN(extra) ? 0 : extra);
 }
 
-type EventVisual = {
-  color: string;
-  label: string;
-};
+type EventVisual = { color: string; label: string };
 
 function useEventVisual(type: MatchDetailEventType): EventVisual {
   const theme = useTheme();
@@ -103,7 +106,6 @@ function useEventVisual(type: MatchDetailEventType): EventVisual {
 function EventTypeIcon({ type, size = 14 }: { type: MatchDetailEventType; size?: number }) {
   const theme = useTheme();
   const sx = { fontSize: size };
-
   switch (type) {
     case 'goal':
     case 'penalty_goal':
@@ -111,25 +113,9 @@ function EventTypeIcon({ type, size = 14 }: { type: MatchDetailEventType; size?:
     case 'own_goal':
       return <SportsSoccerIcon sx={{ ...sx, color: theme.palette.error.main }} />;
     case 'yellow_card':
-      return (
-        <StyleIcon
-          sx={{
-            ...sx,
-            color: theme.palette.warning.main,
-            transform: 'rotate(180deg)'
-          }}
-        />
-      );
+      return <StyleIcon sx={{ ...sx, color: theme.palette.warning.main, transform: 'rotate(180deg)' }} />;
     case 'red_card':
-      return (
-        <StyleIcon
-          sx={{
-            ...sx,
-            color: theme.palette.error.main,
-            transform: 'rotate(180deg)'
-          }}
-        />
-      );
+      return <StyleIcon sx={{ ...sx, color: theme.palette.error.main, transform: 'rotate(180deg)' }} />;
     case 'substitution':
       return <SwapHorizIcon sx={{ ...sx, color: theme.palette.info.main }} />;
   }
@@ -138,17 +124,11 @@ function EventTypeIcon({ type, size = 14 }: { type: MatchDetailEventType; size?:
 // ── Formatters ────────────────────────────────────────────────────────────────
 
 function fmtDate(kickoffAt: string): string {
-  return new Date(kickoffAt).toLocaleDateString('es-AR', {
-    day: 'numeric',
-    month: 'long'
-  });
+  return new Date(kickoffAt).toLocaleDateString('es-AR', { day: 'numeric', month: 'long' });
 }
 
 function fmtTime(kickoffAt: string): string {
-  return new Date(kickoffAt).toLocaleTimeString('es-AR', {
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+  return new Date(kickoffAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
 }
 
 // ── Status badge ──────────────────────────────────────────────────────────────
@@ -166,25 +146,10 @@ function StatusBadge({ status, minuteLabel }: { status: string; minuteLabel: str
       : 'Pendiente';
 
   const sx = isLive
-    ? {
-        border: '1px solid',
-        borderColor: 'success.main',
-        bgcolor: 'rgba(57,217,138,0.10)',
-        color: 'success.main'
-      }
+    ? { border: '1px solid', borderColor: 'success.main', bgcolor: 'rgba(57,217,138,0.10)', color: 'success.main' }
     : isFinished
-      ? {
-          border: '1px solid',
-          borderColor: 'divider',
-          bgcolor: 'rgba(255,255,255,0.04)',
-          color: 'text.secondary'
-        }
-      : {
-          border: '1px solid',
-          borderColor: 'warning.main',
-          bgcolor: 'rgba(255,181,71,0.10)',
-          color: 'warning.main'
-        };
+      ? { border: '1px solid', borderColor: 'divider', bgcolor: 'rgba(255,255,255,0.04)', color: 'text.secondary' }
+      : { border: '1px solid', borderColor: 'warning.main', bgcolor: 'rgba(255,181,71,0.10)', color: 'warning.main' };
 
   return (
     <Box
@@ -208,10 +173,7 @@ function StatusBadge({ status, minuteLabel }: { status: string; minuteLabel: str
             borderRadius: '50%',
             bgcolor: 'success.main',
             animation: 'pulse 1.4s ease-in-out infinite',
-            '@keyframes pulse': {
-              '0%, 100%': { opacity: 1 },
-              '50%': { opacity: 0.3 }
-            }
+            '@keyframes pulse': { '0%, 100%': { opacity: 1 }, '50%': { opacity: 0.3 } }
           }}
         />
       )}
@@ -222,13 +184,12 @@ function StatusBadge({ status, minuteLabel }: { status: string; minuteLabel: str
   );
 }
 
-// ── Scorer list (goals only) ───────────────────────────────────────────────────
+// ── Scorer list ───────────────────────────────────────────────────────────────
 
 function ScorerList({ events }: { events: MatchDetailEvent[] }) {
   const goalEvents = getGoalEvents(events);
   const home = goalEvents.filter((e) => e.side === 'home');
   const away = goalEvents.filter((e) => e.side === 'away');
-
   if (home.length === 0 && away.length === 0) return null;
 
   const col = (list: MatchDetailEvent[], align: 'left' | 'right') => (
@@ -258,7 +219,7 @@ function ScorerList({ events }: { events: MatchDetailEvent[] }) {
   );
 }
 
-// ── HeroData abstraction ──────────────────────────────────────────────────────
+// ── HeroData ──────────────────────────────────────────────────────────────────
 
 type HeroData = {
   status: string;
@@ -321,18 +282,16 @@ function heroFromMatch(m: Match): HeroData {
   };
 }
 
-function MetaDivider() {
-  return <Divider orientation='vertical' flexItem sx={{ borderColor: 'divider', alignSelf: 'stretch', my: 0.5 }} />;
-}
+// ── HeroTab ───────────────────────────────────────────────────────────────────
 
-function MetaBlockAction({
+function HeroTab({
+  label,
   icon,
-  primary,
   isActive,
   onClick
 }: {
+  label: string;
   icon: React.ReactNode;
-  primary: string;
   isActive: boolean;
   onClick: () => void;
 }) {
@@ -343,32 +302,40 @@ function MetaBlockAction({
       sx={{
         flex: 1,
         minWidth: 0,
-        px: 1,
-        py: 0,
-        background: 'none',
         border: 'none',
+        borderBottom: '2px solid',
+        borderColor: isActive ? 'primary.main' : 'transparent',
+        background: 'none',
         cursor: 'pointer',
+        py: 1.25,
+        px: 0.5,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: '4px',
-        color: 'inherit',
-        transition: 'opacity 0.15s ease',
-        '&:hover': { opacity: 0.7 },
-        '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', borderRadius: 1 }
+        gap: '3px',
+        color: isActive ? 'primary.main' : 'text.secondary',
+        transition: 'color 0.15s ease, border-color 0.15s ease',
+        '&:hover': { color: isActive ? 'primary.main' : 'text.primary' },
+        '&:focus-visible': {
+          outline: '2px solid',
+          outlineColor: 'primary.main',
+          outlineOffset: -2,
+          borderRadius: '2px'
+        }
       }}
     >
-      <Box sx={{ color: isActive ? 'primary.main' : 'text.disabled', display: 'flex', transition: 'color 0.2s ease' }}>
-        {icon}
-      </Box>
+      <Box sx={{ color: 'inherit', display: 'flex', flexShrink: 0 }}>{icon}</Box>
       <Typography
-        variant='caption'
-        fontWeight={700}
-        textAlign='center'
-        noWrap
-        sx={{ width: '100%', color: isActive ? 'primary.main' : 'text.primary', transition: 'color 0.2s ease' }}
+        sx={{
+          fontSize: '0.65rem',
+          fontWeight: 700,
+          color: 'inherit',
+          whiteSpace: 'nowrap',
+          lineHeight: 1,
+          letterSpacing: 0.3
+        }}
       >
-        {primary}
+        {label}
       </Typography>
     </Box>
   );
@@ -379,17 +346,13 @@ function MetaBlockAction({
 function MatchHero({
   match,
   detail,
-  timelineOpen,
-  onToggleTimeline,
-  lineupsOpen,
-  onToggleLineups
+  activeTab,
+  onTabChange
 }: {
   match: Match;
   detail: MatchDetailPayload | null;
-  timelineOpen: boolean;
-  onToggleTimeline: () => void;
-  lineupsOpen: boolean;
-  onToggleLineups: () => void;
+  activeTab: DetailTab;
+  onTabChange: (tab: DetailTab) => void;
 }) {
   const navigate = useNavigate();
 
@@ -403,7 +366,6 @@ function MatchHero({
   const isLive = h.status === 'live';
   const isFinished = h.status === 'finished';
   const hasScore = h.scoreHome != null && h.scoreAway != null;
-
   const stageLabel = getStageLabel(h.stage as Parameters<typeof getStageLabel>[0]);
 
   return (
@@ -417,29 +379,58 @@ function MatchHero({
       }}
     >
       {isLive && <Box sx={{ height: 3, bgcolor: 'success.main' }} />}
-      <CardContent sx={{ p: { xs: 2, sm: 2.5, md: 3 } }}>
+
+      <CardContent sx={{ p: { xs: 2, sm: 2.5, md: 3 }, '&:last-child': { pb: 0 } }}>
         <Stack spacing={0}>
-          {/* Row 1: back + breadcrumb + status badge */}
-          <Stack direction='row' justifyContent='space-between' alignItems='center' sx={{ mb: 2.5 }}>
-            <Stack direction='row' spacing={1} alignItems='center' sx={{ minWidth: 0 }}>
-              <IconButton onClick={handleBack} size='small' aria-label='Volver atrás' sx={{ flexShrink: 0 }}>
+          {/* Row 1: back + stage/meta (left) · status badge (right) */}
+          <Stack direction='row' justifyContent='space-between' alignItems='flex-start' sx={{ mb: 2 }}>
+            <Stack direction='row' spacing={0.75} alignItems='flex-start' sx={{ minWidth: 0, flex: 1 }}>
+              <IconButton onClick={handleBack} size='small' aria-label='Volver atrás' sx={{ flexShrink: 0, mt: -0.25 }}>
                 <ArrowBackIcon fontSize='small' />
               </IconButton>
-              <Typography
-                variant='caption'
-                sx={{
-                  color: 'text.secondary',
-                  fontWeight: 500,
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis'
-                }}
-              >
-                {stageLabel}
-                {h.groupCode ? ` · Grupo ${h.groupCode}` : ''}
-              </Typography>
+              <Stack spacing={0.3} sx={{ minWidth: 0 }}>
+                <Typography
+                  variant='caption'
+                  sx={{
+                    color: 'text.secondary',
+                    fontWeight: 600,
+                    lineHeight: 1.3,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}
+                >
+                  {stageLabel}
+                  {h.groupCode ? ` · Grupo ${h.groupCode}` : ''}
+                </Typography>
+                <Stack direction='row' flexWrap='wrap' gap={0.75} alignItems='center'>
+                  <Stack direction='row' spacing={0.4} alignItems='center'>
+                    <CalendarTodayIcon sx={{ fontSize: 10, color: 'text.disabled', flexShrink: 0 }} />
+                    <Typography sx={{ fontSize: '0.63rem', color: 'text.disabled', lineHeight: 1 }}>
+                      {fmtDate(h.kickoffAt)} · {fmtTime(h.kickoffAt)}
+                    </Typography>
+                  </Stack>
+                  {h.venueName && (
+                    <Stack direction='row' spacing={0.4} alignItems='center' sx={{ minWidth: 0 }}>
+                      <StadiumIcon sx={{ fontSize: 10, color: 'text.disabled', flexShrink: 0 }} />
+                      <Typography
+                        sx={{
+                          fontSize: '0.63rem',
+                          color: 'text.disabled',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          maxWidth: { xs: 110, sm: 200 }
+                        }}
+                      >
+                        {h.venueName}
+                        {h.venueCity ? `, ${h.venueCity}` : ''}
+                      </Typography>
+                    </Stack>
+                  )}
+                </Stack>
+              </Stack>
             </Stack>
-
             <Box sx={{ flexShrink: 0, ml: 1 }}>
               <StatusBadge status={h.status} minuteLabel={h.minuteLabel} />
             </Box>
@@ -538,58 +529,44 @@ function MatchHero({
             </Stack>
           </Stack>
 
-          {/* Row 3: goal scorers only */}
+          {/* Row 3: goal scorers */}
           {getGoalEvents(h.events).length > 0 && (
-            <Box sx={{ pb: 2 }}>
+            <Box sx={{ pb: 1.5 }}>
               <ScorerList events={h.events} />
             </Box>
           )}
-
-          {/* Row 4: compact metadata */}
-          <Box sx={{ borderTop: '1px solid', borderColor: 'divider', pt: 1.25, pb: 0.5 }}>
-            <Stack direction='row' flexWrap='wrap' gap={1.5} alignItems='center'>
-              <Stack direction='row' spacing={0.5} alignItems='center'>
-                <CalendarTodayIcon sx={{ fontSize: 12, color: 'text.disabled', flexShrink: 0 }} />
-                <Typography variant='caption' color='text.secondary'>
-                  {fmtDate(h.kickoffAt)} · {fmtTime(h.kickoffAt)}
-                </Typography>
-              </Stack>
-              {h.venueName && (
-                <Stack direction='row' spacing={0.5} alignItems='center' sx={{ minWidth: 0 }}>
-                  <StadiumIcon sx={{ fontSize: 12, color: 'text.disabled', flexShrink: 0 }} />
-                  <Typography
-                    variant='caption'
-                    color='text.secondary'
-                    noWrap
-                    sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}
-                  >
-                    {h.venueName}
-                    {h.venueCity ? `, ${h.venueCity}` : ''}
-                  </Typography>
-                </Stack>
-              )}
-            </Stack>
-          </Box>
-
-          {/* Row 5: content toggles */}
-          <Box sx={{ borderTop: '1px solid', borderColor: 'divider', pt: 1.5 }}>
-            <Stack direction='row' alignItems='stretch' sx={{ width: '100%' }} divider={<MetaDivider />}>
-              <MetaBlockAction
-                icon={<AccessTimeIcon sx={{ fontSize: 16 }} />}
-                primary='Cronología'
-                isActive={timelineOpen}
-                onClick={onToggleTimeline}
-              />
-              <MetaBlockAction
-                icon={<PeopleAltIcon sx={{ fontSize: 16 }} />}
-                primary='Alineaciones'
-                isActive={lineupsOpen}
-                onClick={onToggleLineups}
-              />
-            </Stack>
-          </Box>
         </Stack>
       </CardContent>
+
+      {/* Tabs — full width, outside CardContent so no padding fighting */}
+      <Box sx={{ borderTop: '1px solid', borderColor: 'divider' }}>
+        <Stack direction='row'>
+          <HeroTab
+            label='Resumen'
+            icon={<SportsSoccerIcon sx={{ fontSize: 14 }} />}
+            isActive={activeTab === 'resumen'}
+            onClick={() => onTabChange('resumen')}
+          />
+          <HeroTab
+            label='Cronología'
+            icon={<AccessTimeIcon sx={{ fontSize: 14 }} />}
+            isActive={activeTab === 'cronologia'}
+            onClick={() => onTabChange('cronologia')}
+          />
+          <HeroTab
+            label='Alineaciones'
+            icon={<PeopleAltIcon sx={{ fontSize: 14 }} />}
+            isActive={activeTab === 'alineaciones'}
+            onClick={() => onTabChange('alineaciones')}
+          />
+          <HeroTab
+            label='Estadísticas'
+            icon={<BarChartIcon sx={{ fontSize: 14 }} />}
+            isActive={activeTab === 'estadisticas'}
+            onClick={() => onTabChange('estadisticas')}
+          />
+        </Stack>
+      </Box>
     </Card>
   );
 }
@@ -600,7 +577,6 @@ function MatchEventTimelineItem({ event }: { event: MatchDetailEvent }) {
   const { color, label } = useEventVisual(event.type);
   const isHome = event.side === 'home';
   const playerName = formatPlayerName(event.player);
-
   const suffix = event.type === 'penalty_goal' ? ' (P)' : event.type === 'own_goal' ? ' (OG)' : '';
 
   const content = (
@@ -621,12 +597,9 @@ function MatchEventTimelineItem({ event }: { event: MatchDetailEvent }) {
 
   return (
     <Stack direction='row' alignItems='center'>
-      {/* Left — home events */}
       <Box sx={{ flex: 1, display: 'flex', justifyContent: 'flex-end', pr: 1.5, py: 0.85 }}>
         {isHome ? content : null}
       </Box>
-
-      {/* Center — dot + minute */}
       <Box
         sx={{ width: 44, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}
       >
@@ -647,8 +620,6 @@ function MatchEventTimelineItem({ event }: { event: MatchDetailEvent }) {
           {event.minute}
         </Typography>
       </Box>
-
-      {/* Right — away events */}
       <Box sx={{ flex: 1, display: 'flex', justifyContent: 'flex-start', pl: 1.5, py: 0.85 }}>
         {!isHome ? content : null}
       </Box>
@@ -685,7 +656,6 @@ function MatchVerticalTimeline({ events, status }: { events: MatchDetailEvent[];
 
   return (
     <Box sx={{ position: 'relative' }}>
-      {/* Vertical center axis */}
       <Box
         sx={{
           position: 'absolute',
@@ -713,17 +683,10 @@ export function MatchDetailPage() {
   const { matchId } = useParams<{ matchId: string }>();
   const { data: matches = [], isLoading } = useMatches();
   const { data: detail = null } = useMatchDetail(matchId);
-  const [timelineOpen, setTimelineOpen] = React.useState(false);
-  const [lineupsOpen, setLineupsOpen] = React.useState(false);
+  const [activeTab, setActiveTab] = React.useState<DetailTab>('resumen');
 
-  function handleToggleTimeline() {
-    setTimelineOpen((o) => !o);
-    setLineupsOpen(false);
-  }
-
-  function handleToggleLineups() {
-    setLineupsOpen((o) => !o);
-    setTimelineOpen(false);
+  function handleTabChange(tab: DetailTab) {
+    setActiveTab((prev) => (prev === tab ? 'resumen' : tab));
   }
 
   if (isLoading) {
@@ -756,23 +719,16 @@ export function MatchDetailPage() {
   }
 
   const timelineStatus = detail?.status ?? match.status;
-  const timelineEvents = detail?.events ?? [];
-  const lineups = detail?.lineups ?? null;
   console.log('🚀 ~ MatchDetailPage.tsx ~ MatchDetailPage ~ detail:', detail);
-  console.log('🚀 ~ MatchDetailPage.tsx ~ MatchDetailPage ~ lineups:', lineups);
+  const timelineEvents = detail?.events ?? [];
+  const lineups = USE_MOCK_LINEUPS ? MOCK_LINEUPS : (detail?.lineups ?? null);
 
   return (
     <Stack spacing={2.5}>
-      <MatchHero
-        match={match}
-        detail={detail}
-        timelineOpen={timelineOpen}
-        onToggleTimeline={handleToggleTimeline}
-        lineupsOpen={lineupsOpen}
-        onToggleLineups={handleToggleLineups}
-      />
+      <MatchHero match={match} detail={detail} activeTab={activeTab} onTabChange={handleTabChange} />
 
-      <Collapse in={timelineOpen} timeout={280} unmountOnExit>
+      {/* Cronología */}
+      <Collapse in={activeTab === 'cronologia'} timeout={280} unmountOnExit>
         <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
           <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
             <Stack spacing={1.5}>
@@ -788,7 +744,8 @@ export function MatchDetailPage() {
         </Card>
       </Collapse>
 
-      <Collapse in={lineupsOpen} timeout={280} unmountOnExit>
+      {/* Alineaciones */}
+      <Collapse in={activeTab === 'alineaciones'} timeout={280} unmountOnExit>
         <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
           <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
             <Stack spacing={1.5}>
@@ -803,6 +760,12 @@ export function MatchDetailPage() {
                   lineups={lineups}
                   homeCode={detail?.homeTeam.code ?? match.homeTeamCode ?? ''}
                   awayCode={detail?.awayTeam.code ?? match.awayTeamCode ?? ''}
+                  homeName={detail?.homeTeam.name ?? match.homeTeam}
+                  awayName={detail?.awayTeam.name ?? match.awayTeam}
+                  homeColor={detail?.homeTeam.color}
+                  awayColor={detail?.awayTeam.color}
+                  homeAlternateColor={detail?.homeTeam.alternateColor}
+                  awayAlternateColor={detail?.awayTeam.alternateColor}
                 />
               ) : (
                 <Stack alignItems='center' spacing={1} sx={{ py: 3 }}>
@@ -812,6 +775,20 @@ export function MatchDetailPage() {
                   </Typography>
                 </Stack>
               )}
+            </Stack>
+          </CardContent>
+        </Card>
+      </Collapse>
+
+      {/* Estadísticas — placeholder */}
+      <Collapse in={activeTab === 'estadisticas'} timeout={280} unmountOnExit>
+        <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+          <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
+            <Stack alignItems='center' spacing={1} sx={{ py: 3 }}>
+              <BarChartIcon sx={{ fontSize: 32, color: 'text.disabled', opacity: 0.4 }} />
+              <Typography variant='body2' color='text.secondary' textAlign='center'>
+                Las estadísticas del partido estarán disponibles próximamente.
+              </Typography>
             </Stack>
           </CardContent>
         </Card>

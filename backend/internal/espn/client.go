@@ -142,7 +142,10 @@ type SummaryCompetitor struct {
 	HomeAway string `json:"homeAway"`
 	Score    string `json:"score"`
 	Team     struct {
-		ID string `json:"id"`
+		ID             string `json:"id"`
+		Color          string `json:"color"`
+		AlternateColor string `json:"alternateColor"`
+		Logo           string `json:"logo"`
 	} `json:"team"`
 }
 

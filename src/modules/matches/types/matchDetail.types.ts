@@ -11,6 +11,9 @@ export type MatchDetailEventType =
 export interface MatchDetailTeam {
   name: string;
   code: string;
+  color?: string | null;
+  alternateColor?: string | null;
+  logo?: string | null;
 }
 
 export interface MatchDetailScore {

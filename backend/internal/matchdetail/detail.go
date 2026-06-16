@@ -43,8 +43,11 @@ type Response struct {
 
 // TeamInfo identifies one side of the match.
 type TeamInfo struct {
-	Name string `json:"name"`
-	Code string `json:"code"`
+	Name           string  `json:"name"`
+	Code           string  `json:"code"`
+	Color          *string `json:"color,omitempty"`
+	AlternateColor *string `json:"alternateColor,omitempty"`
+	Logo           *string `json:"logo,omitempty"`
 }
 
 // Score holds the official result.
@@ -249,6 +252,40 @@ func enrichFromESPN(r *Response, s *espn.EventSummary) {
 		r.Score = &Score{Home: *home, Away: *away}
 	}
 
+	enrichTeamColors(r, comp.Competitors)
+}
+
+// enrichTeamColors fills in color/alternateColor/logo for each side when ESPN
+// provides them. Missing fields are left nil — never breaks the response.
+func enrichTeamColors(r *Response, competitors []espn.SummaryCompetitor) {
+	for _, c := range competitors {
+		team := &r.AwayTeam
+		if c.HomeAway == "home" {
+			team = &r.HomeTeam
+		}
+		if c.Team.Color != "" {
+			color := normalizeESPNColor(c.Team.Color)
+			team.Color = &color
+		}
+		if c.Team.AlternateColor != "" {
+			alt := normalizeESPNColor(c.Team.AlternateColor)
+			team.AlternateColor = &alt
+		}
+		if c.Team.Logo != "" {
+			logo := c.Team.Logo
+			team.Logo = &logo
+		}
+	}
+}
+
+// normalizeESPNColor ensures a usable CSS hex string — ESPN sometimes omits
+// the leading '#' (e.g. "6cabdd" instead of "#6cabdd").
+func normalizeESPNColor(c string) string {
+	c = strings.TrimSpace(c)
+	if c != "" && !strings.HasPrefix(c, "#") {
+		return "#" + c
+	}
+	return c
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
