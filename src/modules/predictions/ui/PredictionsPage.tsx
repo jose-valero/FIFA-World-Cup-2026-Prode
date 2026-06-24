@@ -44,6 +44,8 @@ type UserPrediction = {
   matchId: string;
   homeScore: number;
   awayScore: number;
+  knockoutTiebreak: string | null;
+  knockoutWinner: string | null;
 };
 
 export type PredictionWithMatch = {
@@ -58,6 +60,21 @@ function getPredictionOutcome(homeScore: number, awayScore: number) {
   if (homeScore > awayScore) return 'home';
   if (homeScore < awayScore) return 'away';
   return 'draw';
+}
+
+function getKnockoutBonus(prediction: UserPrediction, match: Match): number {
+  if (match.stage === 'group_stage') return 0;
+  if (prediction.homeScore !== prediction.awayScore) return 0;
+  if (!prediction.knockoutTiebreak || !prediction.knockoutWinner) return 0;
+  if (match.officialHomeScore === null || match.officialAwayScore === null) return 0;
+  if (match.officialHomeScore !== match.officialAwayScore) return 0;
+  if (match.penaltyHomeScore === null || match.penaltyAwayScore === null) return 0;
+
+  // official went to penalties — check method match
+  if (prediction.knockoutTiebreak !== 'penalties') return 0;
+
+  const officialWinner = match.penaltyHomeScore > match.penaltyAwayScore ? 'home' : 'away';
+  return 2 + (prediction.knockoutWinner === officialWinner ? 1 : 0);
 }
 
 function getPredictionPoints(prediction: UserPrediction, match: Match | null) {
@@ -80,21 +97,16 @@ function getPredictionPoints(prediction: UserPrediction, match: Match | null) {
   const isExactHit =
     prediction.homeScore === match.officialHomeScore && prediction.awayScore === match.officialAwayScore;
 
-  if (isExactHit) {
-    return {
-      points: 5,
-      isExactHit: true,
-      isOutcomeHit: true
-    };
-  }
-
   const predictionOutcome = getPredictionOutcome(prediction.homeScore, prediction.awayScore);
   const officialOutcome = getPredictionOutcome(match.officialHomeScore, match.officialAwayScore);
   const isOutcomeHit = predictionOutcome === officialOutcome;
 
+  const basePoints = isExactHit ? 5 : isOutcomeHit ? 3 : 0;
+  const bonus = getKnockoutBonus(prediction, match);
+
   return {
-    points: isOutcomeHit ? 3 : 0,
-    isExactHit: false,
+    points: basePoints + bonus,
+    isExactHit,
     isOutcomeHit
   };
 }
@@ -182,7 +194,9 @@ export function PredictionsPage() {
     return predictionRows.map((row) => ({
       matchId: row.match_id,
       homeScore: row.home_score,
-      awayScore: row.away_score
+      awayScore: row.away_score,
+      knockoutTiebreak: row.knockout_tiebreak ?? null,
+      knockoutWinner: row.knockout_winner ?? null
     }));
   }, [predictionRows]);
 

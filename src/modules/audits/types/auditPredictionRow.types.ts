@@ -3,4 +3,6 @@ export interface AuditPredictionRow {
   match_id: string;
   home_score: number;
   away_score: number;
+  knockout_tiebreak: string | null;
+  knockout_winner: string | null;
 }

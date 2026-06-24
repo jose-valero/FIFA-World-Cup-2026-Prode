@@ -46,9 +46,12 @@ type PredictionItem = {
   match: Match | null;
   homeScore: number;
   awayScore: number;
+  knockoutTiebreak: string | null;
+  knockoutWinner: string | null;
   points: number | null;
   isExactHit: boolean;
   isOutcomeHit: boolean;
+  knockoutBonus: number;
 };
 
 function getPredictionOutcome(homeScore: number, awayScore: number) {
@@ -57,33 +60,50 @@ function getPredictionOutcome(homeScore: number, awayScore: number) {
   return 'draw';
 }
 
-function getPredictionPoints(prediction: { homeScore: number; awayScore: number }, match: Match | null) {
+function getKnockoutBonus(
+  prediction: { homeScore: number; awayScore: number; knockoutTiebreak: string | null; knockoutWinner: string | null },
+  match: Match
+): number {
+  if (match.stage === 'group_stage') return 0;
+  if (prediction.homeScore !== prediction.awayScore) return 0;
+  if (!prediction.knockoutTiebreak || !prediction.knockoutWinner) return 0;
+  if (match.officialHomeScore === null || match.officialAwayScore === null) return 0;
+  if (match.officialHomeScore !== match.officialAwayScore) return 0;
+  if (match.penaltyHomeScore === null || match.penaltyAwayScore === null) return 0;
+  if (prediction.knockoutTiebreak !== 'penalties') return 0;
+
+  const officialWinner = match.penaltyHomeScore > match.penaltyAwayScore ? 'home' : 'away';
+  return 2 + (prediction.knockoutWinner === officialWinner ? 1 : 0);
+}
+
+function getPredictionPoints(
+  prediction: { homeScore: number; awayScore: number; knockoutTiebreak: string | null; knockoutWinner: string | null },
+  match: Match | null
+) {
   if (!match || match.officialHomeScore === null || match.officialAwayScore === null) {
     return {
       points: null,
       isExactHit: false,
-      isOutcomeHit: false
+      isOutcomeHit: false,
+      knockoutBonus: 0
     };
   }
 
   const isExactHit =
     prediction.homeScore === match.officialHomeScore && prediction.awayScore === match.officialAwayScore;
 
-  if (isExactHit) {
-    return {
-      points: 5,
-      isExactHit: true,
-      isOutcomeHit: true
-    };
-  }
-
   const predictionOutcome = getPredictionOutcome(prediction.homeScore, prediction.awayScore);
   const officialOutcome = getPredictionOutcome(match.officialHomeScore, match.officialAwayScore);
+  const isOutcomeHit = predictionOutcome === officialOutcome;
+
+  const basePoints = isExactHit ? 5 : isOutcomeHit ? 3 : 0;
+  const knockoutBonus = getKnockoutBonus(prediction, match);
 
   return {
-    points: predictionOutcome === officialOutcome ? 3 : 0,
-    isExactHit: false,
-    isOutcomeHit: predictionOutcome === officialOutcome
+    points: basePoints + knockoutBonus,
+    isExactHit,
+    isOutcomeHit,
+    knockoutBonus
   };
 }
 
@@ -144,21 +164,24 @@ export function ParticipantAuditDrawer({ open, onClose, participant, auditsVisib
   const predictionItems = React.useMemo(() => {
     const items = predictionRows.map((row) => {
       const match = matchMap.get(row.match_id) ?? null;
-      const scoring = getPredictionPoints(
-        {
-          homeScore: row.home_score,
-          awayScore: row.away_score
-        },
-        match
-      );
+      const predInput = {
+        homeScore: row.home_score,
+        awayScore: row.away_score,
+        knockoutTiebreak: row.knockout_tiebreak ?? null,
+        knockoutWinner: row.knockout_winner ?? null
+      };
+      const scoring = getPredictionPoints(predInput, match);
 
       return {
         match,
         homeScore: row.home_score,
         awayScore: row.away_score,
+        knockoutTiebreak: row.knockout_tiebreak ?? null,
+        knockoutWinner: row.knockout_winner ?? null,
         points: scoring.points,
         isExactHit: scoring.isExactHit,
-        isOutcomeHit: scoring.isOutcomeHit
+        isOutcomeHit: scoring.isOutcomeHit,
+        knockoutBonus: scoring.knockoutBonus
       };
     });
 
@@ -373,6 +396,12 @@ export function ParticipantAuditDrawer({ open, onClose, participant, auditsVisib
                                 <Typography fontWeight={800}>
                                   {item.homeScore} - {item.awayScore}
                                 </Typography>
+                                {item.knockoutTiebreak ? (
+                                  <Typography variant='caption' color='text.secondary'>
+                                    {item.knockoutTiebreak === 'penalties' ? 'Penales' : 'Prórroga'} ·{' '}
+                                    {item.knockoutWinner === 'home' ? match.homeTeam : match.awayTeam}
+                                  </Typography>
+                                ) : null}
                               </Box>
 
                               <Box sx={{ flex: 1 }}>
@@ -384,8 +413,23 @@ export function ParticipantAuditDrawer({ open, onClose, participant, auditsVisib
                                     ? `${match.officialHomeScore} - ${match.officialAwayScore}`
                                     : 'Pendiente'}
                                 </Typography>
+                                {match.penaltyHomeScore !== null && match.penaltyAwayScore !== null ? (
+                                  <Typography variant='caption' color='text.secondary'>
+                                    PEN {match.penaltyHomeScore} - {match.penaltyAwayScore}
+                                  </Typography>
+                                ) : null}
                               </Box>
                             </Stack>
+
+                            {item.knockoutBonus > 0 ? (
+                              <Chip
+                                label={`+${item.knockoutBonus} pts bonus eliminatoria`}
+                                size='small'
+                                color='secondary'
+                                variant='outlined'
+                                sx={{ alignSelf: 'flex-start' }}
+                              />
+                            ) : null}
                           </Stack>
                         </CardContent>
                       </Card>

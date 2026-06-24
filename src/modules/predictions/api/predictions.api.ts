@@ -4,7 +4,7 @@ import type { PredictionRow, UpsertPredictionInput } from '../types/predictions.
 export async function getPredictionsByUser(userId: string): Promise<PredictionRow[]> {
   const { data, error } = await supabase
     .from('predictions')
-    .select('id, user_id, match_id, home_score, away_score, created_at, updated_at')
+    .select('id, user_id, match_id, home_score, away_score, knockout_tiebreak, knockout_winner, created_at, updated_at')
     .eq('user_id', userId)
     .order('updated_at', { ascending: false });
 
@@ -19,7 +19,9 @@ export async function upsertPrediction({
   userId,
   matchId,
   homeScore,
-  awayScore
+  awayScore,
+  knockoutTiebreak,
+  knockoutWinner
 }: UpsertPredictionInput): Promise<PredictionRow> {
   const { data, error } = await supabase
     .from('predictions')
@@ -28,13 +30,15 @@ export async function upsertPrediction({
         user_id: userId,
         match_id: matchId,
         home_score: homeScore,
-        away_score: awayScore
+        away_score: awayScore,
+        knockout_tiebreak: knockoutTiebreak,
+        knockout_winner: knockoutWinner
       },
       {
         onConflict: 'user_id,match_id'
       }
     )
-    .select('id, user_id, match_id, home_score, away_score, created_at, updated_at')
+    .select('id, user_id, match_id, home_score, away_score, knockout_tiebreak, knockout_winner, created_at, updated_at')
     .single();
 
   if (error) {

@@ -1,7 +1,8 @@
 import * as React from 'react';
 import { Alert, CircularProgress, Snackbar, Stack } from '@mui/material';
 import { MatchCard } from '../../matches/components/MatchCard';
-import { PredictionDialog } from '../components/PredictionDialog';
+import { PredictionDialog, type PredictionSavePayload } from '../components/PredictionDialog';
+import type { KnockoutTiebreak, KnockoutWinner } from '../types/predictions.types';
 import { ConfirmDeleteDialog } from '../../../shared/components/ConfirmDeleteDialog';
 import { deletePrediction, upsertPrediction } from '../api/predictions.api';
 import { useAuth } from '../../auth/hooks/useAuth';
@@ -32,11 +33,14 @@ type MatchPredictionMap = Record<
   {
     homeScore: number;
     awayScore: number;
+    knockoutTiebreak: string | null;
+    knockoutWinner: string | null;
   }
 >;
 
 export function MatchesPage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const isAdmin = profile?.is_admin === true;
   const queryClient = useQueryClient();
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -88,7 +92,9 @@ export function MatchesPage() {
     return predictionRows.reduce<MatchPredictionMap>((acc, row) => {
       acc[row.match_id] = {
         homeScore: row.home_score,
-        awayScore: row.away_score
+        awayScore: row.away_score,
+        knockoutTiebreak: row.knockout_tiebreak ?? null,
+        knockoutWinner: row.knockout_winner ?? null
       };
       return acc;
     }, {});
@@ -107,8 +113,12 @@ export function MatchesPage() {
   const groupOptions = React.useMemo(() => getUniqueGroupOptions(matches), [matches]);
 
   const filteredMatches = React.useMemo(() => {
-    return sortMatchesByStatusPriority(filterMatches(matches, filters).filter(isKnockoutMatchDefined));
-  }, [matches, filters]);
+    const pool = groupStageLocked ? matches.filter((m) => m.stage !== 'group_stage') : matches;
+    // Admin puede ver partidos knockout aunque el cruce todavía no esté definido (placeholders),
+    // para poder inspeccionar el formulario en producción. El guardado sigue bloqueado.
+    const defined = isAdmin ? pool : pool.filter(isKnockoutMatchDefined);
+    return sortMatchesByStatusPriority(filterMatches(defined, filters));
+  }, [matches, filters, groupStageLocked, isAdmin]);
 
   React.useEffect(() => {
     if (!requestedMatchId) {
@@ -142,10 +152,15 @@ export function MatchesPage() {
     handledRequestedMatchIdRef.current = requestedMatchId;
   }, [requestedMatchId, isLoading, matches, predictionsClosed]);
 
+  const isUndefinedKnockout = (match: Match) =>
+    match.stage !== 'group_stage' && Boolean(!match.homeTeamId || !match.awayTeamId);
+
   const handleOpenPrediction = (match: Match) => {
     const lockMessage = getMatchLockMessage(match, predictionsClosed, groupStageLocked);
 
-    if (lockMessage) {
+    // Admin puede abrir el dialog de un cruce sin equipos para inspeccionar la UI.
+    // El save seguirá bloqueado en handleSavePrediction.
+    if (lockMessage && !(isAdmin && isUndefinedKnockout(match))) {
       setErrorMessage(lockMessage);
       return;
     }
@@ -159,7 +174,7 @@ export function MatchesPage() {
     clearRequestedMatchParam();
   };
 
-  const handleSavePrediction = async (payload: { matchId: string; homeScore: number; awayScore: number }) => {
+  const handleSavePrediction = async (payload: PredictionSavePayload) => {
     if (!user?.id) return;
 
     const match = matches.find((item) => item.id === payload.matchId);
@@ -183,7 +198,9 @@ export function MatchesPage() {
         userId: user.id,
         matchId: payload.matchId,
         homeScore: payload.homeScore,
-        awayScore: payload.awayScore
+        awayScore: payload.awayScore,
+        knockoutTiebreak: payload.knockoutTiebreak,
+        knockoutWinner: payload.knockoutWinner
       });
 
       queryClient.setQueryData(
@@ -196,6 +213,8 @@ export function MatchesPage() {
                 match_id: string;
                 home_score: number;
                 away_score: number;
+                knockout_tiebreak?: string | null;
+                knockout_winner?: string | null;
               }>
             | undefined
         ) => {
@@ -206,7 +225,9 @@ export function MatchesPage() {
             next[existingIndex] = {
               ...next[existingIndex],
               home_score: payload.homeScore,
-              away_score: payload.awayScore
+              away_score: payload.awayScore,
+              knockout_tiebreak: payload.knockoutTiebreak,
+              knockout_winner: payload.knockoutWinner
             };
             return next;
           }
@@ -217,7 +238,9 @@ export function MatchesPage() {
               user_id: user.id,
               match_id: payload.matchId,
               home_score: payload.homeScore,
-              away_score: payload.awayScore
+              away_score: payload.awayScore,
+              knockout_tiebreak: payload.knockoutTiebreak,
+              knockout_winner: payload.knockoutWinner
             }
           ];
         }
@@ -368,6 +391,9 @@ export function MatchesPage() {
         match={selectedMatch}
         initialHomeScore={selectedPrediction?.homeScore ?? null}
         initialAwayScore={selectedPrediction?.awayScore ?? null}
+        initialKnockoutTiebreak={(selectedPrediction?.knockoutTiebreak as KnockoutTiebreak | null) ?? null}
+        initialKnockoutWinner={(selectedPrediction?.knockoutWinner as KnockoutWinner | null) ?? null}
+        isPreviewOnly={selectedMatch ? isUndefinedKnockout(selectedMatch) : false}
         onClose={handleClosePrediction}
         onSave={(payload) => {
           void handleSavePrediction(payload);
