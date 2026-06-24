@@ -134,6 +134,18 @@ func syncESPNMatchesHandler(espnClient *espn.Client, supabaseURL, supabaseKey st
 			result.TotalUnchanged, result.TotalOmitted, result.DurationMs,
 		)
 
+		// Si algún partido pasó a finished, sincronizar el bracket automáticamente.
+		// Se dispara una sola vez por sync run sin importar cuántos partidos terminaron.
+		if result.TotalUpdated > 0 && result.HasFinishedTransition {
+			if err := callSyncKnockout(r.Context(), supabaseURL, supabaseKey); err != nil {
+				log.Printf("sync knockout warning source=%s err=%v", source, err)
+				result.KnockoutSyncWarning = err.Error()
+			} else {
+				log.Printf("sync knockout ok source=%s", source)
+				result.KnockoutSynced = true
+			}
+		}
+
 		insertSyncLogSuccess(context.Background(), supabaseURL, supabaseKey, result)
 
 		w.Header().Set("Content-Type", "application/json")
@@ -234,6 +246,31 @@ func insertSyncLog(ctx context.Context, supabaseURL, key string, p syncLogPayloa
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("sync_logs returned HTTP %d: %s", resp.StatusCode, b)
+	}
+	return nil
+}
+
+// callSyncKnockout invokes the sync_qualified_teams_into_knockout RPC in Supabase.
+func callSyncKnockout(ctx context.Context, supabaseURL, key string) error {
+	url := supabaseURL + "/rest/v1/rpc/sync_qualified_teams_into_knockout"
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader([]byte("{}")))
+	if err != nil {
+		return fmt.Errorf("building request: %w", err)
+	}
+	req.Header.Set("apikey", key)
+	req.Header.Set("Authorization", "Bearer "+key)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("POST rpc/sync_qualified_teams_into_knockout: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, b)
 	}
 	return nil
 }

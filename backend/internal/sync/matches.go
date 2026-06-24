@@ -22,14 +22,17 @@ type Options struct {
 
 // Result summarizes the outcome of a sync run.
 type Result struct {
-	Source         string    `json:"source"`
-	TotalReviewed  int       `json:"total_reviewed"`
-	TotalUpdated   int       `json:"total_updated"`
-	TotalUnchanged int       `json:"total_unchanged"`
-	TotalOmitted   int       `json:"total_omitted"`
-	DurationMs     int64     `json:"duration_ms"`
-	Changes        []Change  `json:"changes"`
-	Omissions      []Omission `json:"omissions,omitempty"`
+	Source                string     `json:"source"`
+	TotalReviewed         int        `json:"total_reviewed"`
+	TotalUpdated          int        `json:"total_updated"`
+	TotalUnchanged        int        `json:"total_unchanged"`
+	TotalOmitted          int        `json:"total_omitted"`
+	DurationMs            int64      `json:"duration_ms"`
+	Changes               []Change   `json:"changes"`
+	Omissions             []Omission `json:"omissions,omitempty"`
+	HasFinishedTransition bool       `json:"has_finished_transition"`
+	KnockoutSynced        bool       `json:"knockout_synced,omitempty"`
+	KnockoutSyncWarning   string     `json:"knockout_sync_warning,omitempty"`
 }
 
 // Change describes a single match that was updated (or would be in dry-run).
@@ -165,6 +168,9 @@ func ESPNMatches(ctx context.Context, espnClient *espn.Client, supabaseURL, supa
 			Before:      before,
 			After:       after,
 		})
+		if newStatus == "finished" {
+			result.HasFinishedTransition = true
+		}
 	}
 
 	result.Source = opts.Source
