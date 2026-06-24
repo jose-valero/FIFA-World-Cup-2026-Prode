@@ -33,3 +33,19 @@ export async function getAuditPredictionsByMatch(matchId: string): Promise<Match
 
   return data ?? [];
 }
+
+export type MatchPredictionRowWithMatchId = MatchPredictionRow & { match_id: string };
+
+export async function getAuditPredictionsByMatches(matchIds: string[]): Promise<MatchPredictionRowWithMatchId[]> {
+  if (matchIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from('predictions')
+    .select('user_id, match_id, home_score, away_score')
+    .in('match_id', matchIds);
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as MatchPredictionRowWithMatchId[];
+}

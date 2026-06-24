@@ -9,7 +9,7 @@ export function useMatches() {
     refetchOnWindowFocus: true,
     refetchInterval: (query) => {
       const hasLive = query.state.data?.some((m) => m.status === 'live') ?? false;
-      return hasLive ? 20_000 : 60_000;
+      return hasLive ? 10_000 : 60_000;
     },
     refetchIntervalInBackground: false
   });

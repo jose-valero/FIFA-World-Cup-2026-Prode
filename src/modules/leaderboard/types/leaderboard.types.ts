@@ -31,9 +31,11 @@ export interface LeaderboardTableProps {
   isAdminOverviewLoading: boolean;
   isSetParticipantDisabledPending: boolean;
   bottomThreeIds: Set<string>;
-  relevantMatch: Match | null;
-  predictionsByUserId: Map<string, InlinePrediction>;
-  liveMatchCount: number;
+  // displayMatches: all live matches (or [nextScheduled] when none are live).
+  // One InlinePredictionLine block is rendered per entry.
+  displayMatches: Match[];
+  // predictionsByMatchId: matchId → userId → prediction for each displayMatch.
+  predictionsByMatchId: Map<string, Map<string, InlinePrediction>>;
   reactionsByReceiver: Map<string, ReactionSummary>;
   onMaranita: (receiverId: string) => void;
   isMaranitaPending: boolean;

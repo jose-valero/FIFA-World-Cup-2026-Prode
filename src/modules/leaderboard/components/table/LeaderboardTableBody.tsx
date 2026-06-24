@@ -40,7 +40,6 @@ function liveBadgeType(pred: InlinePrediction, officialHome: number, officialAwa
 function InlinePredictionLine({
   match,
   pred,
-  liveMatchCount,
   reaction,
   isCurrentUser,
   onMaranita,
@@ -48,7 +47,6 @@ function InlinePredictionLine({
 }: {
   match: Match;
   pred: InlinePrediction | undefined;
-  liveMatchCount: number;
   reaction: ReactionSummary | undefined;
   isCurrentUser: boolean;
   onMaranita: () => void;
@@ -57,7 +55,6 @@ function InlinePredictionLine({
   const home = teamCode(match.homeTeamCode, match.homeTeam);
   const away = teamCode(match.awayTeamCode, match.awayTeam);
   const isLive = match.status === 'live';
-  const siblings = liveMatchCount - 1;
 
   const badge =
     isLive && pred && match.officialHomeScore !== null && match.officialAwayScore !== null
@@ -75,19 +72,11 @@ function InlinePredictionLine({
   return (
     <Stack spacing={0.3}>
       <Stack direction='row' spacing={0.4} alignItems='center'>
-        {/* {isLive ? (
-          <FiberManualRecordIcon sx={{ fontSize: 7, color: 'error.main', flexShrink: 0 }} />
-        ) : null} */}
         <TeamFlag teamCode={match.homeTeamCode} teamName={match.homeTeam} size={12} />
         <Typography variant='caption' sx={{ fontSize: '0.7rem', color: 'text.secondary' }} noWrap>
           {home} {pred.homeScore}–{pred.awayScore} {away}
         </Typography>
         <TeamFlag teamCode={match.awayTeamCode} teamName={match.awayTeam} size={12} />
-        {siblings > 0 ? (
-          <Typography variant='caption' sx={{ fontSize: '0.65rem', color: 'text.disabled' }}>
-            +{siblings}
-          </Typography>
-        ) : null}
         {isLive ? (
           <MaranitaButton
             total={reaction?.total ?? 0}
@@ -129,9 +118,8 @@ export const LeaderboardTableBody = ({
   canInspectPredictions,
   isSetParticipantDisabledPending,
   bottomThreeIds,
-  relevantMatch,
-  predictionsByUserId,
-  liveMatchCount,
+  displayMatches,
+  predictionsByMatchId,
   reactionsByReceiver,
   onMaranita,
   isMaranitaPending,
@@ -144,6 +132,8 @@ export const LeaderboardTableBody = ({
 
   const colSpan = 6 + (canInspectPredictions && !isMobile ? 1 : 0) + (isAdmin ? 1 : 0);
 
+  const showInlinePreds = canInspectPredictions && displayMatches.length > 0;
+
   return (
     <TableBody>
       {displayRows.map((row, index) => {
@@ -155,11 +145,6 @@ export const LeaderboardTableBody = ({
         const position = isDisabledRow ? null : (activePositionMap.get(row.user_id) ?? null);
         const isCurrentUser = Boolean(user?.id && row.user_id === user.id);
         const isBottomThree = !isDisabledRow && bottomThreeIds.has(row.user_id);
-
-        const inlinePred =
-          canInspectPredictions && relevantMatch && !isDisabledRow ? predictionsByUserId.get(row.user_id) : undefined;
-
-        const showInlinePred = canInspectPredictions && Boolean(relevantMatch) && !isDisabledRow;
 
         return (
           <React.Fragment key={row.user_id}>
@@ -244,16 +229,20 @@ export const LeaderboardTableBody = ({
                       ) : null}
                     </Stack>
 
-                    {showInlinePred && relevantMatch ? (
-                      <InlinePredictionLine
-                        match={relevantMatch}
-                        pred={inlinePred}
-                        liveMatchCount={liveMatchCount}
-                        reaction={reactionsByReceiver.get(row.user_id)}
-                        isCurrentUser={isCurrentUser}
-                        onMaranita={() => onMaranita(row.user_id)}
-                        isMaranitaPending={isMaranitaPending}
-                      />
+                    {showInlinePreds && !isDisabledRow ? (
+                      <Stack spacing={0.5} sx={{ mt: 0.25 }}>
+                        {displayMatches.map((match) => (
+                          <InlinePredictionLine
+                            key={match.id}
+                            match={match}
+                            pred={predictionsByMatchId.get(match.id)?.get(row.user_id)}
+                            reaction={reactionsByReceiver.get(row.user_id)}
+                            isCurrentUser={isCurrentUser}
+                            onMaranita={() => onMaranita(row.user_id)}
+                            isMaranitaPending={isMaranitaPending}
+                          />
+                        ))}
+                      </Stack>
                     ) : null}
                   </Box>
                 </Stack>

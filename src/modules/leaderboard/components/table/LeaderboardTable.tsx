@@ -14,9 +14,8 @@ export const LeaderboardTable = ({
   isAdminOverviewLoading,
   isSetParticipantDisabledPending,
   bottomThreeIds,
-  relevantMatch,
-  predictionsByUserId,
-  liveMatchCount,
+  displayMatches,
+  predictionsByMatchId,
   reactionsByReceiver,
   onMaranita,
   isMaranitaPending,
@@ -39,9 +38,8 @@ export const LeaderboardTable = ({
           isAdminOverviewLoading={isAdminOverviewLoading}
           isSetParticipantDisabledPending={isSetParticipantDisabledPending}
           bottomThreeIds={bottomThreeIds}
-          relevantMatch={relevantMatch}
-          predictionsByUserId={predictionsByUserId}
-          liveMatchCount={liveMatchCount}
+          displayMatches={displayMatches}
+          predictionsByMatchId={predictionsByMatchId}
           reactionsByReceiver={reactionsByReceiver}
           onMaranita={onMaranita}
           isMaranitaPending={isMaranitaPending}

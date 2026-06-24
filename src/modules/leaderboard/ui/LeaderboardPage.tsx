@@ -9,10 +9,10 @@ import { useSetParticipantDisabled } from '../../admin/participants/hooks/useSet
 import { ParticipantAuditDrawer } from '../../audits/components/ParticipantAuditDrawer';
 import { ParticipantProfileDrawer } from '../components/ParticipantProfileDrawer';
 import { useMatches } from '../../matches/hooks/useMatches';
-import { useAuditPredictionsByMatch } from '../../audits/hooks/useAuditPredictionsByMatch';
+import { useAuditPredictionsByMatches } from '../../audits/hooks/useAuditPredictionsByMatches';
 import { useReactionsByMatch } from '../hooks/useReactionsByMatch';
 import { useIncrementMaranita } from '../hooks/useIncrementMaranita';
-import type { InlinePrediction } from '../types/leaderboard.types';
+import type { Match } from '../../matches/types/types';
 // import { PageHeader, type PageHeaderBadge } from '../../../shared/components/PageHeader';
 import { getTopThreeAvatars } from '../api/leaderboard.api';
 import { queryKeys } from '../../../lib/react-query/queryKeys';
@@ -92,34 +92,37 @@ export function LeaderboardPage() {
 
   const { data: matches = [] } = useMatches();
 
-  const relevantMatch = React.useMemo(() => {
-    const live = matches.filter((m) => m.status === 'live');
-    if (live.length > 0) return live.sort((a, b) => a.kickoffAt.localeCompare(b.kickoffAt))[0];
-    const now = Date.now();
-    return (
-      matches
-        .filter((m) => m.status === 'scheduled')
-        .sort((a, b) => a.kickoffAt.localeCompare(b.kickoffAt))
-        .find((m) => new Date(m.kickoffAt).getTime() >= now - 3 * 60 * 60 * 1000) ?? null
-    );
-  }, [matches]);
-
-  const liveMatchCount = React.useMemo(
-    () => matches.filter((m) => m.status === 'live').length,
+  // All live matches sorted by kickoff.
+  const liveMatches = React.useMemo(
+    () => matches.filter((m) => m.status === 'live').sort((a, b) => a.kickoffAt.localeCompare(b.kickoffAt)),
     [matches]
   );
 
-  const { data: matchPredictionRows = [] } = useAuditPredictionsByMatch(
-    relevantMatch?.id ?? null,
-    canInspectPredictions && Boolean(relevantMatch)
-  );
+  // displayMatches: all matches belonging to the active time slot.
+  // Slot = group of matches whose kickoff is within ±30 min of the anchor.
+  // Priority: live slot first, then next scheduled slot.
+  const displayMatches = React.useMemo(() => {
+    const slotOf = (anchor: Match, pool: Match[]) =>
+      pool.filter(
+        (m) => Math.abs(new Date(m.kickoffAt).getTime() - new Date(anchor.kickoffAt).getTime()) <= 30 * 60 * 1000
+      );
 
-  const predictionsByUserId = React.useMemo((): Map<string, InlinePrediction> => {
-    return new Map(
-      matchPredictionRows.map((r) => [r.user_id, { homeScore: r.home_score, awayScore: r.away_score }])
-    );
-  }, [matchPredictionRows]);
+    if (liveMatches.length > 0) return slotOf(liveMatches[0], liveMatches);
 
+    const now = Date.now();
+    const upcoming = matches
+      .filter((m) => m.status === 'scheduled' && new Date(m.kickoffAt).getTime() >= now - 3 * 60 * 60 * 1000)
+      .sort((a, b) => a.kickoffAt.localeCompare(b.kickoffAt));
+    if (upcoming.length === 0) return [];
+    return slotOf(upcoming[0], upcoming);
+  }, [liveMatches, matches]);
+
+  // One query for all displayMatch IDs (live or scheduled).
+  const displayMatchIds = React.useMemo(() => displayMatches.map((m) => m.id), [displayMatches]);
+  const predictionsByMatchId = useAuditPredictionsByMatches(displayMatchIds, canInspectPredictions);
+
+  // Reactions/maranita tied to first match of the active slot.
+  const relevantMatch = displayMatches[0] ?? null;
   const isRelevantMatchLive = relevantMatch?.status === 'live';
 
   const { data: reactionRows = [] } = useReactionsByMatch(
@@ -289,9 +292,8 @@ export function LeaderboardPage() {
                 isAdminOverviewLoading={isAdminOverviewLoading}
                 isSetParticipantDisabledPending={isSetParticipantDisabledPending}
                 bottomThreeIds={bottomThreeIds}
-                relevantMatch={relevantMatch}
-                predictionsByUserId={predictionsByUserId}
-                liveMatchCount={liveMatchCount}
+                displayMatches={displayMatches}
+                predictionsByMatchId={predictionsByMatchId}
                 reactionsByReceiver={reactionsByReceiver}
                 onMaranita={handleMaranita}
                 isMaranitaPending={isMaranitaPending}
