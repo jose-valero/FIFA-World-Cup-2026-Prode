@@ -74,6 +74,8 @@ function createTemplateMatch(params: {
     displayOrder: Number(id),
     officialHomeScore: null,
     officialAwayScore: null,
+    penaltyHomeScore: null,
+    penaltyAwayScore: null,
 
     homeSourceType: home.type,
     homeSourceGroupCode: 'groupCode' in home ? home.groupCode : null,
