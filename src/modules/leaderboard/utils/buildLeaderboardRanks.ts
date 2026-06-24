@@ -14,8 +14,7 @@ export function buildLeaderboardRanks(rows: LeaderboardRow[]): Map<string, numbe
     if (i > 0) {
       const prev = rows[i - 1];
       const curr = rows[i];
-      const tied =
-        prev.total_points === curr.total_points && prev.exact_hits === curr.exact_hits;
+      const tied = prev.total_points === curr.total_points;
       if (!tied) rank = i + 1;
     }
     rankMap.set(rows[i].user_id, rank);
