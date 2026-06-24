@@ -20,6 +20,8 @@ interface MatchRow {
   display_order: number | null;
   official_home_score: number | null;
   official_away_score: number | null;
+  penalty_home_score: number | null;
+  penalty_away_score: number | null;
 
   home_source_type: MatchSourceType | null;
   home_source_group_code: string | null;
@@ -61,6 +63,8 @@ function mapMatchRow(row: MatchRow): Match {
     displayOrder: row.display_order,
     officialHomeScore: row.official_home_score,
     officialAwayScore: row.official_away_score,
+    penaltyHomeScore: row.penalty_home_score,
+    penaltyAwayScore: row.penalty_away_score,
 
     homeSourceType: row.home_source_type,
     homeSourceGroupCode: row.home_source_group_code,
@@ -98,6 +102,8 @@ export async function getMatches(): Promise<Match[]> {
       display_order,
       official_home_score,
       official_away_score,
+      penalty_home_score,
+      penalty_away_score,
       home_source_type,
       home_source_group_code,
       home_source_group_rank,

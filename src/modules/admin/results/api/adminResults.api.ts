@@ -20,7 +20,9 @@ export async function getAdminMatches(): Promise<AdminMatchRow[]> {
       city,
       status,
       official_home_score,
-      official_away_score
+      official_away_score,
+      penalty_home_score,
+      penalty_away_score
       `
     )
     .order('stage', { ascending: true })
@@ -40,14 +42,18 @@ export async function updateOfficialResult({
   matchId,
   status,
   officialHomeScore,
-  officialAwayScore
+  officialAwayScore,
+  penaltyHomeScore,
+  penaltyAwayScore
 }: UpdateOfficialResultInput): Promise<void> {
   const { error } = await supabase
     .from('matches')
     .update({
       status,
       official_home_score: officialHomeScore,
-      official_away_score: officialAwayScore
+      official_away_score: officialAwayScore,
+      penalty_home_score: penaltyHomeScore,
+      penalty_away_score: penaltyAwayScore
     })
     .eq('id', matchId);
 

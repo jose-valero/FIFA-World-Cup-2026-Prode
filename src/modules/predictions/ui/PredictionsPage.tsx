@@ -176,6 +176,8 @@ export function PredictionsPage() {
     settings?.predictions_close_at ?? null
   );
 
+  const groupStageLocked = settings?.group_stage_locked ?? false;
+
   const predictions = React.useMemo(() => {
     return predictionRows.map((row) => ({
       matchId: row.match_id,
@@ -254,7 +256,7 @@ export function PredictionsPage() {
   const handleRequestDelete = (matchId: string, match: Match) => {
     if (!user?.id) return;
 
-    if (isMatchLocked(match, predictionsClosed)) {
+    if (isMatchLocked(match, predictionsClosed, groupStageLocked)) {
       setErrorMessage(
         match.status !== 'scheduled' ? 'Este partido ya no admite cambios.' : 'La carga de pronósticos está cerrada.'
       );
@@ -425,7 +427,7 @@ export function PredictionsPage() {
                                 <Chip label='Acierto de signo' color='primary' variant='outlined' />
                               ) : null}
                             </Stack>
-                            {match && !isMatchLocked(match, predictionsClosed) ? (
+                            {match && !isMatchLocked(match, predictionsClosed, groupStageLocked) ? (
                               <Stack direction='row' justifyContent='flex-end'>
                                 <Button
                                   size='small'

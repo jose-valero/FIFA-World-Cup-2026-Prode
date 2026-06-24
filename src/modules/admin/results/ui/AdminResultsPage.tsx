@@ -29,6 +29,8 @@ type DraftMap = Record<
     status: MatchStatus;
     officialHomeScore: string;
     officialAwayScore: string;
+    penaltyHomeScore: string;
+    penaltyAwayScore: string;
   }
 >;
 
@@ -48,7 +50,9 @@ function mergeDraftsWithMatches(prev: DraftMap, matches: AdminMatchRow[]): Draft
     next[match.id] = {
       status: match.status,
       officialHomeScore: match.official_home_score !== null ? String(match.official_home_score) : '',
-      officialAwayScore: match.official_away_score !== null ? String(match.official_away_score) : ''
+      officialAwayScore: match.official_away_score !== null ? String(match.official_away_score) : '',
+      penaltyHomeScore: match.penalty_home_score !== null ? String(match.penalty_home_score) : '',
+      penaltyAwayScore: match.penalty_away_score !== null ? String(match.penalty_away_score) : ''
     };
   }
 
@@ -59,8 +63,10 @@ function validateOfficialResultDraft(input: {
   status: MatchStatus;
   officialHomeScore: number | null;
   officialAwayScore: number | null;
+  penaltyHomeScore: number | null;
+  penaltyAwayScore: number | null;
 }): string | null {
-  const { status, officialHomeScore, officialAwayScore } = input;
+  const { status, officialHomeScore, officialAwayScore, penaltyHomeScore, penaltyAwayScore } = input;
 
   const hasHome = officialHomeScore !== null;
   const hasAway = officialAwayScore !== null;
@@ -82,6 +88,24 @@ function validateOfficialResultDraft(input: {
 
   if (status === 'finished' && (!hasHome || !hasAway)) {
     return 'Un partido finalizado debe tener ambos marcadores cargados.';
+  }
+
+  const hasPenHome = penaltyHomeScore !== null;
+  const hasPenAway = penaltyAwayScore !== null;
+
+  if (hasPenHome !== hasPenAway) {
+    return 'Debes completar ambos marcadores de penales o dejar ambos vacíos.';
+  }
+
+  if (
+    (penaltyHomeScore !== null && (!Number.isInteger(penaltyHomeScore) || penaltyHomeScore < 0)) ||
+    (penaltyAwayScore !== null && (!Number.isInteger(penaltyAwayScore) || penaltyAwayScore < 0))
+  ) {
+    return 'Los marcadores de penales deben ser números enteros válidos mayores o iguales a 0.';
+  }
+
+  if (hasPenHome && penaltyHomeScore === penaltyAwayScore) {
+    return 'Los marcadores de penales deben ser distintos (siempre hay un ganador).';
   }
 
   return null;
@@ -120,11 +144,15 @@ function hasDraftChanged(match: AdminMatchRow, draft: DraftMap[string] | undefin
 
   const originalHome = match.official_home_score !== null ? String(match.official_home_score) : '';
   const originalAway = match.official_away_score !== null ? String(match.official_away_score) : '';
+  const originalPenHome = match.penalty_home_score !== null ? String(match.penalty_home_score) : '';
+  const originalPenAway = match.penalty_away_score !== null ? String(match.penalty_away_score) : '';
 
   return (
     draft.status !== match.status ||
     draft.officialHomeScore !== originalHome ||
-    draft.officialAwayScore !== originalAway
+    draft.officialAwayScore !== originalAway ||
+    draft.penaltyHomeScore !== originalPenHome ||
+    draft.penaltyAwayScore !== originalPenAway
   );
 }
 
@@ -209,7 +237,7 @@ export function AdminResultsPage() {
 
   const handleDraftChange = (
     matchId: string,
-    field: 'status' | 'officialHomeScore' | 'officialAwayScore',
+    field: 'status' | 'officialHomeScore' | 'officialAwayScore' | 'penaltyHomeScore' | 'penaltyAwayScore',
     value: string
   ) => {
     setDrafts((prev) => {
@@ -225,6 +253,8 @@ export function AdminResultsPage() {
       if (field === 'status' && value === 'scheduled') {
         nextDraft.officialHomeScore = '';
         nextDraft.officialAwayScore = '';
+        nextDraft.penaltyHomeScore = '';
+        nextDraft.penaltyAwayScore = '';
       }
 
       return {
@@ -243,8 +273,15 @@ export function AdminResultsPage() {
 
     const parsedHome = draft.officialHomeScore.trim() === '' ? null : Number(draft.officialHomeScore);
     const parsedAway = draft.officialAwayScore.trim() === '' ? null : Number(draft.officialAwayScore);
+    const parsedPenHome = draft.penaltyHomeScore.trim() === '' ? null : Number(draft.penaltyHomeScore);
+    const parsedPenAway = draft.penaltyAwayScore.trim() === '' ? null : Number(draft.penaltyAwayScore);
 
-    if ((parsedHome !== null && Number.isNaN(parsedHome)) || (parsedAway !== null && Number.isNaN(parsedAway))) {
+    if (
+      (parsedHome !== null && Number.isNaN(parsedHome)) ||
+      (parsedAway !== null && Number.isNaN(parsedAway)) ||
+      (parsedPenHome !== null && Number.isNaN(parsedPenHome)) ||
+      (parsedPenAway !== null && Number.isNaN(parsedPenAway))
+    ) {
       setErrorMessage('Los resultados deben ser números válidos.');
       return;
     }
@@ -252,7 +289,9 @@ export function AdminResultsPage() {
     const validationError = validateOfficialResultDraft({
       status: draft.status,
       officialHomeScore: parsedHome,
-      officialAwayScore: parsedAway
+      officialAwayScore: parsedAway,
+      penaltyHomeScore: parsedPenHome,
+      penaltyAwayScore: parsedPenAway
     });
 
     if (validationError) {
@@ -267,7 +306,9 @@ export function AdminResultsPage() {
         matchId,
         status: draft.status,
         officialHomeScore: parsedHome,
-        officialAwayScore: parsedAway
+        officialAwayScore: parsedAway,
+        penaltyHomeScore: parsedPenHome,
+        penaltyAwayScore: parsedPenAway
       });
 
       setDrafts((prev) => ({
@@ -275,7 +316,9 @@ export function AdminResultsPage() {
         [matchId]: {
           status: draft.status,
           officialHomeScore: parsedHome !== null ? String(parsedHome) : '',
-          officialAwayScore: parsedAway !== null ? String(parsedAway) : ''
+          officialAwayScore: parsedAway !== null ? String(parsedAway) : '',
+          penaltyHomeScore: parsedPenHome !== null ? String(parsedPenHome) : '',
+          penaltyAwayScore: parsedPenAway !== null ? String(parsedPenAway) : ''
         }
       }));
 
@@ -438,6 +481,13 @@ export function AdminResultsPage() {
             const draft = drafts[match.id];
             const isDirty = hasDraftChanged(match, draft);
             const isSavingThisRow = savingMatchId === match.id;
+            const isKnockout = match.stage !== 'group_stage';
+            const showPenaltyFields =
+              isKnockout &&
+              (draft?.status ?? match.status) === 'finished' &&
+              draft?.officialHomeScore !== '' &&
+              draft?.officialAwayScore !== '' &&
+              draft?.officialHomeScore === draft?.officialAwayScore;
 
             return (
               <Card key={match.id} elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
@@ -460,7 +510,7 @@ export function AdminResultsPage() {
                       </Typography>
                     </Box>
 
-                    <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+                    <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} flexWrap='wrap' useFlexGap>
                       <TextField
                         select
                         label='Estado'
@@ -491,10 +541,34 @@ export function AdminResultsPage() {
                         sx={{ maxWidth: 180 }}
                       />
 
+                      {showPenaltyFields ? (
+                        <>
+                          <TextField
+                            label={`Pen. ${match.home_team}`}
+                            type='number'
+                            value={draft?.penaltyHomeScore ?? ''}
+                            onChange={(event) => handleDraftChange(match.id, 'penaltyHomeScore', event.target.value)}
+                            inputProps={{ min: 0 }}
+                            sx={{ maxWidth: 160 }}
+                            helperText='Penales'
+                          />
+                          <TextField
+                            label={`Pen. ${match.away_team}`}
+                            type='number'
+                            value={draft?.penaltyAwayScore ?? ''}
+                            onChange={(event) => handleDraftChange(match.id, 'penaltyAwayScore', event.target.value)}
+                            inputProps={{ min: 0 }}
+                            sx={{ maxWidth: 160 }}
+                            helperText='Penales'
+                          />
+                        </>
+                      ) : null}
+
                       <Button
                         variant='contained'
                         onClick={() => void handleSave(match.id)}
                         disabled={isSavingThisRow || !isDirty}
+                        sx={{ alignSelf: 'flex-start', mt: showPenaltyFields ? 0 : 0 }}
                       >
                         {isSavingThisRow ? 'Guardando...' : 'Guardar'}
                       </Button>

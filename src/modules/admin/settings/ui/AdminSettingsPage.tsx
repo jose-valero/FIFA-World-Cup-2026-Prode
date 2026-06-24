@@ -22,6 +22,7 @@ export function AdminSettingsPage() {
   const [predictionsOpen, setPredictionsOpen] = React.useState(true);
   const [predictionsCloseAt, setPredictionsCloseAt] = React.useState('');
   const [auditsVisible, setAuditsVisible] = React.useState(false);
+  const [groupStageLocked, setGroupStageLocked] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState('');
   const [successMessage, setSuccessMessage] = React.useState('');
 
@@ -29,6 +30,7 @@ export function AdminSettingsPage() {
     setPredictionsOpen(settings?.predictions_open ?? true);
     setPredictionsCloseAt(settings?.predictions_close_at ? settings.predictions_close_at.slice(0, 16) : '');
     setAuditsVisible(settings?.audits_visible ?? false);
+    setGroupStageLocked(settings?.group_stage_locked ?? false);
   }, [settings]);
 
   const handleSave = async () => {
@@ -39,7 +41,8 @@ export function AdminSettingsPage() {
       await updateAppSettingsMutation.mutateAsync({
         predictions_open: predictionsOpen,
         predictions_close_at: predictionsCloseAt ? new Date(predictionsCloseAt).toISOString() : null,
-        audits_visible: auditsVisible
+        audits_visible: auditsVisible,
+        group_stage_locked: groupStageLocked
       });
 
       setSuccessMessage('Configuración guardada correctamente.');
@@ -91,6 +94,21 @@ export function AdminSettingsPage() {
                   }
                   label='Pronósticos abiertos'
                 />
+
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={groupStageLocked}
+                      onChange={(event) => setGroupStageLocked(event.target.checked)}
+                      disabled={!predictionsOpen}
+                    />
+                  }
+                  label='Fase de grupos cerrada'
+                />
+
+                <Typography variant='body2' color='text.secondary'>
+                  Cuando está activado, los pronósticos de fase de grupos quedan bloqueados pero el knockout permanece abierto. Solo relevante si los pronósticos están abiertos.
+                </Typography>
 
                 <TextField
                   label='Fecha límite global'

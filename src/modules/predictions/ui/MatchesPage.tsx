@@ -101,6 +101,8 @@ export function MatchesPage() {
     settings?.predictions_close_at ?? null
   );
 
+  const groupStageLocked = settings?.group_stage_locked ?? false;
+
   const stageOptions = React.useMemo(() => getUniqueStageOptions(matches), [matches]);
   const groupOptions = React.useMemo(() => getUniqueGroupOptions(matches), [matches]);
 
@@ -126,7 +128,7 @@ export function MatchesPage() {
       return;
     }
 
-    const lockMessage = getMatchLockMessage(match, predictionsClosed);
+    const lockMessage = getMatchLockMessage(match, predictionsClosed, groupStageLocked);
 
     if (lockMessage) {
       setErrorMessage(lockMessage);
@@ -141,7 +143,7 @@ export function MatchesPage() {
   }, [requestedMatchId, isLoading, matches, predictionsClosed]);
 
   const handleOpenPrediction = (match: Match) => {
-    const lockMessage = getMatchLockMessage(match, predictionsClosed);
+    const lockMessage = getMatchLockMessage(match, predictionsClosed, groupStageLocked);
 
     if (lockMessage) {
       setErrorMessage(lockMessage);
@@ -167,7 +169,7 @@ export function MatchesPage() {
       return;
     }
 
-    const lockMessage = getMatchLockMessage(match, predictionsClosed);
+    const lockMessage = getMatchLockMessage(match, predictionsClosed, groupStageLocked);
 
     if (lockMessage) {
       setErrorMessage(lockMessage);
@@ -237,7 +239,7 @@ export function MatchesPage() {
       return;
     }
 
-    const lockMessage = getMatchLockMessage(match, predictionsClosed);
+    const lockMessage = getMatchLockMessage(match, predictionsClosed, groupStageLocked);
 
     if (lockMessage) {
       setErrorMessage(lockMessage);
@@ -353,8 +355,8 @@ export function MatchesPage() {
                 predictionSummary={buildPredictionSummary(predictions[match.id])}
                 onPredict={handleOpenPrediction}
                 onClearPrediction={handleClearPredictionFromCard}
-                isLocked={isMatchLocked(match, predictionsClosed)}
-                lockMessage={getMatchLockMessage(match, predictionsClosed) || undefined}
+                isLocked={isMatchLocked(match, predictionsClosed, groupStageLocked)}
+                lockMessage={getMatchLockMessage(match, predictionsClosed, groupStageLocked) || undefined}
               />
             ))}
           </Stack>

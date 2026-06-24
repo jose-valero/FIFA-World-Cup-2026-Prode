@@ -9,6 +9,8 @@ type UpdateOfficialResultInput = {
   status: MatchStatus;
   officialHomeScore: number | null;
   officialAwayScore: number | null;
+  penaltyHomeScore: number | null;
+  penaltyAwayScore: number | null;
 };
 
 type UpdateOfficialResultData = {
@@ -47,7 +49,9 @@ export function useUpdateOfficialResultMutation() {
                 ...match,
                 status: input.status,
                 official_home_score: input.officialHomeScore,
-                official_away_score: input.officialAwayScore
+                official_away_score: input.officialAwayScore,
+                penalty_home_score: input.penaltyHomeScore,
+                penalty_away_score: input.penaltyAwayScore
               }
             : match
         );

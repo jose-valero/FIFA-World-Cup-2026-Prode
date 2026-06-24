@@ -17,6 +17,8 @@ export interface AdminMatchRow {
   status: MatchStatus;
   official_home_score: number | null;
   official_away_score: number | null;
+  penalty_home_score: number | null;
+  penalty_away_score: number | null;
 }
 
 export type UpdateOfficialResultInput = {
@@ -24,4 +26,6 @@ export type UpdateOfficialResultInput = {
   status: MatchStatus;
   officialHomeScore: number | null;
   officialAwayScore: number | null;
+  penaltyHomeScore: number | null;
+  penaltyAwayScore: number | null;
 };

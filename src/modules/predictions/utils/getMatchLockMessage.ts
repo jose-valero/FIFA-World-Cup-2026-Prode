@@ -1,8 +1,12 @@
 import type { Match } from '../../matches/types/types';
 
-export function getMatchLockMessage(match: Match, predictionsClosed: boolean) {
+export function getMatchLockMessage(match: Match, predictionsClosed: boolean, groupStageLocked = false) {
   if (predictionsClosed) {
     return 'La carga de pronósticos está cerrada.';
+  }
+
+  if (groupStageLocked && match.stage === 'group_stage') {
+    return 'Los pronósticos de fase de grupos están cerrados.';
   }
 
   if (match.status === 'live') {

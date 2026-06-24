@@ -61,6 +61,7 @@ export function CompetitionStatusCard() {
   const predictionsOpen = settings?.predictions_open ?? true;
   const predictionsCloseAt = settings?.predictions_close_at ?? null;
   const closed = isPredictionsClosed(predictionsOpen, predictionsCloseAt);
+  const groupStageLocked = settings?.group_stage_locked ?? false;
   const currentPhase = getCurrentPhase(matches);
 
   return (
@@ -99,6 +100,9 @@ export function CompetitionStatusCard() {
                   label={closed ? 'Pronósticos cerrados' : 'Pronósticos abiertos'}
                   color={closed ? 'warning' : 'primary'}
                 />
+                {!closed && groupStageLocked ? (
+                  <Chip label='Grupos: cerrados' color='warning' variant='outlined' />
+                ) : null}
                 <Chip label={`Fase actual: ${currentPhase}`} variant='outlined' color='primary' />
               </Stack>
 

@@ -25,12 +25,17 @@ export function PredictionsHubPage() {
     settings?.predictions_close_at ?? null
   );
 
+  const groupStageLocked = settings?.group_stage_locked ?? false;
+
   const badges: PageHeaderBadge[] = [
     {
       label: predictionsClosed ? 'Pronósticos cerrados' : 'Pronósticos abiertos',
       color: predictionsClosed ? 'warning' : 'success',
       variant: predictionsClosed ? 'outlined' : 'filled'
     },
+    ...(!predictionsClosed && groupStageLocked
+      ? [{ label: 'Grupos cerrados', color: 'warning' as const, variant: 'outlined' as const }]
+      : []),
     {
       label: `${predictionRows.length} cargados`,
       color: 'primary',

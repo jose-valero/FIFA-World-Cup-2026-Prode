@@ -5,12 +5,13 @@ export interface AppSettings {
   predictions_open: boolean;
   predictions_close_at: string | null;
   audits_visible: boolean;
+  group_stage_locked: boolean;
 }
 
 export async function getAppSettings(): Promise<AppSettings | null> {
   const { data, error } = await supabase
     .from('app_settings')
-    .select('key, predictions_open, predictions_close_at, audits_visible')
+    .select('key, predictions_open, predictions_close_at, audits_visible, group_stage_locked')
     .eq('key', 'global')
     .maybeSingle();
 
@@ -27,7 +28,8 @@ export async function updateAppSettings(input: Omit<AppSettings, 'key'>): Promis
     .update({
       predictions_open: input.predictions_open,
       predictions_close_at: input.predictions_close_at,
-      audits_visible: input.audits_visible
+      audits_visible: input.audits_visible,
+      group_stage_locked: input.group_stage_locked
     })
     .eq('key', 'global');
 
