@@ -1,5 +1,7 @@
 import * as React from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../auth/hooks/useAuth';
+import { queryKeys } from '../../../../lib/react-query/queryKeys';
 
 type SyncChange = {
   match_id: string;
@@ -21,6 +23,8 @@ export type SyncResult = {
   total_omitted: number;
   changes: SyncChange[];
   omissions?: SyncOmission[];
+  knockout_synced?: boolean;
+  knockout_sync_warning?: string;
 };
 
 type SyncState =
@@ -33,6 +37,7 @@ const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL as string | undefined)?.re
 
 export function useSyncESPNMatches() {
   const { session } = useAuth();
+  const queryClient = useQueryClient();
   const [state, setState] = React.useState<SyncState>({ status: 'idle' });
 
   const run = React.useCallback(async () => {
@@ -56,13 +61,20 @@ export function useSyncESPNMatches() {
 
       const data = (await res.json()) as SyncResult;
       setState({ status: 'success', result: data });
+
+      // Invalidar siempre: el backend puede haber actualizado scores y/o el bracket
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.matches }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.adminResults }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.leaderboard })
+      ]);
     } catch (e) {
       setState({
         status: 'error',
         message: e instanceof Error ? e.message : 'Error desconocido'
       });
     }
-  }, [session?.access_token]);
+  }, [session?.access_token, queryClient]);
 
   const reset = React.useCallback(() => setState({ status: 'idle' }), []);
 

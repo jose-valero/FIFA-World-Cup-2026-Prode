@@ -22,6 +22,7 @@ import type { MatchStatus } from '../../../matches/types/types';
 import { formatKickoff } from '../../../../shared/utils/formatKickoff';
 import { useSyncESPNMatches } from '../../sync/hooks/useSyncESPNMatches';
 import { useLastSyncLog } from '../../sync/hooks/useLastSyncLog';
+import { useSyncKnockoutBracket } from '../hooks/useSyncKnockoutBracket';
 
 type DraftMap = Record<
   string,
@@ -202,6 +203,7 @@ export function AdminResultsPage() {
 
   const updateOfficialResultMutation = useUpdateOfficialResultMutation();
   const { state: syncState, run: runSync } = useSyncESPNMatches();
+  const { state: bracketSyncState, run: runBracketSync } = useSyncKnockoutBracket();
   const lastSyncLogQuery = useLastSyncLog();
 
   const [drafts, setDrafts] = React.useState<DraftMap>({});
@@ -351,26 +353,59 @@ export function AdminResultsPage() {
               </Typography>
             </Stack>
 
-            <Button
-              variant='outlined'
-              startIcon={syncState.status === 'loading' ? <CircularProgress size={16} /> : <SyncIcon />}
-              onClick={() => void runSync()}
-              disabled={syncState.status === 'loading'}
-              sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}
-            >
-              {syncState.status === 'loading' ? 'Sincronizando...' : 'Sincronizar ESPN'}
-            </Button>
+            <Stack direction='row' spacing={1} flexWrap='wrap' useFlexGap>
+              <Button
+                variant='outlined'
+                startIcon={syncState.status === 'loading' ? <CircularProgress size={16} /> : <SyncIcon />}
+                onClick={() => void runSync()}
+                disabled={syncState.status === 'loading'}
+                sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+              >
+                {syncState.status === 'loading' ? 'Sincronizando...' : 'Sincronizar ESPN'}
+              </Button>
+
+              <Button
+                variant='outlined'
+                color='secondary'
+                startIcon={bracketSyncState.status === 'loading' ? <CircularProgress size={16} /> : <SyncIcon />}
+                onClick={() => void runBracketSync()}
+                disabled={bracketSyncState.status === 'loading'}
+                sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+              >
+                {bracketSyncState.status === 'loading' ? 'Sincronizando bracket...' : 'Sincronizar Bracket'}
+              </Button>
+            </Stack>
           </Stack>
 
           {syncState.status === 'success' ? (
-            <Alert severity='success' sx={{ mt: 2 }}>
+            <Alert
+              severity={syncState.result.knockout_sync_warning ? 'warning' : 'success'}
+              sx={{ mt: 2 }}
+            >
               Sync completado — {syncState.result.total_updated} actualizado(s), {syncState.result.total_unchanged} sin cambios, {syncState.result.total_omitted} omitido(s) de {syncState.result.total_reviewed} revisados.
+              {syncState.result.knockout_sync_warning ? (
+                <> · Bracket no sincronizado: {syncState.result.knockout_sync_warning}</>
+              ) : syncState.result.knockout_synced ? (
+                ' · Bracket sincronizado.'
+              ) : null}
             </Alert>
           ) : null}
 
           {syncState.status === 'error' ? (
             <Alert severity='error' sx={{ mt: 2 }}>
               Error al sincronizar: {syncState.message}
+            </Alert>
+          ) : null}
+
+          {bracketSyncState.status === 'success' ? (
+            <Alert severity='success' sx={{ mt: 2 }}>
+              Bracket knockout sincronizado correctamente.
+            </Alert>
+          ) : null}
+
+          {bracketSyncState.status === 'error' ? (
+            <Alert severity='error' sx={{ mt: 2 }}>
+              Error al sincronizar bracket: {bracketSyncState.message}
             </Alert>
           ) : null}
 

@@ -336,10 +336,6 @@ function resolveWinnerOrLoser(sourceMatch: Match, target: 'winner' | 'loser'): R
     return null;
   }
 
-  if (sourceMatch.officialHomeScore === sourceMatch.officialAwayScore) {
-    return null;
-  }
-
   const home: ResolvedTeam = {
     name: sourceMatch.homeTeam || 'Por definir',
     code: sourceMatch.homeTeamCode
@@ -350,8 +346,20 @@ function resolveWinnerOrLoser(sourceMatch: Match, target: 'winner' | 'loser'): R
     code: sourceMatch.awayTeamCode
   };
 
-  const winnerTeam = sourceMatch.officialHomeScore > sourceMatch.officialAwayScore ? home : away;
-  const loserTeam = sourceMatch.officialHomeScore > sourceMatch.officialAwayScore ? away : home;
+  let homeWins: boolean;
+  if (sourceMatch.officialHomeScore > sourceMatch.officialAwayScore) {
+    homeWins = true;
+  } else if (sourceMatch.officialHomeScore < sourceMatch.officialAwayScore) {
+    homeWins = false;
+  } else if (sourceMatch.penaltyHomeScore !== null && sourceMatch.penaltyAwayScore !== null) {
+    homeWins = sourceMatch.penaltyHomeScore > sourceMatch.penaltyAwayScore;
+  } else {
+    // Empate sin penales resueltos — cruce todavía no definido
+    return null;
+  }
+
+  const winnerTeam = homeWins ? home : away;
+  const loserTeam = homeWins ? away : home;
 
   return target === 'winner' ? winnerTeam : loserTeam;
 }
