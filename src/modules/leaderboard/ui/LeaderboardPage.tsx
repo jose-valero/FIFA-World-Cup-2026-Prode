@@ -1,5 +1,18 @@
 import * as React from 'react';
-import { Alert, Box, Card, CardContent, CircularProgress, Divider, Grid, Snackbar, Stack, Tab, Tabs, Typography } from '@mui/material';
+import {
+  Alert,
+  Box,
+  Card,
+  CardContent,
+  CircularProgress,
+  Divider,
+  Grid,
+  Snackbar,
+  Stack,
+  Tab,
+  Tabs,
+  Typography
+} from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../auth/hooks/useAuth';
 import { useLeaderboardByPhase, type LeaderboardPhase } from '../hooks/useLeaderboard';
@@ -25,7 +38,7 @@ import { buildLeaderboardRanks } from '../utils/buildLeaderboardRanks';
 export function LeaderboardPage() {
   const [selectedParticipant, setSelectedParticipant] = React.useState<LeaderboardRow | null>(null);
   const [profileParticipant, setProfileParticipant] = React.useState<LeaderboardRow | null>(null);
-  const [phase, setPhase] = React.useState<LeaderboardPhase>('group_stage');
+  const [phase, setPhase] = React.useState<LeaderboardPhase>('knockout');
   const { user, profile } = useAuth();
   const { data: rows = [], isLoading, isError, error } = useLeaderboardByPhase(phase);
   const { data: settings = null } = useAppSettings();
@@ -143,9 +156,7 @@ export function LeaderboardPage() {
     return map;
   }, [reactionRows, user?.id]);
 
-  const { mutate: mutateMaranita, isPending: isMaranitaPending } = useIncrementMaranita(
-    relevantMatch?.id ?? null
-  );
+  const { mutate: mutateMaranita, isPending: isMaranitaPending } = useIncrementMaranita(relevantMatch?.id ?? null);
 
   const alreadyAlertedIds = React.useRef(new Set<string>());
   const [limitSnackbarOpen, setLimitSnackbarOpen] = React.useState(false);
