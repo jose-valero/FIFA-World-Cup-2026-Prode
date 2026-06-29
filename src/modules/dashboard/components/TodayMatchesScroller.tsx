@@ -5,6 +5,7 @@ import type { Match, MatchStatus } from '../../matches/types/types';
 import { matchDetailPath } from '../../../app/router/routes';
 import { TeamFlag } from '../../../shared/components/TeamFlag';
 import { sortScrollerMatches } from '../utils/sortScrollerMatches';
+import { getEffectiveMatchStatus } from '../../../shared/utils/getEffectiveMatchStatus';
 
 type Props = { matches: Match[] };
 
@@ -64,7 +65,7 @@ export function TodayMatchesScroller({ matches }: Props) {
               maxWidth: 210,
               flexShrink: 0,
               border: '1px solid',
-              borderColor: match.status === 'live' ? 'error.main' : 'divider',
+              borderColor: getEffectiveMatchStatus(match) === 'live' ? 'error.main' : 'divider',
               borderRadius: '28px'
             }}
           >
@@ -76,10 +77,10 @@ export function TodayMatchesScroller({ matches }: Props) {
                 <Stack spacing={0.75}>
                   <Stack direction='row' justifyContent='space-between' alignItems='center'>
                     <Chip
-                      label={statusLabel(match.status)}
-                      color={statusChipColor(match.status)}
+                      label={statusLabel(getEffectiveMatchStatus(match))}
+                      color={statusChipColor(getEffectiveMatchStatus(match))}
                       size='small'
-                      variant={match.status === 'live' ? 'filled' : 'outlined'}
+                      variant={getEffectiveMatchStatus(match) === 'live' ? 'filled' : 'outlined'}
                       sx={{ fontSize: 10, height: 18, px: 0.25 }}
                     />
                     <Typography variant='caption' color='text.secondary'>

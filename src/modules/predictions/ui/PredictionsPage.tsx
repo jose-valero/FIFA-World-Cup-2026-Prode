@@ -38,6 +38,7 @@ import { isPredictionsClosed } from '../../../shared/utils/isPredictionsClosed';
 import { queryKeys } from '../../../lib/react-query/queryKeys';
 import { getStatusLabel } from '../../../shared/utils/getStatusLabel';
 import { getStatusColor } from '../../../shared/utils/getStatusColor';
+import { getEffectiveMatchStatus } from '../../../shared/utils/getEffectiveMatchStatus';
 import { sortPredictionItems } from '../../../shared/utils/sortMatchesByStatusPriority';
 
 type UserPrediction = {
@@ -399,9 +400,9 @@ export function PredictionsPage() {
                               {match ? <Chip label={match.group} size='small' variant='outlined' /> : null}
                               {match ? (
                                 <Chip
-                                  label={getStatusLabel(match.status)}
+                                  label={getStatusLabel(getEffectiveMatchStatus(match))}
                                   size='small'
-                                  color={getStatusColor(match.status)}
+                                  color={getStatusColor(getEffectiveMatchStatus(match))}
                                   variant='outlined'
                                 />
                               ) : (

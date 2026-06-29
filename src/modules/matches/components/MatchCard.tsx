@@ -1,6 +1,7 @@
 import { Button, Card, CardContent, Chip, Divider, Stack, Typography } from '@mui/material';
 import { getStatusLabel } from '../../../shared/utils/getStatusLabel';
 import { getStatusColor } from '../../../shared/utils/getStatusColor';
+import { getEffectiveMatchStatus } from '../../../shared/utils/getEffectiveMatchStatus';
 import { MatchVs } from '../../../shared/components/MatchVs';
 import type { Match } from '../types/types';
 
@@ -37,9 +38,9 @@ export function MatchCard({
               <Stack direction='row' spacing={1} flexWrap='wrap' useFlexGap>
                 <Chip label={match.group} size='small' variant='outlined' />
                 <Chip
-                  label={getStatusLabel(match.status)}
+                  label={getStatusLabel(getEffectiveMatchStatus(match))}
                   size='small'
-                  color={getStatusColor(match.status)}
+                  color={getStatusColor(getEffectiveMatchStatus(match))}
                   variant='outlined'
                 />
               </Stack>

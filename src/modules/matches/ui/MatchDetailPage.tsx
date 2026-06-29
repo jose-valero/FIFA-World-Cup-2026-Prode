@@ -33,6 +33,7 @@ import type { MatchDetailPayload, MatchDetailEvent, MatchDetailEventType } from 
 import { MatchLineupsSection } from '../components/MatchLineupsSection';
 import { MatchSummarySection } from '../components/MatchSummarySection';
 import { MatchOddsCard } from '../components/MatchOddsCard';
+import { getEffectiveMatchStatus } from '../../../shared/utils/getEffectiveMatchStatus';
 // MOCK TEMPORAL — cambiar a false para usar datos reales
 import { MOCK_LINEUPS } from '../mocks/mockLineups';
 const USE_MOCK_LINEUPS = false;
@@ -389,8 +390,9 @@ function MatchHero({
   }
 
   const h = detail ? heroFromDetail(detail, match) : heroFromMatch(match);
-  const isLive = h.status === 'live';
-  const isFinished = h.status === 'finished';
+  const effectiveHeroStatus = getEffectiveMatchStatus({ status: h.status as 'scheduled' | 'live' | 'finished', kickoffAt: h.kickoffAt });
+  const isLive = effectiveHeroStatus === 'live';
+  const isFinished = effectiveHeroStatus === 'finished';
   const hasScore = h.scoreHome != null && h.scoreAway != null;
   const stageLabel = getStageLabel(h.stage as Parameters<typeof getStageLabel>[0]);
 
@@ -456,7 +458,7 @@ function MatchHero({
               </Stack>
             </Stack>
             <Box sx={{ flexShrink: 0, ml: 1 }}>
-              <StatusBadge status={h.status} minuteLabel={h.minuteLabel} />
+              <StatusBadge status={effectiveHeroStatus} minuteLabel={h.minuteLabel} />
             </Box>
           </Stack>
 
@@ -742,8 +744,8 @@ export function MatchDetailPage() {
     );
   }
 
-  const timelineStatus = detail?.status ?? match.status;
-  console.log('🚀 ~ MatchDetailPage.tsx ~ MatchDetailPage ~ detail:', detail);
+  const rawTimelineStatus = detail?.status ?? match.status;
+  const timelineStatus = getEffectiveMatchStatus({ status: rawTimelineStatus as 'scheduled' | 'live' | 'finished', kickoffAt: match.kickoffAt });
   const timelineEvents = detail?.events ?? [];
   const lineups = USE_MOCK_LINEUPS ? MOCK_LINEUPS : (detail?.lineups ?? null);
 
