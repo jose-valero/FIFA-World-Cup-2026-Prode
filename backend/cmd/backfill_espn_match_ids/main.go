@@ -1,4 +1,8 @@
-// backfill_espn_match_ids maps ESPN event IDs to group_stage matches in Supabase.
+// backfill_espn_match_ids maps ESPN event IDs to Supabase matches.
+//
+// By default it targets all stages (group_stage, round_of_32, etc.) where
+// both team codes are already defined but espn_event_id is still null.
+// Use --stage to restrict to a specific stage.
 //
 // Runs in dry-run mode by default. Pass --apply to write to the database.
 //
@@ -10,9 +14,11 @@
 //
 // Usage (from the backend/ directory):
 //
-//	go run ./cmd/backfill_espn_match_ids               # dry run
+//	go run ./cmd/backfill_espn_match_ids               # dry run (all stages)
 //	go run ./cmd/backfill_espn_match_ids --apply       # write to Supabase
 //	go run ./cmd/backfill_espn_match_ids --inspect     # detailed diagnostics for unresolved matches
+//	go run ./cmd/backfill_espn_match_ids --stage=round_of_32          # restrict to round of 32
+//	go run ./cmd/backfill_espn_match_ids --stage=group_stage --apply  # original behaviour
 //
 // Override individual values:
 //
@@ -50,11 +56,13 @@ type cfg struct {
 	espnBase    string
 	apply       bool
 	inspect     bool
+	stage       string // empty = all stages with team codes defined
 }
 
-// dbMatch represents a group_stage match row from Supabase.
+// dbMatch represents a match row from Supabase used for ESPN backfill.
 type dbMatch struct {
 	ID           string  `json:"id"`
+	Stage        string  `json:"stage"`
 	KickoffAt    string  `json:"kickoff_at"`
 	HomeTeamCode *string `json:"home_team_code"`
 	AwayTeamCode *string `json:"away_team_code"`
@@ -73,8 +81,14 @@ func main() {
 	ctx := context.Background()
 	espnClient := espn.NewClient(c.espnBase, "")
 
+	stageDesc := c.stage
+	if stageDesc == "" {
+		stageDesc = "all stages (with team codes defined)"
+	}
+
 	log.Printf("Supabase URL : %s", c.supabaseURL)
 	log.Printf("ESPN base    : %s", c.espnBase)
+	log.Printf("Stage filter : %s", stageDesc)
 	switch {
 	case c.inspect:
 		log.Printf("Mode         : INSPECT — detailed diagnostics for unresolved matches (read-only)")
@@ -85,13 +99,13 @@ func main() {
 	}
 
 	log.Println()
-	log.Printf("fetching group_stage matches from Supabase...")
+	log.Printf("fetching matches without espn_event_id from Supabase...")
 
-	matches, err := fetchGroupStageMatches(ctx, c)
+	matches, err := fetchMatchesNeedingESPNID(ctx, c)
 	if err != nil {
 		log.Fatalf("ERROR: %v", err)
 	}
-	log.Printf("found %d group_stage match(es) without espn_event_id", len(matches))
+	log.Printf("found %d match(es) without espn_event_id", len(matches))
 
 	// Collect unique dates to minimize ESPN API calls.
 	// We also include the previous calendar day because ESPN organizes scoreboards
@@ -281,6 +295,7 @@ func parseConfig() cfg {
 	fEnvFile := flag.String("env-file", "", "Path to env file  (default: .env.local, or ENV_FILE env var)")
 	fApply := flag.Bool("apply", false, "Write changes to Supabase (default: dry run)")
 	fInspect := flag.Bool("inspect", false, "Print detailed ESPN diagnostics for each unresolved match (read-only)")
+	fStage := flag.String("stage", "", "Restrict to a specific stage (e.g. group_stage, round_of_32). Default: all stages with team codes.")
 	flag.Parse()
 
 	// Load env file so env vars are available; godotenv never overwrites existing env vars.
@@ -290,6 +305,7 @@ func parseConfig() cfg {
 	c := cfg{
 		apply:       *fApply,
 		inspect:     *fInspect,
+		stage:       *fStage,
 		supabaseURL: coalesce(*fSupabaseURL, os.Getenv("SUPABASE_URL")),
 		supabaseKey: coalesce(*fSupabaseKey, os.Getenv("SUPABASE_SERVICE_ROLE_KEY")),
 		espnBase:    coalesce(*fESPNBase, os.Getenv("ESPN_SITE_API_BASE")),
@@ -329,9 +345,19 @@ func loadEnvFile(path string) {
 	}
 }
 
-// fetchGroupStageMatches returns group_stage matches where espn_event_id IS NULL.
-func fetchGroupStageMatches(ctx context.Context, c cfg) ([]dbMatch, error) {
-	url := c.supabaseURL + "/rest/v1/matches?select=id,kickoff_at,home_team_code,away_team_code,espn_event_id&stage=eq.group_stage&espn_event_id=is.null&order=kickoff_at.asc"
+// fetchMatchesNeedingESPNID returns matches where espn_event_id IS NULL and both
+// team codes are already defined. When c.stage is non-empty, restricts to that stage.
+func fetchMatchesNeedingESPNID(ctx context.Context, c cfg) ([]dbMatch, error) {
+	base := c.supabaseURL + "/rest/v1/matches" +
+		"?select=id,stage,kickoff_at,home_team_code,away_team_code,espn_event_id" +
+		"&espn_event_id=is.null" +
+		"&home_team_code=not.is.null" +
+		"&away_team_code=not.is.null" +
+		"&order=kickoff_at.asc"
+	if c.stage != "" {
+		base += "&stage=eq." + c.stage
+	}
+	url := base
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
