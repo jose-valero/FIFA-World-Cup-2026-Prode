@@ -431,6 +431,16 @@ function resolveSide(params: {
       };
     }
 
+    // DB es la fuente de verdad: si el sync ya asignó un equipo, usarlo directamente.
+    // Esto evita divergencia entre la proyección client-side y las demás vistas.
+    const dbTeamId = side === 'home' ? match.homeTeamId : match.awayTeamId;
+    if (dbTeamId) {
+      return {
+        name: currentName?.trim() ? currentName : `3${groupSet}`,
+        code: currentCode ?? null
+      };
+    }
+
     const row = bestThirdAssignments.get(groupSet);
 
     if (row) {
