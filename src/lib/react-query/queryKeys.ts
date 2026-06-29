@@ -2,6 +2,7 @@ export const queryKeys = {
   myProfile: (userId: string) => ['auth', 'profile', userId] as const,
   matches: ['matches'] as const,
   leaderboard: ['leaderboard'] as const,
+  leaderboardByPhase: (phase: 'group_stage' | 'knockout') => ['leaderboard', 'phase', phase] as const,
   appSettings: ['app-settings'] as const,
 
   teams: ['teams'] as const,

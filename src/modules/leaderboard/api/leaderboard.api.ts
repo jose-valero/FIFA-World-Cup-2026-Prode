@@ -25,3 +25,15 @@ export async function getLeaderboard(): Promise<LeaderboardRow[]> {
 
   return (data ?? []) as LeaderboardRow[];
 }
+
+export type LeaderboardPhase = 'group_stage' | 'knockout';
+
+export async function getLeaderboardByPhase(phase: LeaderboardPhase): Promise<LeaderboardRow[]> {
+  const { data, error } = await supabase.rpc('get_leaderboard_by_phase', { phase });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as LeaderboardRow[];
+}

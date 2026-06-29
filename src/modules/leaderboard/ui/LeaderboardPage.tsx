@@ -1,8 +1,8 @@
 import * as React from 'react';
-import { Alert, Box, Card, CardContent, CircularProgress, Divider, Grid, Snackbar, Stack, Typography } from '@mui/material';
+import { Alert, Box, Card, CardContent, CircularProgress, Divider, Grid, Snackbar, Stack, Tab, Tabs, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../auth/hooks/useAuth';
-import { useLeaderboard } from '../hooks/useLeaderboard';
+import { useLeaderboardByPhase, type LeaderboardPhase } from '../hooks/useLeaderboard';
 import { useAppSettings } from '../../admin/settings/hooks/useAppSettings';
 import { useAdminParticipantsOverview } from '../../admin/participants/hooks/useAdminParticipantsOverview';
 import { useSetParticipantDisabled } from '../../admin/participants/hooks/useSetParticipantDisabled';
@@ -25,8 +25,9 @@ import { buildLeaderboardRanks } from '../utils/buildLeaderboardRanks';
 export function LeaderboardPage() {
   const [selectedParticipant, setSelectedParticipant] = React.useState<LeaderboardRow | null>(null);
   const [profileParticipant, setProfileParticipant] = React.useState<LeaderboardRow | null>(null);
+  const [phase, setPhase] = React.useState<LeaderboardPhase>('group_stage');
   const { user, profile } = useAuth();
-  const { data: rows = [], isLoading, isError, error } = useLeaderboard();
+  const { data: rows = [], isLoading, isError, error } = useLeaderboardByPhase(phase);
   const { data: settings = null } = useAppSettings();
 
   const isAdmin = Boolean(profile?.is_admin);
@@ -224,16 +225,22 @@ export function LeaderboardPage() {
     });
   };
 
+  const phaseLabel = phase === 'group_stage' ? 'fase de grupos' : 'eliminatorias';
+
   return (
     <Stack spacing={2.5}>
-      {/* <PageHeader
-        title='Tabla global'
-        // description='Ranking general de participantes según los resultados oficiales cargados.'
-        badges={badges}
-      /> */}
+      <Tabs
+        value={phase}
+        onChange={(_, v: LeaderboardPhase) => setPhase(v)}
+        variant='fullWidth'
+        sx={{ borderBottom: 1, borderColor: 'divider' }}
+      >
+        <Tab label='Fase de grupos' value='group_stage' />
+        <Tab label='Eliminatorias' value='knockout' />
+      </Tabs>
 
       {isError ? (
-        <Alert severity='error'>{error instanceof Error ? error.message : 'No se pudo cargar el leaderboard'}</Alert>
+        <Alert severity='error'>{error instanceof Error ? error.message : 'No se pudo cargar el ranking'}</Alert>
       ) : null}
 
       {isLoading ? (
@@ -307,7 +314,7 @@ export function LeaderboardPage() {
               {displayRows.length > 0 ? (
                 <Box sx={{ px: 3, py: 2 }}>
                   <Typography variant='body2' color='text.secondary'>
-                    El ranking se ordena por puntos totales, luego por exactos y después por nombre.
+                    Ranking de {phaseLabel} — ordenado por puntos, luego por exactos y después por nombre.
                   </Typography>
                 </Box>
               ) : null}
