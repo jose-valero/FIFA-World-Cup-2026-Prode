@@ -4,6 +4,7 @@ export function isMatchLocked(match: Match, predictionsClosed: boolean, groupSta
   if (predictionsClosed) return true;
   if (groupStageLocked && match.stage === 'group_stage') return true;
   if (match.status !== 'scheduled') return true;
+  if (new Date(match.kickoffAt) <= new Date()) return true;
   if (match.stage !== 'group_stage' && (!match.homeTeamId || !match.awayTeamId)) return true;
   return false;
 }
