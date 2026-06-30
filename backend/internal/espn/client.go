@@ -57,9 +57,10 @@ type CompStatusType struct {
 
 // Competitor is one team in a competition.
 type Competitor struct {
-	HomeAway string `json:"homeAway"`
-	Score    string `json:"score"`
-	Team     Team   `json:"team"`
+	HomeAway      string `json:"homeAway"`
+	Score         string `json:"score"`
+	ShootoutScore string `json:"shootoutScore"` // only set when ESPN status is STATUS_FINAL_PEN
+	Team          Team   `json:"team"`
 }
 
 // Team holds the identifying info we use for matching.
@@ -232,6 +233,16 @@ func (e Event) HomeScore() string {
 // AwayScore returns the away team's raw score string from ESPN.
 func (e Event) AwayScore() string {
 	return e.competitor("away").Score
+}
+
+// HomePenaltyScore returns the home team's penalty shootout score (only set for STATUS_FINAL_PEN).
+func (e Event) HomePenaltyScore() string {
+	return e.competitor("home").ShootoutScore
+}
+
+// AwayPenaltyScore returns the away team's penalty shootout score (only set for STATUS_FINAL_PEN).
+func (e Event) AwayPenaltyScore() string {
+	return e.competitor("away").ShootoutScore
 }
 
 // StatusName returns the ESPN status type name (e.g. "STATUS_FINAL").

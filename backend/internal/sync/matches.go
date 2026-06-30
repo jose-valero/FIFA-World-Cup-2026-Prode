@@ -52,26 +52,32 @@ type Omission struct {
 
 // MatchState is a snapshot of the mutable sync fields.
 type MatchState struct {
-	Status    string `json:"status"`
-	HomeScore *int   `json:"home_score"`
-	AwayScore *int   `json:"away_score"`
+	Status           string `json:"status"`
+	HomeScore        *int   `json:"home_score"`
+	AwayScore        *int   `json:"away_score"`
+	PenaltyHomeScore *int   `json:"penalty_home_score,omitempty"`
+	PenaltyAwayScore *int   `json:"penalty_away_score,omitempty"`
 }
 
 // dbMatch is a row from Supabase with only the fields relevant to sync.
 type dbMatch struct {
-	ID          string  `json:"id"`
-	ESPNEventID string  `json:"espn_event_id"`
-	KickoffAt   string  `json:"kickoff_at"`
-	Status      string  `json:"status"`
-	HomeScore   *int    `json:"official_home_score"`
-	AwayScore   *int    `json:"official_away_score"`
+	ID               string `json:"id"`
+	ESPNEventID      string `json:"espn_event_id"`
+	KickoffAt        string `json:"kickoff_at"`
+	Status           string `json:"status"`
+	HomeScore        *int   `json:"official_home_score"`
+	AwayScore        *int   `json:"official_away_score"`
+	PenaltyHomeScore *int   `json:"penalty_home_score"`
+	PenaltyAwayScore *int   `json:"penalty_away_score"`
 }
 
 // patchPayload is what we send to Supabase REST to update a match.
 type patchPayload struct {
-	Status    string `json:"status"`
-	HomeScore *int   `json:"official_home_score"`
-	AwayScore *int   `json:"official_away_score"`
+	Status           string `json:"status"`
+	HomeScore        *int   `json:"official_home_score"`
+	AwayScore        *int   `json:"official_away_score"`
+	PenaltyHomeScore *int   `json:"penalty_home_score,omitempty"`
+	PenaltyAwayScore *int   `json:"penalty_away_score,omitempty"`
 }
 
 // ESPNMatches fetches ESPN scoreboard data for all matches that have an
@@ -128,29 +134,43 @@ func ESPNMatches(ctx context.Context, espnClient *espn.Client, supabaseURL, supa
 			continue
 		}
 
-		newStatus, newHome, newAway, omitReason := computeNewState(m, ev)
-		if omitReason != "" {
+		ns := computeNewState(m, ev)
+		if ns.OmitReason != "" {
 			result.TotalOmitted++
 			result.Omissions = append(result.Omissions, Omission{
 				MatchID:     m.ID,
 				ESPNEventID: m.ESPNEventID,
-				Reason:      omitReason,
+				Reason:      ns.OmitReason,
 			})
 			continue
 		}
 
-		if !stateChanged(m, newStatus, newHome, newAway) {
+		if !stateChanged(m, ns) {
 			result.TotalUnchanged++
 			continue
 		}
 
-		before := MatchState{Status: m.Status, HomeScore: m.HomeScore, AwayScore: m.AwayScore}
-		after := MatchState{Status: newStatus, HomeScore: newHome, AwayScore: newAway}
+		before := MatchState{
+			Status:           m.Status,
+			HomeScore:        m.HomeScore,
+			AwayScore:        m.AwayScore,
+			PenaltyHomeScore: m.PenaltyHomeScore,
+			PenaltyAwayScore: m.PenaltyAwayScore,
+		}
+		after := MatchState{
+			Status:           ns.Status,
+			HomeScore:        ns.HomeScore,
+			AwayScore:        ns.AwayScore,
+			PenaltyHomeScore: ns.PenaltyHomeScore,
+			PenaltyAwayScore: ns.PenaltyAwayScore,
+		}
 
 		if err := patchMatch(ctx, supabaseURL, supabaseKey, m.ID, patchPayload{
-			Status:    newStatus,
-			HomeScore: newHome,
-			AwayScore: newAway,
+			Status:           ns.Status,
+			HomeScore:        ns.HomeScore,
+			AwayScore:        ns.AwayScore,
+			PenaltyHomeScore: ns.PenaltyHomeScore,
+			PenaltyAwayScore: ns.PenaltyAwayScore,
 		}); err != nil {
 			result.TotalOmitted++
 			result.Omissions = append(result.Omissions, Omission{
@@ -168,7 +188,7 @@ func ESPNMatches(ctx context.Context, espnClient *espn.Client, supabaseURL, supa
 			Before:      before,
 			After:       after,
 		})
-		if newStatus == "finished" {
+		if ns.Status == "finished" {
 			result.HasFinishedTransition = true
 		}
 	}
@@ -179,24 +199,33 @@ func ESPNMatches(ctx context.Context, espnClient *espn.Client, supabaseURL, supa
 	return result, nil
 }
 
+// newState is the computed target state for a match, returned by computeNewState.
+type newState struct {
+	Status           string
+	HomeScore        *int
+	AwayScore        *int
+	PenaltyHomeScore *int
+	PenaltyAwayScore *int
+	OmitReason       string
+}
+
 // computeNewState maps an ESPN event to the target DB state for a match.
-// Returns an omit reason (non-empty) if the match should be skipped.
-func computeNewState(m dbMatch, ev espn.Event) (status string, homeScore *int, awayScore *int, omitReason string) {
+// Returns a newState with OmitReason non-empty if the match should be skipped.
+func computeNewState(m dbMatch, ev espn.Event) newState {
 	// Never revert a match that is already finished in the DB.
 	if m.Status == "finished" {
-		return "", nil, nil, "already finished in DB — not reverting"
+		return newState{OmitReason: "already finished in DB — not reverting"}
 	}
 
 	espnStatus := ev.StatusName()
-	newStatus, ok := mapESPNStatus(espnStatus)
+	mapped, ok := mapESPNStatus(espnStatus)
 	if !ok {
-		return "", nil, nil, fmt.Sprintf("unknown ESPN status %q", espnStatus)
+		return newState{OmitReason: fmt.Sprintf("unknown ESPN status %q", espnStatus)}
 	}
 
-	switch newStatus {
+	switch mapped {
 	case "scheduled":
-		// Constraint: scheduled must have null scores.
-		return "scheduled", nil, nil, ""
+		return newState{Status: "scheduled"}
 
 	case "live":
 		home, homeOK := parseScore(ev.HomeScore())
@@ -208,19 +237,27 @@ func computeNewState(m dbMatch, ev espn.Event) (status string, homeScore *int, a
 		if awayOK {
 			ap = &away
 		}
-		return "live", hp, ap, ""
+		return newState{Status: "live", HomeScore: hp, AwayScore: ap}
 
 	case "finished":
 		home, homeOK := parseScore(ev.HomeScore())
 		away, awayOK := parseScore(ev.AwayScore())
 		if !homeOK || !awayOK {
-			// Constraint: finished must have both scores. Skip if ESPN hasn't provided them.
-			return "", nil, nil, fmt.Sprintf("ESPN status is finished but scores not available (home=%q away=%q)", ev.HomeScore(), ev.AwayScore())
+			return newState{OmitReason: fmt.Sprintf("ESPN status is finished but scores not available (home=%q away=%q)", ev.HomeScore(), ev.AwayScore())}
 		}
-		return "finished", &home, &away, ""
+		ns := newState{Status: "finished", HomeScore: &home, AwayScore: &away}
+		if espnStatus == "STATUS_FINAL_PEN" {
+			ph, phOK := parseScore(ev.HomePenaltyScore())
+			pa, paOK := parseScore(ev.AwayPenaltyScore())
+			if phOK && paOK {
+				ns.PenaltyHomeScore = &ph
+				ns.PenaltyAwayScore = &pa
+			}
+		}
+		return ns
 	}
 
-	return "", nil, nil, fmt.Sprintf("unhandled status %q", newStatus)
+	return newState{OmitReason: fmt.Sprintf("unhandled status %q", mapped)}
 }
 
 // mapESPNStatus converts an ESPN status name to our DB enum.
@@ -237,25 +274,20 @@ func mapESPNStatus(name string) (string, bool) {
 		"STATUS_EXTRA_TIME",
 		"STATUS_SHOOTOUT":
 		return "live", true
-	case "STATUS_FINAL", "STATUS_FULL_TIME":
+	case "STATUS_FINAL", "STATUS_FULL_TIME", "STATUS_FINAL_PEN":
 		return "finished", true
 	default:
 		return "", false
 	}
 }
 
-// stateChanged returns true if any of the three sync fields differ from the DB row.
-func stateChanged(m dbMatch, newStatus string, newHome *int, newAway *int) bool {
-	if m.Status != newStatus {
-		return true
-	}
-	if !intPtrEqual(m.HomeScore, newHome) {
-		return true
-	}
-	if !intPtrEqual(m.AwayScore, newAway) {
-		return true
-	}
-	return false
+// stateChanged returns true if any sync field differs from the DB row.
+func stateChanged(m dbMatch, ns newState) bool {
+	return m.Status != ns.Status ||
+		!intPtrEqual(m.HomeScore, ns.HomeScore) ||
+		!intPtrEqual(m.AwayScore, ns.AwayScore) ||
+		!intPtrEqual(m.PenaltyHomeScore, ns.PenaltyHomeScore) ||
+		!intPtrEqual(m.PenaltyAwayScore, ns.PenaltyAwayScore)
 }
 
 func intPtrEqual(a, b *int) bool {
@@ -271,7 +303,7 @@ func intPtrEqual(a, b *int) bool {
 // fetchSyncableMatches returns matches that have a non-null espn_event_id.
 func fetchSyncableMatches(ctx context.Context, supabaseURL, key string) ([]dbMatch, error) {
 	url := supabaseURL + "/rest/v1/matches" +
-		"?select=id,espn_event_id,kickoff_at,status,official_home_score,official_away_score" +
+		"?select=id,espn_event_id,kickoff_at,status,official_home_score,official_away_score,penalty_home_score,penalty_away_score" +
 		"&espn_event_id=not.is.null" +
 		"&order=kickoff_at.asc"
 
