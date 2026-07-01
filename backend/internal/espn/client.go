@@ -163,14 +163,21 @@ type TeamLogo struct {
 	Rel  []string `json:"rel"`
 }
 
+// SummaryLinescore is one period entry in a competitor's linescores array.
+// DisplayValue is the number of goals scored in that period.
+type SummaryLinescore struct {
+	DisplayValue string `json:"displayValue"`
+}
+
 // SummaryCompetitor is a team entry in the summary response.
 // ID is the competitor's event-specific identifier used in Core API roster URLs.
 // Team.ID is the global team identifier — do not use for roster endpoint.
 type SummaryCompetitor struct {
-	ID       string `json:"id"`
-	HomeAway string `json:"homeAway"`
-	Score    string `json:"score"`
-	Team     struct {
+	ID         string             `json:"id"`
+	HomeAway   string             `json:"homeAway"`
+	Score      string             `json:"score"`
+	Linescores []SummaryLinescore `json:"linescores"`
+	Team       struct {
 		ID             string     `json:"id"`
 		Color          string     `json:"color"`
 		AlternateColor string     `json:"alternateColor"`

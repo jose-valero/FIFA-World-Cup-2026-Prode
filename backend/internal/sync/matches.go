@@ -52,32 +52,42 @@ type Omission struct {
 
 // MatchState is a snapshot of the mutable sync fields.
 type MatchState struct {
-	Status           string `json:"status"`
-	HomeScore        *int   `json:"home_score"`
-	AwayScore        *int   `json:"away_score"`
-	PenaltyHomeScore *int   `json:"penalty_home_score,omitempty"`
-	PenaltyAwayScore *int   `json:"penalty_away_score,omitempty"`
+	Status              string `json:"status"`
+	HomeScore           *int   `json:"home_score"`
+	AwayScore           *int   `json:"away_score"`
+	PenaltyHomeScore    *int   `json:"penalty_home_score,omitempty"`
+	PenaltyAwayScore    *int   `json:"penalty_away_score,omitempty"`
+	RegulationHomeScore *int   `json:"regulation_home_score,omitempty"`
+	RegulationAwayScore *int   `json:"regulation_away_score,omitempty"`
+	KnockoutResolution  string `json:"knockout_resolution,omitempty"`
 }
 
 // dbMatch is a row from Supabase with only the fields relevant to sync.
 type dbMatch struct {
-	ID               string `json:"id"`
-	ESPNEventID      string `json:"espn_event_id"`
-	KickoffAt        string `json:"kickoff_at"`
-	Status           string `json:"status"`
-	HomeScore        *int   `json:"official_home_score"`
-	AwayScore        *int   `json:"official_away_score"`
-	PenaltyHomeScore *int   `json:"penalty_home_score"`
-	PenaltyAwayScore *int   `json:"penalty_away_score"`
+	ID                  string `json:"id"`
+	ESPNEventID         string `json:"espn_event_id"`
+	KickoffAt           string `json:"kickoff_at"`
+	Stage               string `json:"stage"`
+	Status              string `json:"status"`
+	HomeScore           *int   `json:"official_home_score"`
+	AwayScore           *int   `json:"official_away_score"`
+	PenaltyHomeScore    *int   `json:"penalty_home_score"`
+	PenaltyAwayScore    *int   `json:"penalty_away_score"`
+	RegulationHomeScore *int   `json:"regulation_home_score"`
+	RegulationAwayScore *int   `json:"regulation_away_score"`
+	KnockoutResolution  string `json:"knockout_resolution"`
 }
 
 // patchPayload is what we send to Supabase REST to update a match.
 type patchPayload struct {
-	Status           string `json:"status"`
-	HomeScore        *int   `json:"official_home_score"`
-	AwayScore        *int   `json:"official_away_score"`
-	PenaltyHomeScore *int   `json:"penalty_home_score,omitempty"`
-	PenaltyAwayScore *int   `json:"penalty_away_score,omitempty"`
+	Status              string `json:"status"`
+	HomeScore           *int   `json:"official_home_score"`
+	AwayScore           *int   `json:"official_away_score"`
+	PenaltyHomeScore    *int   `json:"penalty_home_score,omitempty"`
+	PenaltyAwayScore    *int   `json:"penalty_away_score,omitempty"`
+	RegulationHomeScore *int   `json:"regulation_home_score,omitempty"`
+	RegulationAwayScore *int   `json:"regulation_away_score,omitempty"`
+	KnockoutResolution  string `json:"knockout_resolution,omitempty"`
 }
 
 // ESPNMatches fetches ESPN scoreboard data for all matches that have an
@@ -145,32 +155,49 @@ func ESPNMatches(ctx context.Context, espnClient *espn.Client, supabaseURL, supa
 			continue
 		}
 
+		// For knockout matches transitioning to finished, enrich with regulation
+		// scores and resolution method via ESPN summary (linescores).
+		if ns.Status == "finished" && m.Stage != "group_stage" {
+			if summary, err := espnClient.GetEventSummary(ctx, m.ESPNEventID); err == nil {
+				enrichKnockoutResolution(summary, ev.StatusName(), &ns)
+			}
+		}
+
 		if !stateChanged(m, ns) {
 			result.TotalUnchanged++
 			continue
 		}
 
 		before := MatchState{
-			Status:           m.Status,
-			HomeScore:        m.HomeScore,
-			AwayScore:        m.AwayScore,
-			PenaltyHomeScore: m.PenaltyHomeScore,
-			PenaltyAwayScore: m.PenaltyAwayScore,
+			Status:              m.Status,
+			HomeScore:           m.HomeScore,
+			AwayScore:           m.AwayScore,
+			PenaltyHomeScore:    m.PenaltyHomeScore,
+			PenaltyAwayScore:    m.PenaltyAwayScore,
+			RegulationHomeScore: m.RegulationHomeScore,
+			RegulationAwayScore: m.RegulationAwayScore,
+			KnockoutResolution:  m.KnockoutResolution,
 		}
 		after := MatchState{
-			Status:           ns.Status,
-			HomeScore:        ns.HomeScore,
-			AwayScore:        ns.AwayScore,
-			PenaltyHomeScore: ns.PenaltyHomeScore,
-			PenaltyAwayScore: ns.PenaltyAwayScore,
+			Status:              ns.Status,
+			HomeScore:           ns.HomeScore,
+			AwayScore:           ns.AwayScore,
+			PenaltyHomeScore:    ns.PenaltyHomeScore,
+			PenaltyAwayScore:    ns.PenaltyAwayScore,
+			RegulationHomeScore: ns.RegulationHomeScore,
+			RegulationAwayScore: ns.RegulationAwayScore,
+			KnockoutResolution:  ns.KnockoutResolution,
 		}
 
 		if err := patchMatch(ctx, supabaseURL, supabaseKey, m.ID, patchPayload{
-			Status:           ns.Status,
-			HomeScore:        ns.HomeScore,
-			AwayScore:        ns.AwayScore,
-			PenaltyHomeScore: ns.PenaltyHomeScore,
-			PenaltyAwayScore: ns.PenaltyAwayScore,
+			Status:              ns.Status,
+			HomeScore:           ns.HomeScore,
+			AwayScore:           ns.AwayScore,
+			PenaltyHomeScore:    ns.PenaltyHomeScore,
+			PenaltyAwayScore:    ns.PenaltyAwayScore,
+			RegulationHomeScore: ns.RegulationHomeScore,
+			RegulationAwayScore: ns.RegulationAwayScore,
+			KnockoutResolution:  ns.KnockoutResolution,
 		}); err != nil {
 			result.TotalOmitted++
 			result.Omissions = append(result.Omissions, Omission{
@@ -201,12 +228,15 @@ func ESPNMatches(ctx context.Context, espnClient *espn.Client, supabaseURL, supa
 
 // newState is the computed target state for a match, returned by computeNewState.
 type newState struct {
-	Status           string
-	HomeScore        *int
-	AwayScore        *int
-	PenaltyHomeScore *int
-	PenaltyAwayScore *int
-	OmitReason       string
+	Status              string
+	HomeScore           *int
+	AwayScore           *int
+	PenaltyHomeScore    *int
+	PenaltyAwayScore    *int
+	RegulationHomeScore *int
+	RegulationAwayScore *int
+	KnockoutResolution  string // "regulation", "extra_time", or "penalties"
+	OmitReason          string
 }
 
 // computeNewState maps an ESPN event to the target DB state for a match.
@@ -287,7 +317,10 @@ func stateChanged(m dbMatch, ns newState) bool {
 		!intPtrEqual(m.HomeScore, ns.HomeScore) ||
 		!intPtrEqual(m.AwayScore, ns.AwayScore) ||
 		!intPtrEqual(m.PenaltyHomeScore, ns.PenaltyHomeScore) ||
-		!intPtrEqual(m.PenaltyAwayScore, ns.PenaltyAwayScore)
+		!intPtrEqual(m.PenaltyAwayScore, ns.PenaltyAwayScore) ||
+		!intPtrEqual(m.RegulationHomeScore, ns.RegulationHomeScore) ||
+		!intPtrEqual(m.RegulationAwayScore, ns.RegulationAwayScore) ||
+		m.KnockoutResolution != ns.KnockoutResolution
 }
 
 func intPtrEqual(a, b *int) bool {
@@ -303,7 +336,7 @@ func intPtrEqual(a, b *int) bool {
 // fetchSyncableMatches returns matches that have a non-null espn_event_id.
 func fetchSyncableMatches(ctx context.Context, supabaseURL, key string) ([]dbMatch, error) {
 	url := supabaseURL + "/rest/v1/matches" +
-		"?select=id,espn_event_id,kickoff_at,status,official_home_score,official_away_score,penalty_home_score,penalty_away_score" +
+		"?select=id,espn_event_id,kickoff_at,stage,status,official_home_score,official_away_score,penalty_home_score,penalty_away_score,regulation_home_score,regulation_away_score,knockout_resolution" +
 		"&espn_event_id=not.is.null" +
 		"&order=kickoff_at.asc"
 
@@ -377,6 +410,64 @@ func parseScore(s string) (int, bool) {
 		return 0, false
 	}
 	return n, true
+}
+
+// enrichKnockoutResolution fills ns.RegulationHomeScore, RegulationAwayScore, and
+// KnockoutResolution by reading linescores from the ESPN event summary.
+//
+// Linescore layout per competitor (from ESPN summary header.competitions[0].competitors):
+//   period 0: 1st half
+//   period 1: 2nd half
+//   period 2: 1st ET half  (only present if ET occurred)
+//   period 3: 2nd ET half  (only present if ET occurred)
+//   period 4: penalties    (only present for STATUS_FINAL_PEN)
+//
+// Regulation score = sum of periods 0+1.
+// If len(linescores) >= 3 and espnStatus != STATUS_FINAL_PEN → extra_time.
+// If espnStatus == STATUS_FINAL_PEN → penalties.
+// Otherwise → regulation.
+func enrichKnockoutResolution(summary *espn.EventSummary, espnStatus string, ns *newState) {
+	if len(summary.Header.Competitions) == 0 {
+		return
+	}
+	comps := summary.Header.Competitions[0].Competitors
+	var homeLs, awayLs []espn.SummaryLinescore
+	for _, c := range comps {
+		switch c.HomeAway {
+		case "home":
+			homeLs = c.Linescores
+		case "away":
+			awayLs = c.Linescores
+		}
+	}
+	if len(homeLs) < 2 || len(awayLs) < 2 {
+		return
+	}
+
+	sumLS := func(ls []espn.SummaryLinescore, periods int) int {
+		total := 0
+		for i := 0; i < periods && i < len(ls); i++ {
+			n, err := strconv.Atoi(ls[i].DisplayValue)
+			if err == nil && n >= 0 {
+				total += n
+			}
+		}
+		return total
+	}
+
+	regHome := sumLS(homeLs, 2)
+	regAway := sumLS(awayLs, 2)
+	ns.RegulationHomeScore = &regHome
+	ns.RegulationAwayScore = &regAway
+
+	switch {
+	case espnStatus == "STATUS_FINAL_PEN":
+		ns.KnockoutResolution = "penalties"
+	case len(homeLs) >= 3:
+		ns.KnockoutResolution = "extra_time"
+	default:
+		ns.KnockoutResolution = "regulation"
+	}
 }
 
 func parseTime(s string) (time.Time, error) {
