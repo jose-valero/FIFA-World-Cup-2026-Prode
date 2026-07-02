@@ -275,6 +275,13 @@ func computeNewState(m dbMatch, ev espn.Event) newState {
 		if !homeOK || !awayOK {
 			return newState{OmitReason: fmt.Sprintf("ESPN status is finished but scores not available (home=%q away=%q)", ev.HomeScore(), ev.AwayScore())}
 		}
+		// STATUS_FULL_TIME on a knockout match with a tied score means the 90 minutes
+		// just ended and extra time is imminent. Treating it as "finished" here would
+		// lock the match permanently via the "already finished" guard.
+		// Map to "live" instead and wait for STATUS_EXTRA_TIME / STATUS_FINAL_AET.
+		if espnStatus == "STATUS_FULL_TIME" && m.Stage != "group_stage" && home == away {
+			return newState{Status: "live", HomeScore: &home, AwayScore: &away}
+		}
 		ns := newState{Status: "finished", HomeScore: &home, AwayScore: &away}
 		if espnStatus == "STATUS_FINAL_PEN" {
 			ph, phOK := parseScore(ev.HomePenaltyScore())
@@ -304,7 +311,7 @@ func mapESPNStatus(name string) (string, bool) {
 		"STATUS_EXTRA_TIME",
 		"STATUS_SHOOTOUT":
 		return "live", true
-	case "STATUS_FINAL", "STATUS_FULL_TIME", "STATUS_FINAL_PEN":
+	case "STATUS_FINAL", "STATUS_FULL_TIME", "STATUS_FINAL_AET", "STATUS_FINAL_PEN":
 		return "finished", true
 	default:
 		return "", false
