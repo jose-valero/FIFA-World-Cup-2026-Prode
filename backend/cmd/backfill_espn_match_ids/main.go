@@ -47,7 +47,12 @@ import (
 	"quiniela-backend/internal/espn"
 )
 
-const matchWindow = 15 * time.Minute
+// defaultMatchWindow is the default ±tolerance for kickoff time matching.
+// 30 minutes is intentionally more generous than the old 15-minute value:
+// kickoff_at values in DB may be off by a few minutes vs ESPN's canonical time,
+// and we need headroom after correcting previously wrong kickoff_at values.
+// Use --window to override at the CLI (e.g. --window=60 for a one-shot wide scan).
+const defaultMatchWindow = 30 * time.Minute
 
 // cfg holds resolved runtime configuration.
 type cfg struct {
@@ -56,7 +61,8 @@ type cfg struct {
 	espnBase    string
 	apply       bool
 	inspect     bool
-	stage       string // empty = all stages with team codes defined
+	stage       string        // empty = all stages with team codes defined
+	window      time.Duration // kickoff time-matching tolerance
 }
 
 // dbMatch represents a match row from Supabase used for ESPN backfill.
@@ -174,7 +180,7 @@ func main() {
 			if diff < 0 {
 				diff = -diff
 			}
-			if diff > matchWindow {
+			if diff > c.window {
 				continue
 			}
 			if strings.ToUpper(ev.HomeAbbrev()) != homeCode {
@@ -220,7 +226,7 @@ func main() {
 		if c.inspect {
 			fmt.Printf("\nINSPECT — %d unresolved match(es) with ESPN event candidates:\n", len(unresolved))
 			for _, r := range unresolved {
-				printInspectDetail(r, dateEvents)
+				printInspectDetail(r, dateEvents, c.window)
 			}
 		} else {
 			fmt.Printf("\nUNRESOLVED (%d) — no ESPN event matched:\n", len(unresolved))
@@ -296,6 +302,7 @@ func parseConfig() cfg {
 	fApply := flag.Bool("apply", false, "Write changes to Supabase (default: dry run)")
 	fInspect := flag.Bool("inspect", false, "Print detailed ESPN diagnostics for each unresolved match (read-only)")
 	fStage := flag.String("stage", "", "Restrict to a specific stage (e.g. group_stage, round_of_32). Default: all stages with team codes.")
+	fWindow := flag.Int("window", 30, "Kickoff time matching tolerance in minutes (default 30). Use a larger value when kickoff_at may be slightly off.")
 	flag.Parse()
 
 	// Load env file so env vars are available; godotenv never overwrites existing env vars.
@@ -306,6 +313,7 @@ func parseConfig() cfg {
 		apply:       *fApply,
 		inspect:     *fInspect,
 		stage:       *fStage,
+		window:      time.Duration(*fWindow) * time.Minute,
 		supabaseURL: coalesce(*fSupabaseURL, os.Getenv("SUPABASE_URL")),
 		supabaseKey: coalesce(*fSupabaseKey, os.Getenv("SUPABASE_SERVICE_ROLE_KEY")),
 		espnBase:    coalesce(*fESPNBase, os.Getenv("ESPN_SITE_API_BASE")),
@@ -489,7 +497,7 @@ type inspectCandidate struct {
 
 // printInspectDetail prints a diagnostic table for one unresolved match,
 // showing all ESPN events from the fetched date range with time diffs and code comparisons.
-func printInspectDetail(r matchResult, dateEvents map[string][]espn.Event) {
+func printInspectDetail(r matchResult, dateEvents map[string][]espn.Event, window time.Duration) {
 	m := r.dbMatch
 	dbKickoff, err := parseTime(m.KickoffAt)
 	if err != nil {
@@ -523,7 +531,7 @@ func printInspectDetail(r matchResult, dateEvents map[string][]espn.Event) {
 				timeDiff:  absDiff,
 				homeMatch: strings.ToUpper(ev.HomeAbbrev()) == homeCode,
 				awayMatch: strings.ToUpper(ev.AwayAbbrev()) == awayCode,
-				inWindow:  absDiff <= matchWindow,
+				inWindow:  absDiff <= window,
 			})
 		}
 	}

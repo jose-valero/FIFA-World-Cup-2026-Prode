@@ -55,10 +55,13 @@ function InlinePredictionLine({
 }) {
   const home = teamCode(match.homeTeamCode, match.homeTeam);
   const away = teamCode(match.awayTeamCode, match.awayTeam);
-  const isLive = getEffectiveMatchStatus(match) === 'live';
+  // isEffectiveLive: time-based inference, used for display (badge, sort).
+  // isConfirmedLive: DB status = 'live' (ESPN has synced it), used for interactive features (maranita).
+  const isEffectiveLive = getEffectiveMatchStatus(match) === 'live';
+  const isConfirmedLive = match.status === 'live';
 
   const badge =
-    isLive && pred && match.officialHomeScore !== null && match.officialAwayScore !== null
+    isEffectiveLive && pred && match.officialHomeScore !== null && match.officialAwayScore !== null
       ? liveBadgeType(pred, match.officialHomeScore, match.officialAwayScore)
       : null;
 
@@ -78,7 +81,7 @@ function InlinePredictionLine({
           {home} {pred.homeScore}–{pred.awayScore} {away}
         </Typography>
         <TeamFlag teamCode={match.awayTeamCode} teamName={match.awayTeam} size={12} />
-        {isLive ? (
+        {isConfirmedLive ? (
           <MaranitaButton
             total={reaction?.total ?? 0}
             myCount={reaction?.myCount ?? 0}
