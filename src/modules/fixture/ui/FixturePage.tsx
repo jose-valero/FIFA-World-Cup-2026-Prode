@@ -39,6 +39,7 @@ import type { Match } from '../../matches/types/types';
 import { TeamFlag } from '../../../shared/components/TeamFlag';
 import { getStatusLabel } from '../../../shared/utils/getStatusLabel';
 import { getStatusColor } from '../../../shared/utils/getStatusColor';
+import { getEffectiveMatchStatus } from '../../../shared/utils/getEffectiveMatchStatus';
 import { sortMatches } from '../../../shared/utils/sortMatches';
 import type { ClientGroupStandingRow, FixtureViewMode, GroupStageStatusFilter } from '../types/fixture.types';
 import { initialFixtureView } from '../helpers/initialFixtureView';
@@ -58,6 +59,7 @@ function groupStandingsByCode(rows: ClientGroupStandingRow[]) {
 
 function GroupMatchCard({ match }: { match: Match }) {
   const score = scoreLabel(match);
+  const effectiveStatus = getEffectiveMatchStatus(match);
 
   return (
     <Box
@@ -72,9 +74,9 @@ function GroupMatchCard({ match }: { match: Match }) {
       <Stack spacing={1}>
         <Stack direction='row' spacing={1} alignItems='center' flexWrap='wrap' useFlexGap>
           <Chip
-            label={getStatusLabel(match.status)}
+            label={getStatusLabel(effectiveStatus)}
             size='small'
-            color={getStatusColor(match.status)}
+            color={getStatusColor(effectiveStatus)}
             variant='outlined'
           />
           {score ? <Chip label={score} size='small' color='primary' /> : null}

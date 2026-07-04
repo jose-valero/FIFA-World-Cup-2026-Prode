@@ -51,7 +51,7 @@ export function TodayMatchesScroller({ matches }: Props) {
     >
       {sorted.map((match) => {
         const hasScore =
-          match.status !== 'scheduled' && match.officialHomeScore != null && match.officialAwayScore != null;
+          getEffectiveMatchStatus(match) !== 'scheduled' && match.officialHomeScore != null && match.officialAwayScore != null;
 
         const homeLabel = match.homeTeamCode ?? match.homeTeam;
         const awayLabel = match.awayTeamCode ?? match.awayTeam;

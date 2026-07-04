@@ -144,6 +144,13 @@ func ESPNMatches(ctx context.Context, espnClient *espn.Client, supabaseURL, supa
 	for _, m := range rows {
 		result.TotalReviewed++
 
+		// Matches already finished in DB cannot be reverted and need no ESPN lookup.
+		// Classify as unchanged to avoid inflating omission metrics.
+		if m.Status == "finished" {
+			result.TotalUnchanged++
+			continue
+		}
+
 		var ns newState
 
 		ev, found := eventByID[m.ESPNEventID]
