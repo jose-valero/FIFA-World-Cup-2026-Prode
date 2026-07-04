@@ -97,6 +97,10 @@ type patchPayload struct {
 // Matches without espn_event_id are silently ignored.
 // Already-finished matches in the DB are never reverted.
 // A finished transition is only written if ESPN supplies both valid scores.
+//
+// If a match is absent from the scoreboard, the sync falls back to the ESPN
+// summary endpoint (GetEventSummary) so that recently-finished events are
+// never silently omitted just because the scoreboard window missed them.
 func ESPNMatches(ctx context.Context, espnClient *espn.Client, supabaseURL, supabaseKey string, opts Options) (*Result, error) {
 	start := time.Now()
 
@@ -105,8 +109,14 @@ func ESPNMatches(ctx context.Context, espnClient *espn.Client, supabaseURL, supa
 		return nil, fmt.Errorf("fetching matches from Supabase: %w", err)
 	}
 
-	// Collect dates to fetch (UTC date + previous day to cover Americas timezone offset).
+	// Collect dates to fetch.
+	// Always include today and yesterday so live/just-finished matches are covered
+	// regardless of kickoff_at. Then add the kickoff date of each eligible match
+	// (and its previous day) to catch matches from prior days that may still be live.
 	dateSet := map[string]struct{}{}
+	now := time.Now().UTC()
+	dateSet[now.Format("20060102")] = struct{}{}
+	dateSet[now.AddDate(0, 0, -1).Format("20060102")] = struct{}{}
 	for _, m := range rows {
 		t, err := parseTime(m.KickoffAt)
 		if err != nil {
@@ -134,23 +144,54 @@ func ESPNMatches(ctx context.Context, espnClient *espn.Client, supabaseURL, supa
 	for _, m := range rows {
 		result.TotalReviewed++
 
+		var ns newState
+
 		ev, found := eventByID[m.ESPNEventID]
-		if !found {
-			reason := "espn event not found in scoreboard"
-			log.Printf("sync omit match_id=%s espn_event_id=%s db_status=%s reason=%q", m.ID, m.ESPNEventID, m.Status, reason)
-			result.TotalOmitted++
-			result.Omissions = append(result.Omissions, Omission{
-				MatchID:     m.ID,
-				ESPNEventID: m.ESPNEventID,
-				Reason:      reason,
-			})
-			continue
+		if found {
+			log.Printf("sync eval match_id=%s espn_event_id=%s db_status=%s espn_status=%s espn_score=%s-%s [scoreboard]",
+				m.ID, m.ESPNEventID, m.Status, ev.StatusName(), ev.HomeScore(), ev.AwayScore())
+
+			ns = computeNewState(m, ev)
+
+			// For knockout matches transitioning to finished, enrich with regulation
+			// scores and resolution method via ESPN summary (linescores).
+			if ns.OmitReason == "" && ns.Status == "finished" && m.Stage != "group_stage" {
+				if summary, err := espnClient.GetEventSummary(ctx, m.ESPNEventID); err == nil {
+					enrichKnockoutResolution(summary, ev.StatusName(), &ns)
+				} else {
+					log.Printf("sync warn match_id=%s espn_event_id=%s summary fetch failed: %v", m.ID, m.ESPNEventID, err)
+				}
+			}
+		} else {
+			// Scoreboard miss — fall back to the summary endpoint.
+			// ESPN's scoreboard window is narrow for recently-finished events; the
+			// summary endpoint always returns complete data for any event ID.
+			log.Printf("sync scoreboard_miss match_id=%s espn_event_id=%s db_status=%s — trying summary fallback",
+				m.ID, m.ESPNEventID, m.Status)
+
+			summary, err := espnClient.GetEventSummary(ctx, m.ESPNEventID)
+			if err != nil {
+				reason := fmt.Sprintf("not in scoreboard; summary fetch failed: %v", err)
+				log.Printf("sync omit match_id=%s espn_event_id=%s reason=%q", m.ID, m.ESPNEventID, reason)
+				result.TotalOmitted++
+				result.Omissions = append(result.Omissions, Omission{
+					MatchID:     m.ID,
+					ESPNEventID: m.ESPNEventID,
+					Reason:      reason,
+				})
+				continue
+			}
+
+			espnStatus := ""
+			if len(summary.Header.Competitions) > 0 {
+				espnStatus = summary.Header.Competitions[0].Status.Type.Name
+			}
+			log.Printf("sync eval match_id=%s espn_event_id=%s db_status=%s espn_status=%s [summary-fallback]",
+				m.ID, m.ESPNEventID, m.Status, espnStatus)
+
+			ns = computeNewStateFromSummary(m, summary)
 		}
 
-		log.Printf("sync eval match_id=%s espn_event_id=%s db_status=%s espn_status=%s espn_score=%s-%s",
-			m.ID, m.ESPNEventID, m.Status, ev.StatusName(), ev.HomeScore(), ev.AwayScore())
-
-		ns := computeNewState(m, ev)
 		if ns.OmitReason != "" {
 			log.Printf("sync omit match_id=%s espn_event_id=%s reason=%q", m.ID, m.ESPNEventID, ns.OmitReason)
 			result.TotalOmitted++
@@ -160,16 +201,6 @@ func ESPNMatches(ctx context.Context, espnClient *espn.Client, supabaseURL, supa
 				Reason:      ns.OmitReason,
 			})
 			continue
-		}
-
-		// For knockout matches transitioning to finished, enrich with regulation
-		// scores and resolution method via ESPN summary (linescores).
-		if ns.Status == "finished" && m.Stage != "group_stage" {
-			if summary, err := espnClient.GetEventSummary(ctx, m.ESPNEventID); err == nil {
-				enrichKnockoutResolution(summary, ev.StatusName(), &ns)
-			} else {
-				log.Printf("sync warn match_id=%s espn_event_id=%s summary fetch failed: %v", m.ID, m.ESPNEventID, err)
-			}
 		}
 
 		if !stateChanged(m, ns) {
@@ -313,6 +344,96 @@ func computeNewState(m dbMatch, ev espn.Event) newState {
 	return newState{OmitReason: fmt.Sprintf("unhandled status %q", mapped)}
 }
 
+// computeNewStateFromSummary derives the target DB state from an ESPN event summary.
+// Used as a fallback when the match is absent from the scoreboard.
+//
+// For finished knockout matches it also computes regulation scores and
+// knockout_resolution inline (via enrichKnockoutResolution), since the
+// summary linescores are already available.
+//
+// Penalty shootout scores are read from linescores[4] (present only for
+// STATUS_FINAL_PEN), matching the linescore layout:
+//
+//	[0]=1st half  [1]=2nd half  [2]=ET1  [3]=ET2  [4]=penalties
+func computeNewStateFromSummary(m dbMatch, summary *espn.EventSummary) newState {
+	if m.Status == "finished" {
+		return newState{OmitReason: "already finished in DB — not reverting"}
+	}
+	if len(summary.Header.Competitions) == 0 {
+		return newState{OmitReason: "summary has no competitions"}
+	}
+	comp := summary.Header.Competitions[0]
+	espnStatus := comp.Status.Type.Name
+
+	mapped, ok := mapESPNStatus(espnStatus)
+	if !ok {
+		return newState{OmitReason: fmt.Sprintf("unknown ESPN status %q in summary", espnStatus)}
+	}
+
+	var homeScore, awayScore int
+	var homeOK, awayOK bool
+	var homeLs, awayLs []espn.SummaryLinescore
+	for _, c := range comp.Competitors {
+		switch c.HomeAway {
+		case "home":
+			homeScore, homeOK = parseScore(c.Score)
+			homeLs = c.Linescores
+		case "away":
+			awayScore, awayOK = parseScore(c.Score)
+			awayLs = c.Linescores
+		}
+	}
+
+	switch mapped {
+	case "scheduled":
+		return newState{Status: "scheduled"}
+
+	case "live":
+		var hp, ap *int
+		if homeOK {
+			hp = &homeScore
+		}
+		if awayOK {
+			ap = &awayScore
+		}
+		return newState{Status: "live", HomeScore: hp, AwayScore: ap}
+
+	case "finished":
+		if !homeOK || !awayOK {
+			return newState{OmitReason: "summary finished but scores missing"}
+		}
+		// Same STATUS_FULL_TIME guard as the scoreboard path.
+		if espnStatus == "STATUS_FULL_TIME" && m.Stage != "group_stage" && homeScore == awayScore {
+			return newState{Status: "live", HomeScore: &homeScore, AwayScore: &awayScore}
+		}
+
+		ns := newState{Status: "finished", HomeScore: &homeScore, AwayScore: &awayScore}
+
+		// Penalty shootout scores live at linescores[4].
+		if espnStatus == "STATUS_FINAL_PEN" {
+			if len(homeLs) > 4 {
+				if ph, ok := parseScore(homeLs[4].DisplayValue); ok {
+					ns.PenaltyHomeScore = &ph
+				}
+			}
+			if len(awayLs) > 4 {
+				if pa, ok := parseScore(awayLs[4].DisplayValue); ok {
+					ns.PenaltyAwayScore = &pa
+				}
+			}
+		}
+
+		// Compute regulation scores and resolution for knockout matches.
+		if m.Stage != "group_stage" {
+			enrichKnockoutResolution(summary, espnStatus, &ns)
+		}
+
+		return ns
+	}
+
+	return newState{OmitReason: fmt.Sprintf("unhandled mapped status %q", mapped)}
+}
+
 // mapESPNStatus converts an ESPN status name to our DB enum.
 // Returns (status, true) on success, ("", false) for unknown/unsupported statuses.
 func mapESPNStatus(name string) (string, bool) {
@@ -439,16 +560,17 @@ func parseScore(s string) (int, bool) {
 // KnockoutResolution by reading linescores from the ESPN event summary.
 //
 // Linescore layout per competitor (from ESPN summary header.competitions[0].competitors):
-//   period 0: 1st half
-//   period 1: 2nd half
-//   period 2: 1st ET half  (only present if ET occurred)
-//   period 3: 2nd ET half  (only present if ET occurred)
-//   period 4: penalties    (only present for STATUS_FINAL_PEN)
+//
+//	period 0: 1st half
+//	period 1: 2nd half
+//	period 2: 1st ET half  (only present if ET occurred)
+//	period 3: 2nd ET half  (only present if ET occurred)
+//	period 4: penalties    (only present for STATUS_FINAL_PEN)
 //
 // Regulation score = sum of periods 0+1.
-// If len(linescores) >= 3 and espnStatus != STATUS_FINAL_PEN → extra_time.
-// If espnStatus == STATUS_FINAL_PEN → penalties.
-// Otherwise → regulation.
+// If len(linescores) >= 3 and espnStatus != STATUS_FINAL_PEN => extra_time.
+// If espnStatus == STATUS_FINAL_PEN => penalties.
+// Otherwise => regulation.
 func enrichKnockoutResolution(summary *espn.EventSummary, espnStatus string, ns *newState) {
 	if len(summary.Header.Competitions) == 0 {
 		return
