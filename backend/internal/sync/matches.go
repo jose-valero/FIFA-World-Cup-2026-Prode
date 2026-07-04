@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -135,17 +136,23 @@ func ESPNMatches(ctx context.Context, espnClient *espn.Client, supabaseURL, supa
 
 		ev, found := eventByID[m.ESPNEventID]
 		if !found {
+			reason := "espn event not found in scoreboard"
+			log.Printf("sync omit match_id=%s espn_event_id=%s db_status=%s reason=%q", m.ID, m.ESPNEventID, m.Status, reason)
 			result.TotalOmitted++
 			result.Omissions = append(result.Omissions, Omission{
 				MatchID:     m.ID,
 				ESPNEventID: m.ESPNEventID,
-				Reason:      "espn event not found in scoreboard",
+				Reason:      reason,
 			})
 			continue
 		}
 
+		log.Printf("sync eval match_id=%s espn_event_id=%s db_status=%s espn_status=%s espn_score=%s-%s",
+			m.ID, m.ESPNEventID, m.Status, ev.StatusName(), ev.HomeScore(), ev.AwayScore())
+
 		ns := computeNewState(m, ev)
 		if ns.OmitReason != "" {
+			log.Printf("sync omit match_id=%s espn_event_id=%s reason=%q", m.ID, m.ESPNEventID, ns.OmitReason)
 			result.TotalOmitted++
 			result.Omissions = append(result.Omissions, Omission{
 				MatchID:     m.ID,
@@ -160,6 +167,8 @@ func ESPNMatches(ctx context.Context, espnClient *espn.Client, supabaseURL, supa
 		if ns.Status == "finished" && m.Stage != "group_stage" {
 			if summary, err := espnClient.GetEventSummary(ctx, m.ESPNEventID); err == nil {
 				enrichKnockoutResolution(summary, ev.StatusName(), &ns)
+			} else {
+				log.Printf("sync warn match_id=%s espn_event_id=%s summary fetch failed: %v", m.ID, m.ESPNEventID, err)
 			}
 		}
 
@@ -189,6 +198,11 @@ func ESPNMatches(ctx context.Context, espnClient *espn.Client, supabaseURL, supa
 			KnockoutResolution:  ns.KnockoutResolution,
 		}
 
+		log.Printf("sync patch match_id=%s espn_event_id=%s status=%s->%s score=%v/%v->%v/%v resolution=%q",
+			m.ID, m.ESPNEventID, m.Status, ns.Status,
+			m.HomeScore, m.AwayScore, ns.HomeScore, ns.AwayScore,
+			ns.KnockoutResolution)
+
 		if err := patchMatch(ctx, supabaseURL, supabaseKey, m.ID, patchPayload{
 			Status:              ns.Status,
 			HomeScore:           ns.HomeScore,
@@ -199,6 +213,7 @@ func ESPNMatches(ctx context.Context, espnClient *espn.Client, supabaseURL, supa
 			RegulationAwayScore: ns.RegulationAwayScore,
 			KnockoutResolution:  ns.KnockoutResolution,
 		}); err != nil {
+			log.Printf("sync patch_error match_id=%s espn_event_id=%s err=%v", m.ID, m.ESPNEventID, err)
 			result.TotalOmitted++
 			result.Omissions = append(result.Omissions, Omission{
 				MatchID:     m.ID,
@@ -208,6 +223,7 @@ func ESPNMatches(ctx context.Context, espnClient *espn.Client, supabaseURL, supa
 			continue
 		}
 
+		log.Printf("sync patched match_id=%s espn_event_id=%s ok", m.ID, m.ESPNEventID)
 		result.TotalUpdated++
 		result.Changes = append(result.Changes, Change{
 			MatchID:     m.ID,
