@@ -46,6 +46,10 @@ export function LeaderboardPage() {
 
   const isAdmin = Boolean(profile?.is_admin);
   const auditsVisible = settings?.audits_visible ?? false;
+  // canShowFeaturedPrediction: any authenticated user can see the inline prediction
+  // for the single featured match (live or next scheduled). Not admin-gated.
+  const canShowFeaturedPrediction = Boolean(user?.id);
+  // canInspectPredictions: full audit drawer per participant — admin-controlled via audits_visible.
   const canInspectPredictions = Boolean(user?.id && auditsVisible);
 
   const { data: adminOverview = [], isLoading: isAdminOverviewLoading } = useAdminParticipantsOverview(isAdmin);
@@ -114,7 +118,7 @@ export function LeaderboardPage() {
 
   // One query for the featured match prediction data.
   const displayMatchIds = React.useMemo(() => displayMatches.map((m) => m.id), [displayMatches]);
-  const predictionsByMatchId = useAuditPredictionsByMatches(displayMatchIds, canInspectPredictions);
+  const predictionsByMatchId = useAuditPredictionsByMatches(displayMatchIds, canShowFeaturedPrediction);
 
   // Reactions/maranita enabled when the featured match is effectively live.
   const isRelevantMatchLive = relevantMatch != null && getEffectiveMatchStatus(relevantMatch) === 'live';
@@ -286,6 +290,7 @@ export function LeaderboardPage() {
                 avatarMap={participantAvatars}
                 user={user}
                 isAdmin={isAdmin}
+                canShowFeaturedPrediction={canShowFeaturedPrediction}
                 canInspectPredictions={canInspectPredictions}
                 isAdminOverviewLoading={isAdminOverviewLoading}
                 isSetParticipantDisabledPending={isSetParticipantDisabledPending}
@@ -328,6 +333,7 @@ export function LeaderboardPage() {
         onClose={handleCloseParticipantAudit}
         participant={selectedParticipant}
         auditsVisible={auditsVisible}
+        currentUserId={user?.id ?? null}
       />
 
       <Snackbar

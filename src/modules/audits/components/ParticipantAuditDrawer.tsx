@@ -40,6 +40,7 @@ type ParticipantAuditDrawerProps = {
   onClose: () => void;
   participant: LeaderboardRow | null;
   auditsVisible: boolean;
+  currentUserId: string | null;
 };
 
 type PredictionItem = {
@@ -118,7 +119,7 @@ function sortAuditItems(items: PredictionItem[]): PredictionItem[] {
   });
 }
 
-export function ParticipantAuditDrawer({ open, onClose, participant, auditsVisible }: ParticipantAuditDrawerProps) {
+export function ParticipantAuditDrawer({ open, onClose, participant, auditsVisible, currentUserId }: ParticipantAuditDrawerProps) {
   // const theme = useTheme();
   // const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -146,12 +147,18 @@ export function ParticipantAuditDrawer({ open, onClose, participant, auditsVisib
     error: matchesError
   } = useMatches();
 
+  // Always enable the query for the current user's own predictions (own predictions
+  // are always readable per RLS regardless of audits_visible). For other participants,
+  // require auditsVisible so the admin controls when audit data is exposed.
+  const isOwnUser = Boolean(currentUserId && participant?.user_id === currentUserId);
+  const predictionsEnabled = open && (isOwnUser || auditsVisible);
+
   const {
     data: predictionRows = [],
     isLoading: isPredictionsLoading,
     isError: isPredictionsError,
     error: predictionsError
-  } = useAuditPredictionsByUser(participant?.user_id, open && auditsVisible);
+  } = useAuditPredictionsByUser(participant?.user_id, predictionsEnabled);
 
   const isLoading = open && (isMatchesLoading || isPredictionsLoading);
   const isError = isMatchesError || isPredictionsError;
@@ -237,7 +244,7 @@ export function ParticipantAuditDrawer({ open, onClose, participant, auditsVisib
 
         <Divider sx={{ my: 2 }} />
 
-        {!auditsVisible ? (
+        {!predictionsEnabled ? (
           <Alert severity='info'>La auditoría no está disponible en este momento.</Alert>
         ) : isError ? (
           <Alert severity='error'>

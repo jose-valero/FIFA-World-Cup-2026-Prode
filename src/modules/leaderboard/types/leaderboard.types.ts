@@ -27,14 +27,17 @@ export interface LeaderboardTableProps {
   avatarMap: Map<string, string | null>;
   user: User | null;
   isAdmin: boolean;
+  // canShowFeaturedPrediction: show the inline prediction for the featured match (live or next scheduled).
+  // Only requires authentication — not tied to audits_visible.
+  canShowFeaturedPrediction: boolean;
+  // canInspectPredictions: gates the full "Ver pronósticos" audit drawer (admin-controlled via audits_visible).
   canInspectPredictions: boolean;
   isAdminOverviewLoading: boolean;
   isSetParticipantDisabledPending: boolean;
   bottomThreeIds: Set<string>;
-  // displayMatches: all live matches (or [nextScheduled] when none are live).
-  // One InlinePredictionLine block is rendered per entry.
+  // displayMatches: the single featured match (live first, then next scheduled).
   displayMatches: Match[];
-  // predictionsByMatchId: matchId → userId → prediction for each displayMatch.
+  // predictionsByMatchId: matchId → userId → prediction for the featured match.
   predictionsByMatchId: Map<string, Map<string, InlinePrediction>>;
   reactionsByReceiver: Map<string, ReactionSummary>;
   onMaranita: (receiverId: string) => void;

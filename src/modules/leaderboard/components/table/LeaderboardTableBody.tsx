@@ -119,6 +119,7 @@ export const LeaderboardTableBody = ({
   avatarMap,
   user,
   isAdmin,
+  canShowFeaturedPrediction,
   canInspectPredictions,
   isSetParticipantDisabledPending,
   bottomThreeIds,
@@ -136,7 +137,7 @@ export const LeaderboardTableBody = ({
 
   const colSpan = 6 + (canInspectPredictions && !isMobile ? 1 : 0) + (isAdmin ? 1 : 0);
 
-  const showInlinePreds = canInspectPredictions && displayMatches.length > 0;
+  const showInlinePreds = canShowFeaturedPrediction && displayMatches.length > 0;
 
   return (
     <TableBody>
