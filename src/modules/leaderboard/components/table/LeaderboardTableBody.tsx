@@ -20,6 +20,7 @@ import type { InlinePrediction, LeaderboardTableProps, ReactionSummary } from '.
 import type { Match } from '../../../matches/types/types';
 import { TeamFlag } from '../../../../shared/components/TeamFlag';
 import { MaranitaButton } from '../MaranitaButton';
+import { getEffectiveMatchStatus } from '../../../../shared/utils/getEffectiveMatchStatus';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 
 function teamCode(code: string | null, name: string): string {
@@ -54,7 +55,7 @@ function InlinePredictionLine({
 }) {
   const home = teamCode(match.homeTeamCode, match.homeTeam);
   const away = teamCode(match.awayTeamCode, match.awayTeam);
-  const isLive = match.status === 'live';
+  const isLive = getEffectiveMatchStatus(match) === 'live';
 
   const badge =
     isLive && pred && match.officialHomeScore !== null && match.officialAwayScore !== null

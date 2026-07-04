@@ -22,10 +22,11 @@ import { useSetParticipantDisabled } from '../../admin/participants/hooks/useSet
 import { ParticipantAuditDrawer } from '../../audits/components/ParticipantAuditDrawer';
 import { ParticipantProfileDrawer } from '../components/ParticipantProfileDrawer';
 import { useMatches } from '../../matches/hooks/useMatches';
+import { selectFeaturedMatch } from '../../../shared/utils/selectFeaturedMatch';
+import { getEffectiveMatchStatus } from '../../../shared/utils/getEffectiveMatchStatus';
 import { useAuditPredictionsByMatches } from '../../audits/hooks/useAuditPredictionsByMatches';
 import { useReactionsByMatch } from '../hooks/useReactionsByMatch';
 import { useIncrementMaranita } from '../hooks/useIncrementMaranita';
-import type { Match } from '../../matches/types/types';
 // import { PageHeader, type PageHeaderBadge } from '../../../shared/components/PageHeader';
 import { getTopThreeAvatars } from '../api/leaderboard.api';
 import { queryKeys } from '../../../lib/react-query/queryKeys';
@@ -106,38 +107,17 @@ export function LeaderboardPage() {
 
   const { data: matches = [] } = useMatches();
 
-  // All live matches sorted by kickoff.
-  const liveMatches = React.useMemo(
-    () => matches.filter((m) => m.status === 'live').sort((a, b) => a.kickoffAt.localeCompare(b.kickoffAt)),
-    [matches]
-  );
+  // Featured match: live first, then next scheduled. Uses effective status so
+  // a match in progress but not yet synced in DB still shows up as live.
+  const relevantMatch = React.useMemo(() => selectFeaturedMatch(matches), [matches]);
+  const displayMatches = relevantMatch ? [relevantMatch] : [];
 
-  // displayMatches: all matches belonging to the active time slot.
-  // Slot = group of matches whose kickoff is within ±30 min of the anchor.
-  // Priority: live slot first, then next scheduled slot.
-  const displayMatches = React.useMemo(() => {
-    const slotOf = (anchor: Match, pool: Match[]) =>
-      pool.filter(
-        (m) => Math.abs(new Date(m.kickoffAt).getTime() - new Date(anchor.kickoffAt).getTime()) <= 30 * 60 * 1000
-      );
-
-    if (liveMatches.length > 0) return slotOf(liveMatches[0], liveMatches);
-
-    const now = Date.now();
-    const upcoming = matches
-      .filter((m) => m.status === 'scheduled' && new Date(m.kickoffAt).getTime() >= now - 3 * 60 * 60 * 1000)
-      .sort((a, b) => a.kickoffAt.localeCompare(b.kickoffAt));
-    if (upcoming.length === 0) return [];
-    return slotOf(upcoming[0], upcoming);
-  }, [liveMatches, matches]);
-
-  // One query for all displayMatch IDs (live or scheduled).
+  // One query for the featured match prediction data.
   const displayMatchIds = React.useMemo(() => displayMatches.map((m) => m.id), [displayMatches]);
   const predictionsByMatchId = useAuditPredictionsByMatches(displayMatchIds, canInspectPredictions);
 
-  // Reactions/maranita tied to first match of the active slot.
-  const relevantMatch = displayMatches[0] ?? null;
-  const isRelevantMatchLive = relevantMatch?.status === 'live';
+  // Reactions/maranita enabled when the featured match is effectively live.
+  const isRelevantMatchLive = relevantMatch != null && getEffectiveMatchStatus(relevantMatch) === 'live';
 
   const { data: reactionRows = [] } = useReactionsByMatch(
     relevantMatch?.id ?? null,
